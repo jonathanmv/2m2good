@@ -1,0 +1,17 @@
+# Swift Package Manager and compiler output
+.build/
+.swiftpm/
+
+# Xcode-derived and per-user state
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+
+# Local pilot artifacts
+outputs/
+work/
+
+# macOS metadata
+.DS_Store

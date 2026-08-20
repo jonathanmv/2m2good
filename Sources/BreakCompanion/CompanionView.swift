@@ -1,0 +1,257 @@
+import SwiftUI
+
+struct CompanionView: View {
+    @ObservedObject var store: CompanionStore
+    @State private var hovered = false
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: store.mode == .idle ? 28 : 30, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: store.mode == .idle ? 28 : 30, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.3), lineWidth: 0.7)
+                }
+
+            switch store.mode {
+            case .idle:
+                idleView
+            case .checkIn:
+                checkInView
+            case .routine:
+                routineView
+            case .complete:
+                completionView
+            }
+        }
+        .padding(8)
+        .background(Color.clear)
+        .animation(.spring(response: 0.45, dampingFraction: 0.84), value: store.mode)
+    }
+
+    private var idleView: some View {
+        Button(action: store.offerBreakNow) {
+            CompanionOrb(motion: .breathe, warmth: 0.28, active: hovered)
+                .frame(width: 58, height: 58)
+                .padding(10)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+        .help("Break Companion — click for a pause")
+        .accessibilityLabel("Break Companion. Offer a wellbeing break now.")
+    }
+
+    private var checkInView: some View {
+        VStack(spacing: 17) {
+            HStack(spacing: 14) {
+                CompanionOrb(motion: .breathe, warmth: 0.9, active: true)
+                    .frame(width: 62, height: 62)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("A small pause?")
+                        .font(.system(size: 19, weight: .semibold, design: .rounded))
+                    Text(store.routine.invitation)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+
+            if let status = store.statusText {
+                Text(status)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color(red: 0.24, green: 0.42, blue: 0.38))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                VStack(spacing: 10) {
+                    Button("Start  ·  2 min", action: store.startRoutine)
+                        .buttonStyle(PrimaryButtonStyle())
+                    HStack(spacing: 9) {
+                        Button("Later", action: { store.postpone(minutes: 60) })
+                        Button("Tomorrow", action: store.postponeUntilTomorrow)
+                    }
+                    .buttonStyle(QuietButtonStyle())
+                }
+
+                HStack(spacing: 7) {
+                    Image(systemName: store.voice.isListening ? "waveform" : "mic")
+                        .symbolEffect(.variableColor.iterative, isActive: store.voice.isListening)
+                    Text(voiceStatus)
+                        .lineLimit(1)
+                    Spacer()
+                    if !store.voice.isListening {
+                        Button("Try voice", action: store.voice.requestAndListen)
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(25)
+    }
+
+    private var routineView: some View {
+        VStack(spacing: 14) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(store.routine.title)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text(store.currentStep.title)
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                }
+                Spacer()
+                Text(timeString(store.remainingSeconds))
+                    .font(.system(size: 15, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+
+            CompanionOrb(motion: store.currentStep.motion, warmth: 0.84, active: !store.isPaused)
+                .frame(width: 92, height: 92)
+
+            Text(store.currentStep.instruction)
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(minHeight: 39)
+
+            ProgressView(value: store.progress)
+                .tint(Color(red: 0.46, green: 0.67, blue: 0.60))
+
+            HStack(spacing: 10) {
+                Button(store.isPaused ? "Resume" : "Pause", action: store.togglePause)
+                Button("End", action: store.endRoutine)
+            }
+            .buttonStyle(QuietButtonStyle())
+        }
+        .padding(25)
+    }
+
+    private var completionView: some View {
+        VStack(spacing: 16) {
+            CompanionOrb(motion: .breathe, warmth: 0.68, active: true)
+                .frame(width: 76, height: 76)
+            Text("That’s it.")
+                .font(.system(size: 21, weight: .semibold, design: .rounded))
+            Text("Welcome back.")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+            Button("Done", action: store.dismissCompletion)
+                .buttonStyle(PrimaryButtonStyle())
+        }
+        .padding(25)
+    }
+
+    private var voiceStatus: String {
+        if store.voice.isListening {
+            return store.voice.transcript.isEmpty ? "Listening — say start, later, or tomorrow" : "“\(store.voice.transcript)”"
+        }
+        return store.voice.availabilityMessage ?? "Voice-first, with buttons when you need them"
+    }
+
+    private func timeString(_ seconds: Int) -> String {
+        String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+}
+
+private struct CompanionOrb: View {
+    let motion: MotionCue
+    let warmth: Double
+    let active: Bool
+    @State private var animate = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.48 + 0.22 * warmth, green: 0.72, blue: 0.66 - 0.16 * warmth),
+                            Color(red: 0.32 + 0.30 * warmth, green: 0.56 + 0.12 * warmth, blue: 0.65)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: Color.black.opacity(0.12), radius: 11, y: 5)
+
+            HStack(spacing: 9) {
+                Capsule().fill(Color.white.opacity(0.83)).frame(width: 5, height: animate && motion == .blink ? 2 : 9)
+                Capsule().fill(Color.white.opacity(0.83)).frame(width: 5, height: animate && motion == .blink ? 2 : 9)
+            }
+            .offset(y: -2)
+        }
+        .scaleEffect(scale)
+        .rotationEffect(rotation)
+        .offset(x: horizontalOffset, y: verticalOffset)
+        .onAppear { beginAnimation() }
+        .onChange(of: motion) { _, _ in beginAnimation() }
+        .onChange(of: active) { _, _ in beginAnimation() }
+    }
+
+    private var scale: CGFloat {
+        guard active else { return 1 }
+        switch motion {
+        case .breathe: return animate ? 1.08 : 0.94
+        case .rise: return animate ? 1.06 : 0.97
+        default: return 1
+        }
+    }
+
+    private var rotation: Angle {
+        guard active else { return .zero }
+        switch motion {
+        case .roll: return .degrees(animate ? 7 : -7)
+        default: return .zero
+        }
+    }
+
+    private var horizontalOffset: CGFloat {
+        guard active, motion == .sideToSide else { return 0 }
+        return animate ? 9 : -9
+    }
+
+    private var verticalOffset: CGFloat {
+        guard active, motion == .rise else { return 0 }
+        return animate ? -5 : 5
+    }
+
+    private func beginAnimation() {
+        animate = false
+        guard active else { return }
+        let duration = motion == .blink ? 1.8 : 2.5
+        withAnimation(.easeInOut(duration: duration).repeatForever(autoreverses: true)) {
+            animate = true
+        }
+    }
+}
+
+private struct PrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(red: 0.27, green: 0.55, blue: 0.49).opacity(configuration.isPressed ? 0.75 : 1))
+            )
+    }
+}
+
+private struct QuietButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(.primary.opacity(0.76))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.primary.opacity(configuration.isPressed ? 0.10 : 0.055))
+            )
+    }
+}
