@@ -67,3 +67,51 @@ struct BreakRoutine: Identifiable, Equatable {
         )
     ]
 }
+
+enum RoutineSelectionPolicy {
+    static func suggestion(
+        from routines: [BreakRoutine],
+        pendingRoutineID: String?,
+        lastCompletedRoutineID: String?
+    ) -> BreakRoutine? {
+        guard !routines.isEmpty else { return nil }
+
+        if let pendingRoutineID,
+           let pending = routines.first(where: { $0.id == pendingRoutineID }) {
+            return pending
+        }
+
+        if let lastCompletedRoutineID,
+           let completedIndex = routines.firstIndex(where: { $0.id == lastCompletedRoutineID }) {
+            return routines[(completedIndex + 1) % routines.count]
+        }
+
+        return routines[0]
+    }
+}
+
+struct RoutineSelectionStore {
+    private enum Key {
+        static let pendingRoutineID = "routine.pendingID"
+        static let lastCompletedRoutineID = "routine.lastCompletedID"
+    }
+
+    let defaults: UserDefaults
+
+    func suggestion(from routines: [BreakRoutine]) -> BreakRoutine? {
+        let suggestion = RoutineSelectionPolicy.suggestion(
+            from: routines,
+            pendingRoutineID: defaults.string(forKey: Key.pendingRoutineID),
+            lastCompletedRoutineID: defaults.string(forKey: Key.lastCompletedRoutineID)
+        )
+        if let suggestion {
+            defaults.set(suggestion.id, forKey: Key.pendingRoutineID)
+        }
+        return suggestion
+    }
+
+    func markCompleted(_ routine: BreakRoutine) {
+        defaults.set(routine.id, forKey: Key.lastCompletedRoutineID)
+        defaults.removeObject(forKey: Key.pendingRoutineID)
+    }
+}

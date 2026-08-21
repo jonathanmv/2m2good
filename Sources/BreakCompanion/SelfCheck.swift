@@ -36,8 +36,52 @@ enum SelfCheck {
             failures.append("movement past the threshold should become a drag")
         }
 
+        let firstRoutine = BreakRoutine.all[0]
+        let secondRoutine = BreakRoutine.all[1]
+        let lastRoutine = BreakRoutine.all[2]
+        if RoutineSelectionPolicy.suggestion(
+            from: BreakRoutine.all,
+            pendingRoutineID: firstRoutine.id,
+            lastCompletedRoutineID: nil
+        ) != firstRoutine {
+            failures.append("a postponed routine should remain the current suggestion")
+        }
+        if RoutineSelectionPolicy.suggestion(
+            from: BreakRoutine.all,
+            pendingRoutineID: nil,
+            lastCompletedRoutineID: firstRoutine.id
+        ) != secondRoutine {
+            failures.append("a completed routine should advance the next suggestion")
+        }
+        if RoutineSelectionPolicy.suggestion(
+            from: BreakRoutine.all,
+            pendingRoutineID: nil,
+            lastCompletedRoutineID: lastRoutine.id
+        ) != firstRoutine {
+            failures.append("routine suggestions should wrap after the final routine")
+        }
+
+        let suiteName = "local.break-companion.pilot.self-check.\(ProcessInfo.processInfo.processIdentifier)"
+        if let defaults = UserDefaults(suiteName: suiteName) {
+            defaults.removePersistentDomain(forName: suiteName)
+            let firstLaunch = RoutineSelectionStore(defaults: defaults)
+            _ = firstLaunch.suggestion(from: BreakRoutine.all)
+            let restartedWhilePending = RoutineSelectionStore(defaults: defaults)
+            if restartedWhilePending.suggestion(from: BreakRoutine.all) != firstRoutine {
+                failures.append("a pending routine should survive a selection-store restart")
+            }
+            restartedWhilePending.markCompleted(firstRoutine)
+            let restartedAfterCompletion = RoutineSelectionStore(defaults: defaults)
+            if restartedAfterCompletion.suggestion(from: BreakRoutine.all) != secondRoutine {
+                failures.append("completed routine state should survive a selection-store restart")
+            }
+            defaults.removePersistentDomain(forName: suiteName)
+        } else {
+            failures.append("could not create isolated preferences for persistence check")
+        }
+
         if failures.isEmpty {
-            print("Self-check passed: routines, timing, safety language, voice commands, and pointer movement.")
+            print("Self-check passed: routines, timing, safety language, voice commands, pointer movement, and routine selection.")
             return true
         }
 

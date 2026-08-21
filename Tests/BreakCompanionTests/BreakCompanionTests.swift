@@ -43,4 +43,61 @@ final class BreakCompanionTests: XCTestCase {
             "Movement past the threshold should reposition the orb without activating it"
         )
     }
+
+    func testPostponementKeepsThePendingRoutine() {
+        let pending = BreakRoutine.all[1]
+        XCTAssertEqual(
+            RoutineSelectionPolicy.suggestion(
+                from: BreakRoutine.all,
+                pendingRoutineID: pending.id,
+                lastCompletedRoutineID: BreakRoutine.all[0].id
+            ),
+            pending
+        )
+    }
+
+    func testCompletionAdvancesAndWrapsRoutineSelection() {
+        XCTAssertEqual(
+            RoutineSelectionPolicy.suggestion(
+                from: BreakRoutine.all,
+                pendingRoutineID: nil,
+                lastCompletedRoutineID: BreakRoutine.all[0].id
+            ),
+            BreakRoutine.all[1]
+        )
+        XCTAssertEqual(
+            RoutineSelectionPolicy.suggestion(
+                from: BreakRoutine.all,
+                pendingRoutineID: nil,
+                lastCompletedRoutineID: BreakRoutine.all[2].id
+            ),
+            BreakRoutine.all[0]
+        )
+    }
+
+    func testSelectionStorePersistsPendingAndCompletedState() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let firstLaunch = RoutineSelectionStore(defaults: defaults)
+        let firstSuggestion = firstLaunch.suggestion(from: BreakRoutine.all)
+        XCTAssertEqual(firstSuggestion, BreakRoutine.all[0])
+
+        let restartedWhilePending = RoutineSelectionStore(defaults: defaults)
+        XCTAssertEqual(
+            restartedWhilePending.suggestion(from: BreakRoutine.all),
+            BreakRoutine.all[0],
+            "An app restart must not replace a postponed or interrupted suggestion"
+        )
+
+        restartedWhilePending.markCompleted(BreakRoutine.all[0])
+        let restartedAfterCompletion = RoutineSelectionStore(defaults: defaults)
+        XCTAssertEqual(
+            restartedAfterCompletion.suggestion(from: BreakRoutine.all),
+            BreakRoutine.all[1],
+            "An app restart after completion must advance to the next routine"
+        )
+    }
 }

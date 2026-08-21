@@ -23,17 +23,21 @@ final class CompanionStore: ObservableObject {
     private let speaker = GuideSpeaker()
     private let workInterval: TimeInterval
     private let idleThreshold: TimeInterval
+    private let routineSelection: RoutineSelectionStore
     private var accumulatedActiveTime: TimeInterval = 0
     private var scheduledPromptAt: Date?
     private var lastTick = Date()
     private var timer: Timer?
-    private var routineCursor = 0
 
-    init(environment: [String: String] = ProcessInfo.processInfo.environment) {
+    init(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        defaults: UserDefaults = .standard
+    ) {
         let configuredInterval = Double(environment["BREAK_INTERVAL_SECONDS"] ?? "")
         workInterval = max(5, configuredInterval ?? 60 * 60)
         let configuredIdle = Double(environment["BREAK_IDLE_THRESHOLD_SECONDS"] ?? "")
         idleThreshold = max(10, configuredIdle ?? 60)
+        routineSelection = RoutineSelectionStore(defaults: defaults)
         routine = BreakRoutine.all[0]
 
         voice.onCommand = { [weak self] command in
@@ -147,8 +151,8 @@ final class CompanionStore: ObservableObject {
     private func showCheckIn() {
         guard mode == .idle else { return }
         accumulatedActiveTime = 0
-        routine = BreakRoutine.all[routineCursor % BreakRoutine.all.count]
-        routineCursor += 1
+        guard let suggestion = routineSelection.suggestion(from: BreakRoutine.all) else { return }
+        routine = suggestion
         statusText = nil
         mode = .checkIn
         notifySizeChange()
@@ -183,6 +187,7 @@ final class CompanionStore: ObservableObject {
     }
 
     private func finishRoutine() {
+        routineSelection.markCompleted(routine)
         mode = .complete
         accumulatedActiveTime = 0
         scheduledPromptAt = nil
