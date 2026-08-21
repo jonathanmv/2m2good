@@ -97,6 +97,22 @@ final class CompanionStore: ObservableObject {
         if isPaused { speaker.stop() } else { speaker.speak(currentStep.instruction) }
     }
 
+    func nextRoutine() {
+        guard mode == .routine,
+              let next = RandomRoutineSelector.next(
+                from: BreakRoutine.all,
+                currentRoutineID: routine.id
+              ) else { return }
+
+        speaker.stop()
+        routine = next
+        stepIndex = 0
+        elapsedInStep = 0
+        isPaused = false
+        statusText = nil
+        speaker.speak(currentStep.instruction)
+    }
+
     func endRoutine() {
         speaker.stop()
         finishRoutine()
@@ -168,11 +184,11 @@ final class CompanionStore: ObservableObject {
 
     private func handle(_ command: VoiceCommand) {
         guard mode == .checkIn else { return }
-        switch command {
-        case .start: startRoutine()
-        case .later(let minutes): postpone(minutes: minutes)
+        switch CheckInVoiceAction.resolve(command) {
+        case .startRoutine: startRoutine()
+        case .postpone(let minutes): postpone(minutes: minutes)
         case .tomorrow: postponeUntilTomorrow()
-        case .unknown: break
+        case .ignore: break
         }
     }
 

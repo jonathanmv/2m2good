@@ -2,7 +2,13 @@ import SwiftUI
 
 struct CompanionView: View {
     @ObservedObject var store: CompanionStore
+    @ObservedObject private var voice: VoiceService
     @State private var hovered = false
+
+    init(store: CompanionStore) {
+        self.store = store
+        _voice = ObservedObject(wrappedValue: store.voice)
+    }
 
     var body: some View {
         ZStack {
@@ -77,13 +83,13 @@ struct CompanionView: View {
                 }
 
                 HStack(spacing: 7) {
-                    Image(systemName: store.voice.isListening ? "waveform" : "mic")
-                        .symbolEffect(.variableColor.iterative, isActive: store.voice.isListening)
+                    Image(systemName: voice.isListening ? "waveform" : "mic")
+                        .symbolEffect(.variableColor.iterative, isActive: voice.isListening)
                     Text(voiceStatus)
-                        .lineLimit(1)
+                        .lineLimit(2)
                     Spacer()
-                    if !store.voice.isListening {
-                        Button("Try voice", action: store.voice.requestAndListen)
+                    if !voice.isListening {
+                        Button("Try voice", action: voice.requestAndListen)
                             .buttonStyle(.plain)
                             .foregroundStyle(.secondary)
                     }
@@ -125,6 +131,7 @@ struct CompanionView: View {
 
             HStack(spacing: 10) {
                 Button(store.isPaused ? "Resume" : "Pause", action: store.togglePause)
+                Button("Next", action: store.nextRoutine)
                 Button("End", action: store.endRoutine)
             }
             .buttonStyle(QuietButtonStyle())
@@ -148,10 +155,10 @@ struct CompanionView: View {
     }
 
     private var voiceStatus: String {
-        if store.voice.isListening {
-            return store.voice.transcript.isEmpty ? "Listening — say start, later, or tomorrow" : "“\(store.voice.transcript)”"
+        if voice.isListening {
+            return voice.transcript.isEmpty ? "Listening — say start, later, or tomorrow" : "“\(voice.transcript)”"
         }
-        return store.voice.availabilityMessage ?? "Voice-first, with buttons when you need them"
+        return voice.availabilityMessage ?? "Voice-first, with buttons when you need them"
     }
 
     private func timeString(_ seconds: Int) -> String {

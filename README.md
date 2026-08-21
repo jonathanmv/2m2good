@@ -8,8 +8,9 @@ A deliberately small, local macOS break companion. After 60 minutes of active ke
 - Active-use timing that pauses while the Mac is idle.
 - Warm check-ins with **Start**, **Later** (one hour), and **Tomorrow**.
 - Speech recognition for “start,” “later,” “tomorrow,” “in 20 minutes,” or “in two hours.”
-- Three rotating routines: neck + shoulders, eyes + posture, and a standing reset.
-- Every routine is exactly 120 seconds, with spoken guidance, simple motion cues, pause/end controls, and safety wording.
+- Ten rotating desk-friendly routines covering neck, eyes, standing, hands, seated mobility, breathing, feet, jaw, upper back, and side stretching.
+- Every routine is exactly 120 seconds, with spoken guidance, simple motion cues, Pause, Next, End, and safety wording.
+- **Next** immediately starts a different randomly chosen routine from 2:00. The abandoned routine is not recorded as complete; the routine ultimately completed or ended sets the next ordinary check-in in the persisted cycle.
 - All processing uses Apple’s on-device/system frameworks; the app has no network integration or analytics.
 
 ## Build and run
@@ -31,7 +32,7 @@ BREAK_SDK_PATH=/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk ./scripts
 
 ## Permissions
 
-On the first spoken check-in, macOS asks for **Microphone** and **Speech Recognition** access. Both are optional: Start, Later, Tomorrow, Pause, and End always work as buttons. Permissions can be changed later in **System Settings → Privacy & Security**.
+On the first spoken check-in, macOS asks for **Microphone** and **Speech Recognition** access. **Try Voice** shows whether it is requesting permission, listening, or could not understand a command. Both permissions are optional: Start, Later, Tomorrow, Pause, Next, and End always work as buttons. Permissions can be changed later in **System Settings → Privacy & Security**.
 
 The app does not need Accessibility permission. It reads only macOS’s aggregate “time since last keyboard/mouse event,” not the keys pressed or the content of events.
 
@@ -55,4 +56,4 @@ The Swift package and XCTest target are included for use in a standard Xcode too
 
 ## Pilot boundaries
 
-This prototype intentionally does not launch at login, collect wellbeing data, sync, coach, score, or offer a routine library. “Tomorrow” means 24 hours from the response. For a later iteration, that could become a user-selected quiet-hours-aware morning without changing the core state machine.
+This prototype intentionally does not launch at login, collect wellbeing data, sync, coach, score, or expose a browsable routine catalog. “Tomorrow” means 24 hours from the response. For a later iteration, that could become a user-selected quiet-hours-aware morning without changing the core state machine.

@@ -4,8 +4,11 @@ enum SelfCheck {
     static func run() -> Bool {
         var failures: [String] = []
 
-        if BreakRoutine.all.count != 3 {
-            failures.append("expected three routines")
+        if BreakRoutine.all.count != 10 {
+            failures.append("expected ten routines")
+        }
+        if Set(BreakRoutine.all.map(\.id)).count != 10 {
+            failures.append("routine identifiers should be unique")
         }
         for routine in BreakRoutine.all {
             if routine.duration != 120 {
@@ -28,6 +31,9 @@ enum SelfCheck {
         for (phrase, expected) in voiceCases where VoiceCommandParser.parse(phrase) != expected {
             failures.append("voice phrase failed: \(phrase)")
         }
+        if CheckInVoiceAction.resolve(VoiceCommandParser.parse("start")) != .startRoutine {
+            failures.append("recognized start should route to the offered routine")
+        }
 
         if PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 4, y: 0)) != .tap {
             failures.append("movement at the threshold should remain a tap")
@@ -36,9 +42,26 @@ enum SelfCheck {
             failures.append("movement past the threshold should become a drag")
         }
 
+        for current in BreakRoutine.all {
+            let alternatives = BreakRoutine.all.filter { $0.id != current.id }
+            let selectedIDs = Set(alternatives.indices.compactMap { index in
+                RandomRoutineSelector.next(
+                    from: BreakRoutine.all,
+                    currentRoutineID: current.id,
+                    chooseIndex: { _ in index }
+                )?.id
+            })
+            if selectedIDs.contains(current.id) {
+                failures.append("random next repeated the active routine")
+            }
+            if selectedIDs != Set(alternatives.map(\.id)) {
+                failures.append("random next did not cover every alternative routine")
+            }
+        }
+
         let firstRoutine = BreakRoutine.all[0]
         let secondRoutine = BreakRoutine.all[1]
-        let lastRoutine = BreakRoutine.all[2]
+        let lastRoutine = BreakRoutine.all.last!
         if RoutineSelectionPolicy.suggestion(
             from: BreakRoutine.all,
             pendingRoutineID: firstRoutine.id,
@@ -81,7 +104,7 @@ enum SelfCheck {
         }
 
         if failures.isEmpty {
-            print("Self-check passed: routines, timing, safety language, voice commands, pointer movement, and routine selection.")
+            print("Self-check passed: ten routines, timing, safety language, voice command routing, random next, pointer movement, and persisted selection.")
             return true
         }
 
