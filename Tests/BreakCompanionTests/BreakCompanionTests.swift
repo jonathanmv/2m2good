@@ -2,6 +2,48 @@ import XCTest
 @testable import BreakCompanion
 
 final class BreakCompanionTests: XCTestCase {
+    func testBreakProgressAtBeginningMidpointAndNearDue() {
+        let now = Date(timeIntervalSinceReferenceDate: 1_000)
+
+        XCTAssertEqual(BreakProgress.value(activeSeconds: 0, activeInterval: 3_600, scheduledWindow: nil, now: now), 0)
+        XCTAssertEqual(BreakProgress.value(activeSeconds: 1_800, activeInterval: 3_600, scheduledWindow: nil, now: now), 0.5)
+        XCTAssertEqual(BreakProgress.value(activeSeconds: 3_240, activeInterval: 3_600, scheduledWindow: nil, now: now), 0.9)
+        XCTAssertEqual(BreakProgress.value(activeSeconds: 4_000, activeInterval: 3_600, scheduledWindow: nil, now: now), 1)
+    }
+
+    func testBreakProgressUsesScheduledDeferralAndResets() {
+        let start = Date(timeIntervalSinceReferenceDate: 2_000)
+        let deferral = ScheduledCheckInWindow(startedAt: start, dueAt: start.addingTimeInterval(1_200))
+
+        XCTAssertEqual(BreakProgress.value(activeSeconds: 2_700, activeInterval: 3_600, scheduledWindow: nil, now: start), 0.75)
+        XCTAssertEqual(BreakProgress.value(activeSeconds: 0, activeInterval: 3_600, scheduledWindow: deferral, now: start), 0)
+        XCTAssertEqual(BreakProgress.value(activeSeconds: 0, activeInterval: 3_600, scheduledWindow: deferral, now: start.addingTimeInterval(600)), 0.5)
+        XCTAssertEqual(BreakProgress.remainingSeconds(activeSeconds: 0, activeInterval: 3_600, scheduledWindow: deferral, now: start.addingTimeInterval(600)), 600)
+        XCTAssertEqual(BreakProgress.value(activeSeconds: 0, activeInterval: 3_600, scheduledWindow: nil, now: start), 0)
+    }
+
+    func testBreakProgressColorMappingIsCalmAndDeterministic() {
+        XCTAssertEqual(BreakProgress.color(at: 0), OrbProgressColor(red: 0.30, green: 0.68, blue: 0.52))
+        XCTAssertEqual(BreakProgress.color(at: 0.5), OrbProgressColor(red: 0.88, green: 0.58, blue: 0.28))
+
+        let nearDue = BreakProgress.color(at: 0.9)
+        XCTAssertEqual(nearDue.red, 0.80, accuracy: 0.000_001)
+        XCTAssertEqual(nearDue.green, 0.388, accuracy: 0.000_001)
+        XCTAssertEqual(nearDue.blue, 0.312, accuracy: 0.000_001)
+        XCTAssertEqual(BreakProgress.color(at: 1), OrbProgressColor(red: 0.78, green: 0.34, blue: 0.32))
+    }
+
+    func testBreakProgressAccessibilityDoesNotDependOnColor() {
+        XCTAssertEqual(
+            BreakProgress.accessibilityValue(progress: 0.5, remainingSeconds: 1_800),
+            "Next break in about 30 minutes. 50 percent of the interval has elapsed."
+        )
+        XCTAssertEqual(
+            BreakProgress.accessibilityValue(progress: 1, remainingSeconds: 0),
+            "Next break is due now. 100 percent of the interval has elapsed."
+        )
+    }
+
     func testEveryRoutineIsExactlyTwoMinutes() {
         XCTAssertEqual(BreakRoutine.all.count, 10)
         XCTAssertEqual(Set(BreakRoutine.all.map(\.id)).count, 10)

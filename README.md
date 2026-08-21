@@ -58,3 +58,5 @@ The Swift package and XCTest target are included for use in a standard Xcode too
 ## Pilot boundaries
 
 This prototype intentionally does not launch at login, collect wellbeing data, sync, coach, score, or expose a browsable routine catalog. “Tomorrow” means 24 hours from the response. For a later iteration, that could become a user-selected quiet-hours-aware morning without changing the core state machine.
+
+A quiet idle orb shifts from soft green through muted orange to calm red as the next check-in approaches. The same timing is available to VoiceOver as remaining time and interval progress, so color is never the only signal.

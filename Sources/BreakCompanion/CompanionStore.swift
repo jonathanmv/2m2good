@@ -16,6 +16,8 @@ final class CompanionStore: ObservableObject {
     @Published private(set) var elapsedInStep = 0
     @Published private(set) var isPaused = false
     @Published private(set) var statusText: String?
+    @Published private(set) var checkInProgress: Double = 0
+    @Published private(set) var nextCheckInRemainingSeconds: TimeInterval = 0
 
     let voice = VoiceService()
     var onSizeChange: ((Mode) -> Void)?
@@ -25,7 +27,7 @@ final class CompanionStore: ObservableObject {
     private let idleThreshold: TimeInterval
     private let routineSelection: RoutineSelectionStore
     private var accumulatedActiveTime: TimeInterval = 0
-    private var scheduledPromptAt: Date?
+    private var scheduledCheckIn: ScheduledCheckInWindow?
     private var lastTick = Date()
     private var timer: Timer?
 
@@ -39,6 +41,7 @@ final class CompanionStore: ObservableObject {
         idleThreshold = max(10, configuredIdle ?? 60)
         routineSelection = RoutineSelectionStore(defaults: defaults)
         routine = BreakRoutine.all[0]
+        nextCheckInRemainingSeconds = workInterval
 
         voice.onCommand = { [weak self] command in
             self?.handle(command)
@@ -61,6 +64,13 @@ final class CompanionStore: ObservableObject {
         Double(routine.duration - remainingSeconds) / Double(routine.duration)
     }
 
+    var checkInAccessibilityValue: String {
+        BreakProgress.accessibilityValue(
+            progress: checkInProgress,
+            remainingSeconds: nextCheckInRemainingSeconds
+        )
+    }
+
     func offerBreakNow() {
         showCheckIn()
     }
@@ -78,16 +88,25 @@ final class CompanionStore: ObservableObject {
 
     func postpone(minutes: Int) {
         voice.stopListening()
-        scheduledPromptAt = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        let now = Date()
+        scheduledCheckIn = ScheduledCheckInWindow(
+            startedAt: now,
+            dueAt: now.addingTimeInterval(TimeInterval(minutes * 60))
+        )
         accumulatedActiveTime = 0
+        updateCheckInProgress(at: now)
         statusText = minutes == 60 ? "I’ll check back in an hour." : "I’ll check back in \(minutes) minutes."
         returnToIdle(after: 1.5)
     }
 
     func postponeUntilTomorrow() {
         voice.stopListening()
-        scheduledPromptAt = Calendar.current.date(byAdding: .day, value: 1, to: Date())
+        let now = Date()
+        let dueAt = Calendar.current.date(byAdding: .day, value: 1, to: now)
+            ?? now.addingTimeInterval(24 * 60 * 60)
+        scheduledCheckIn = ScheduledCheckInWindow(startedAt: now, dueAt: dueAt)
         accumulatedActiveTime = 0
+        updateCheckInProgress(at: now)
         statusText = "See you tomorrow."
         returnToIdle(after: 1.5)
     }
@@ -142,17 +161,21 @@ final class CompanionStore: ObservableObject {
             return
         }
 
-        guard mode == .idle, userIsActive else { return }
+        guard mode == .idle else { return }
 
-        if let scheduledPromptAt {
-            if now >= scheduledPromptAt {
-                self.scheduledPromptAt = nil
+        if let scheduledCheckIn {
+            updateCheckInProgress(at: now)
+            guard userIsActive else { return }
+            if now >= scheduledCheckIn.dueAt {
+                self.scheduledCheckIn = nil
                 showCheckIn()
             }
             return
         }
 
+        guard userIsActive else { return }
         accumulatedActiveTime += delta
+        updateCheckInProgress(at: now)
         if accumulatedActiveTime >= workInterval {
             showCheckIn()
         }
@@ -206,7 +229,8 @@ final class CompanionStore: ObservableObject {
         routineSelection.markCompleted(routine)
         mode = .complete
         accumulatedActiveTime = 0
-        scheduledPromptAt = nil
+        scheduledCheckIn = nil
+        updateCheckInProgress(at: Date())
         statusText = nil
         speaker.speak("That’s it. Welcome back.")
         notifySizeChange()
@@ -224,5 +248,20 @@ final class CompanionStore: ObservableObject {
 
     private func notifySizeChange() {
         onSizeChange?(mode)
+    }
+
+    private func updateCheckInProgress(at now: Date) {
+        checkInProgress = BreakProgress.value(
+            activeSeconds: accumulatedActiveTime,
+            activeInterval: workInterval,
+            scheduledWindow: scheduledCheckIn,
+            now: now
+        )
+        nextCheckInRemainingSeconds = BreakProgress.remainingSeconds(
+            activeSeconds: accumulatedActiveTime,
+            activeInterval: workInterval,
+            scheduledWindow: scheduledCheckIn,
+            now: now
+        )
     }
 }

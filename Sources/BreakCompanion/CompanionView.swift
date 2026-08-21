@@ -36,7 +36,12 @@ struct CompanionView: View {
     }
 
     private var idleView: some View {
-        CompanionOrb(motion: .breathe, warmth: 0.28, active: hovered)
+        CompanionOrb(
+            motion: .breathe,
+            warmth: 0.28,
+            active: hovered,
+            progressColor: BreakProgress.color(at: store.checkInProgress)
+        )
             .frame(width: 58, height: 58)
             .padding(10)
             .overlay {
@@ -46,6 +51,7 @@ struct CompanionView: View {
         .help("Break Companion — click for a pause")
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Break Companion. Offer a wellbeing break now.")
+        .accessibilityValue(store.checkInAccessibilityValue)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { store.offerBreakNow() }
     }
@@ -170,6 +176,7 @@ private struct CompanionOrb: View {
     let motion: MotionCue
     let warmth: Double
     let active: Bool
+    var progressColor: OrbProgressColor? = nil
     @State private var animate = false
 
     var body: some View {
@@ -177,10 +184,7 @@ private struct CompanionOrb: View {
             Circle()
                 .fill(
                     LinearGradient(
-                        colors: [
-                            Color(red: 0.48 + 0.22 * warmth, green: 0.72, blue: 0.66 - 0.16 * warmth),
-                            Color(red: 0.32 + 0.30 * warmth, green: 0.56 + 0.12 * warmth, blue: 0.65)
-                        ],
+                        colors: gradientColors,
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -199,6 +203,29 @@ private struct CompanionOrb: View {
         .onAppear { beginAnimation() }
         .onChange(of: motion) { _, _ in beginAnimation() }
         .onChange(of: active) { _, _ in beginAnimation() }
+        .animation(.linear(duration: 1), value: progressColor)
+    }
+
+    private var gradientColors: [Color] {
+        guard let progressColor else {
+            return [
+                Color(red: 0.48 + 0.22 * warmth, green: 0.72, blue: 0.66 - 0.16 * warmth),
+                Color(red: 0.32 + 0.30 * warmth, green: 0.56 + 0.12 * warmth, blue: 0.65)
+            ]
+        }
+
+        return [
+            Color(
+                red: min(1, progressColor.red + 0.08),
+                green: min(1, progressColor.green + 0.07),
+                blue: min(1, progressColor.blue + 0.06)
+            ),
+            Color(
+                red: progressColor.red * 0.82,
+                green: progressColor.green * 0.82,
+                blue: progressColor.blue * 0.82
+            )
+        ]
     }
 
     private var scale: CGFloat {

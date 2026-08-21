@@ -4,6 +4,46 @@ enum SelfCheck {
     static func run() -> Bool {
         var failures: [String] = []
 
+        let progressNow = Date(timeIntervalSinceReferenceDate: 1_000)
+        let deferral = ScheduledCheckInWindow(
+            startedAt: progressNow,
+            dueAt: progressNow.addingTimeInterval(1_200)
+        )
+        let progressCases: [(TimeInterval, Double)] = [(0, 0), (1_800, 0.5), (3_240, 0.9)]
+        for (activeSeconds, expected) in progressCases where BreakProgress.value(
+            activeSeconds: activeSeconds,
+            activeInterval: 3_600,
+            scheduledWindow: nil,
+            now: progressNow
+        ) != expected {
+            failures.append("active-use progress failed at \(expected)")
+        }
+        if BreakProgress.value(
+            activeSeconds: 2_700,
+            activeInterval: 3_600,
+            scheduledWindow: deferral,
+            now: progressNow
+        ) != 0 {
+            failures.append("a deferral should reset visible progress")
+        }
+        if BreakProgress.value(
+            activeSeconds: 0,
+            activeInterval: 3_600,
+            scheduledWindow: deferral,
+            now: progressNow.addingTimeInterval(600)
+        ) != 0.5 {
+            failures.append("deferred progress should use its scheduled window")
+        }
+        if BreakProgress.color(at: 0) != OrbProgressColor(red: 0.30, green: 0.68, blue: 0.52)
+            || BreakProgress.color(at: 0.5) != OrbProgressColor(red: 0.88, green: 0.58, blue: 0.28)
+            || BreakProgress.color(at: 1) != OrbProgressColor(red: 0.78, green: 0.34, blue: 0.32) {
+            failures.append("orb color anchors should be green, orange, and muted red")
+        }
+        if BreakProgress.accessibilityValue(progress: 0.5, remainingSeconds: 1_800)
+            != "Next break in about 30 minutes. 50 percent of the interval has elapsed." {
+            failures.append("progress should have a non-color accessibility value")
+        }
+
         if BreakRoutine.all.count != 10 {
             failures.append("expected ten routines")
         }
@@ -143,7 +183,7 @@ enum SelfCheck {
         }
 
         if failures.isEmpty {
-            print("Self-check passed: ten routines, focus taxonomy, balanced history, safe fallback, random next, voice routing, pointer movement, and persistence.")
+            print("Self-check passed: progress color and accessibility, ten routines, focus taxonomy, balanced history, safe fallback, random next, voice routing, pointer movement, and persistence.")
             return true
         }
 
