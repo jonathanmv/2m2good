@@ -156,6 +156,7 @@ struct CompanionView: View {
                 .foregroundStyle(.secondary)
             Button("Done", action: store.dismissCompletion)
                 .buttonStyle(PrimaryButtonStyle())
+                .keyboardShortcut(.defaultAction)
         }
         .padding(25)
     }

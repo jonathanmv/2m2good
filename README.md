@@ -7,12 +7,13 @@ A deliberately small, local macOS break companion. After 60 minutes of active ke
 - A small floating orb plus a menu-bar fallback; no dashboard, history, streaks, or account.
 - Active-use timing that pauses while the Mac is idle.
 - Warm check-ins with **Start**, **Later** (one hour), and **Tomorrow**.
-- Speech recognition for “start,” “later,” “tomorrow,” “in 20 minutes,” or “in two hours.”
-- Ten rotating desk-friendly routines covering neck, eyes, standing, hands, seated mobility, breathing, feet, jaw, upper back, and side stretching.
-- Normal check-ins quietly favor movement-focus areas that have appeared less often in the last six completed breaks, without exposing scores or body data in the interface.
-- Every routine is exactly 120 seconds, with spoken guidance, simple motion cues, Pause, Next, End, and safety wording.
-- **Next** immediately starts a different randomly chosen routine from 2:00. The abandoned routine is not recorded as complete; only the routine ultimately completed or ended enters the local history used for future check-ins.
-- Selection history is limited to six routine identifiers in local macOS preferences. All processing uses Apple’s on-device/system frameworks; the app has no network integration or analytics.
+- Speech recognition for natural affirmatives such as “yeah,” “yes,” “yep,” “let’s do it,” and “let’s go,” plus “start,” “later,” “tomorrow,” “in 20 minutes,” or “in two hours.”
+- A library of 24 gentle, standing-compatible desk-break movements. Each offered session combines six different 20-second movements into a fresh two-minute reset.
+- Normal check-ins quietly favor conservative movement-focus areas that have appeared less often in recently completed sessions, without exposing scores or body data in the interface.
+- Every session is exactly 120 seconds, with a gentle standing invitation, spoken guidance, simple motion cues, Pause, Next, End, and safety wording.
+- **Next** immediately composes a new session from 2:00 and avoids every move in the current session. Moves are recorded when shown, so skipped and switched sessions also reduce near-term repetition.
+- The Done screen closes itself after about 10 seconds; Return or Enter closes it immediately.
+- Selection state is bounded to 18 recently shown and 24 recently completed movement identifiers in local macOS preferences. Older routine history is migrated into conservative move-focus history once. All processing uses Apple’s on-device/system frameworks; the app has no network integration or analytics.
 
 ## Build and run
 

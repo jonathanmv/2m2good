@@ -12,7 +12,8 @@ enum VoiceCommand: Equatable {
 
 enum VoiceCommandParser {
     static func parse(_ rawText: String) -> VoiceCommand {
-        let text = rawText.lowercased()
+        let text = normalized(rawText)
+        let words = Set(text.split(separator: " ").map(String.init))
 
         if text.contains("tomorrow") { return .tomorrow }
 
@@ -28,11 +29,28 @@ enum VoiceCommandParser {
             return .later(minutes: 60)
         }
 
-        if text.contains("start") || text.contains("yes") || text.contains("okay") || text.contains("ready") {
+        let affirmativeWords: Set<String> = [
+            "start", "yes", "yeah", "yea", "yep", "okay", "ok", "ready", "sure"
+        ]
+        let affirmativePhrases = [
+            "lets do it", "let us do it", "lets go", "go ahead", "sounds good"
+        ]
+        if !words.isDisjoint(with: affirmativeWords)
+            || affirmativePhrases.contains(where: text.contains) {
             return .start
         }
 
         return .unknown
+    }
+
+    private static func normalized(_ rawText: String) -> String {
+        rawText
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .replacingOccurrences(of: "’", with: "")
+            .replacingOccurrences(of: "'", with: "")
+            .replacingOccurrences(of: #"[^a-z0-9-]+"#, with: " ", options: .regularExpression)
+            .split(separator: " ")
+            .joined(separator: " ")
     }
 
     private static func firstNumber(in text: String) -> Int? {

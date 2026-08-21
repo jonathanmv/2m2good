@@ -25,11 +25,13 @@ final class CompanionStore: ObservableObject {
     private let speaker = GuideSpeaker()
     private let workInterval: TimeInterval
     private let idleThreshold: TimeInterval
-    private let routineSelection: RoutineSelectionStore
+    private let sessionSelection: SessionSelectionStore
     private var accumulatedActiveTime: TimeInterval = 0
     private var scheduledCheckIn: ScheduledCheckInWindow?
     private var lastTick = Date()
     private var timer: Timer?
+    private var completionDismissTask: Task<Void, Never>?
+    private var completionDismissalState = CompletionDismissalState()
 
     init(
         environment: [String: String] = ProcessInfo.processInfo.environment,
@@ -39,8 +41,8 @@ final class CompanionStore: ObservableObject {
         workInterval = max(5, configuredInterval ?? 60 * 60)
         let configuredIdle = Double(environment["BREAK_IDLE_THRESHOLD_SECONDS"] ?? "")
         idleThreshold = max(10, configuredIdle ?? 60)
-        routineSelection = RoutineSelectionStore(defaults: defaults)
-        routine = BreakRoutine.all[0]
+        sessionSelection = SessionSelectionStore(defaults: defaults)
+        routine = BreakRoutine.fallback
         nextCheckInRemainingSeconds = workInterval
 
         voice.onCommand = { [weak self] command in
@@ -51,6 +53,7 @@ final class CompanionStore: ObservableObject {
 
     deinit {
         timer?.invalidate()
+        completionDismissTask?.cancel()
     }
 
     var currentStep: RoutineStep { routine.steps[stepIndex] }
@@ -76,6 +79,7 @@ final class CompanionStore: ObservableObject {
     }
 
     func startRoutine() {
+        cancelCompletionAutoDismiss()
         voice.stopListening()
         mode = .routine
         stepIndex = 0
@@ -118,9 +122,9 @@ final class CompanionStore: ObservableObject {
 
     func nextRoutine() {
         guard mode == .routine,
-              let next = RandomRoutineSelector.next(
-                from: BreakRoutine.all,
-                currentRoutineID: routine.id
+              let next = sessionSelection.nextSession(
+                after: routine,
+                from: MoveLibrary.all
               ) else { return }
 
         speaker.stop()
@@ -134,12 +138,27 @@ final class CompanionStore: ObservableObject {
 
     func endRoutine() {
         speaker.stop()
-        finishRoutine()
+        finishRoutine(countAsCompleted: false)
     }
 
     func dismissCompletion() {
+        guard mode == .complete else { return }
+        cancelCompletionAutoDismiss()
         mode = .idle
         notifySizeChange()
+    }
+
+    @discardableResult
+    func handleCompletionKey(characters: String?, keyCode: UInt16) -> Bool {
+        guard CompletionDismissalPolicy.shouldDismiss(
+            isCompletionVisible: mode == .complete,
+            characters: characters,
+            keyCode: keyCode
+        ) else {
+            return false
+        }
+        dismissCompletion()
+        return true
     }
 
     private func startClock() {
@@ -189,8 +208,9 @@ final class CompanionStore: ObservableObject {
 
     private func showCheckIn() {
         guard mode == .idle else { return }
+        cancelCompletionAutoDismiss()
         accumulatedActiveTime = 0
-        guard let suggestion = routineSelection.suggestion(from: BreakRoutine.all) else { return }
+        guard let suggestion = sessionSelection.suggestion(from: MoveLibrary.all) else { return }
         routine = suggestion
         statusText = nil
         mode = .checkIn
@@ -221,19 +241,45 @@ final class CompanionStore: ObservableObject {
             elapsedInStep = 0
             speaker.speak(currentStep.instruction)
         } else {
-            finishRoutine()
+            finishRoutine(countAsCompleted: true)
         }
     }
 
-    private func finishRoutine() {
-        routineSelection.markCompleted(routine)
+    private func finishRoutine(countAsCompleted: Bool) {
+        if countAsCompleted {
+            sessionSelection.markCompleted(routine)
+        } else {
+            sessionSelection.clearPendingSession()
+        }
         mode = .complete
         accumulatedActiveTime = 0
         scheduledCheckIn = nil
         updateCheckInProgress(at: Date())
         statusText = nil
         speaker.speak("That’s it. Welcome back.")
+        scheduleCompletionAutoDismiss()
         notifySizeChange()
+    }
+
+    private func scheduleCompletionAutoDismiss() {
+        completionDismissTask?.cancel()
+        let token = completionDismissalState.begin()
+        completionDismissTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(CompletionDismissalState.delaySeconds))
+            guard !Task.isCancelled,
+                  let self,
+                  self.mode == .complete,
+                  self.completionDismissalState.isCurrent(token) else {
+                return
+            }
+            self.dismissCompletion()
+        }
+    }
+
+    private func cancelCompletionAutoDismiss() {
+        completionDismissTask?.cancel()
+        completionDismissTask = nil
+        completionDismissalState.cancel()
     }
 
     private func returnToIdle(after seconds: TimeInterval) {

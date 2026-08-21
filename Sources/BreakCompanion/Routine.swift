@@ -1,13 +1,5 @@
 import Foundation
 
-struct RoutineStep: Identifiable, Equatable {
-    let id = UUID()
-    let title: String
-    let instruction: String
-    let duration: Int
-    let motion: MotionCue
-}
-
 enum MotionCue: Equatable {
     case breathe
     case sideToSide
@@ -28,6 +20,220 @@ enum BodyFocus: String, CaseIterable, Hashable {
     case eyesFace
 }
 
+struct BreakMove: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let instruction: String
+    let focuses: Set<BodyFocus>
+    let motion: MotionCue
+    let supportsStanding: Bool
+}
+
+enum MoveLibrary {
+    static let all: [BreakMove] = [
+        .init(
+            id: "shoulder-rolls",
+            title: "Shoulder rolls",
+            instruction: "Circle your shoulders slowly back, then let the circles become smaller.",
+            focuses: [.neckShoulders, .upperBackPosture],
+            motion: .roll,
+            supportsStanding: true
+        ),
+        .init(
+            id: "neck-turns",
+            title: "Easy neck turns",
+            instruction: "Turn your head a little right, return to center, then a little left. Keep it comfortable.",
+            focuses: [.neckShoulders],
+            motion: .sideToSide,
+            supportsStanding: true
+        ),
+        .init(
+            id: "overhead-reach",
+            title: "Overhead reach",
+            instruction: "If comfortable, float both arms upward. Lower them before your shoulders work hard.",
+            focuses: [.chestSideBody, .upperBackPosture],
+            motion: .rise,
+            supportsStanding: true
+        ),
+        .init(
+            id: "side-reach",
+            title: "Side reach",
+            instruction: "Reach one arm up and lean slightly away. Return through center and change sides.",
+            focuses: [.chestSideBody, .trunkMobility],
+            motion: .sideToSide,
+            supportsStanding: true
+        ),
+        .init(
+            id: "weight-shifts",
+            title: "Weight shifts",
+            instruction: "With support nearby if useful, shift your weight slowly from one foot to the other.",
+            focuses: [.lowerLegsFeetAnkles, .breathRelaxation],
+            motion: .sideToSide,
+            supportsStanding: true
+        ),
+        .init(
+            id: "calf-raises",
+            title: "Calf raises",
+            instruction: "Holding support if helpful, lift your heels a little, lower slowly, and repeat easily.",
+            focuses: [.lowerLegsFeetAnkles],
+            motion: .rise,
+            supportsStanding: true
+        ),
+        .init(
+            id: "light-march",
+            title: "Light march",
+            instruction: "March gently in place with low steps. Keep the pace easy and the floor quiet.",
+            focuses: [.lowerLegsFeetAnkles, .breathRelaxation],
+            motion: .rise,
+            supportsStanding: true
+        ),
+        .init(
+            id: "ankle-circles",
+            title: "Ankle circles",
+            instruction: "Use support, lighten one foot, and draw small ankle circles. Change feet halfway.",
+            focuses: [.lowerLegsFeetAnkles],
+            motion: .roll,
+            supportsStanding: true
+        ),
+        .init(
+            id: "upper-back-open",
+            title: "Upper-back opening",
+            instruction: "Reach your hands forward and let your upper back widen, then release the reach.",
+            focuses: [.upperBackPosture, .neckShoulders],
+            motion: .breathe,
+            supportsStanding: true
+        ),
+        .init(
+            id: "hand-shake",
+            title: "Hand shake",
+            instruction: "Let your arms hang and gently shake out your hands. Keep your shoulders loose.",
+            focuses: [.handsWristsForearms, .neckShoulders],
+            motion: .sideToSide,
+            supportsStanding: true
+        ),
+        .init(
+            id: "easy-breath",
+            title: "Easy breath",
+            instruction: "Let one comfortable breath arrive and leave without making it bigger.",
+            focuses: [.breathRelaxation],
+            motion: .breathe,
+            supportsStanding: true
+        ),
+        .init(
+            id: "far-gaze",
+            title: "Far gaze",
+            instruction: "Let your eyes leave the screen and rest softly on something farther away.",
+            focuses: [.eyesFace, .upperBackPosture],
+            motion: .still,
+            supportsStanding: true
+        ),
+        .init(
+            id: "heel-toe-rock",
+            title: "Heel-to-toe rock",
+            instruction: "With support if useful, rock gently toward your toes and back toward your heels.",
+            focuses: [.lowerLegsFeetAnkles],
+            motion: .sideToSide,
+            supportsStanding: true
+        ),
+        .init(
+            id: "chest-open",
+            title: "Chest opening",
+            instruction: "Let your arms open comfortably to the sides, then bring them forward again.",
+            focuses: [.chestSideBody, .upperBackPosture],
+            motion: .breathe,
+            supportsStanding: true
+        ),
+        .init(
+            id: "standing-twist",
+            title: "Standing turn",
+            instruction: "Keep your hips easy and turn your ribs a little right, then a little left.",
+            focuses: [.trunkMobility, .upperBackPosture],
+            motion: .sideToSide,
+            supportsStanding: true
+        ),
+        .init(
+            id: "elbow-circles",
+            title: "Elbow circles",
+            instruction: "Touch your fingertips lightly to your shoulders and draw small elbow circles.",
+            focuses: [.neckShoulders, .upperBackPosture],
+            motion: .roll,
+            supportsStanding: true
+        ),
+        .init(
+            id: "wrist-circles",
+            title: "Wrist circles",
+            instruction: "Make small easy circles with both wrists, then change direction.",
+            focuses: [.handsWristsForearms],
+            motion: .roll,
+            supportsStanding: true
+        ),
+        .init(
+            id: "finger-fan",
+            title: "Finger fan",
+            instruction: "Open your fingers comfortably, soften them, and repeat without forcing the stretch.",
+            focuses: [.handsWristsForearms],
+            motion: .blink,
+            supportsStanding: true
+        ),
+        .init(
+            id: "jaw-soften",
+            title: "Jaw soften",
+            instruction: "Let your teeth part slightly and allow your jaw and tongue to feel unforced.",
+            focuses: [.eyesFace, .breathRelaxation],
+            motion: .still,
+            supportsStanding: true
+        ),
+        .init(
+            id: "slow-blinks",
+            title: "Slow blinks",
+            instruction: "Blink slowly a few times, then let your gaze stay wide and soft.",
+            focuses: [.eyesFace, .breathRelaxation],
+            motion: .blink,
+            supportsStanding: true
+        ),
+        .init(
+            id: "soft-knees",
+            title: "Soften the knees",
+            instruction: "Unlock your knees slightly, grow tall without stiffening, then soften again.",
+            focuses: [.lowerLegsFeetAnkles, .upperBackPosture],
+            motion: .rise,
+            supportsStanding: true
+        ),
+        .init(
+            id: "hip-shifts",
+            title: "Easy hip shifts",
+            instruction: "Shift your hips a small amount right and left while your feet stay grounded.",
+            focuses: [.trunkMobility, .lowerLegsFeetAnkles],
+            motion: .sideToSide,
+            supportsStanding: true
+        ),
+        .init(
+            id: "arm-sweep",
+            title: "Arm sweep",
+            instruction: "Sweep your arms forward and gently out to the sides, staying below any strain.",
+            focuses: [.chestSideBody, .upperBackPosture],
+            motion: .breathe,
+            supportsStanding: true
+        ),
+        .init(
+            id: "reach-and-release",
+            title: "Reach and release",
+            instruction: "Reach both hands forward without rounding hard, then let your arms fall loose.",
+            focuses: [.upperBackPosture, .handsWristsForearms],
+            motion: .rise,
+            supportsStanding: true
+        )
+    ]
+}
+
+struct RoutineStep: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let instruction: String
+    let duration: Int
+    let motion: MotionCue
+}
+
 struct BreakRoutine: Identifiable, Equatable {
     let id: String
     let title: String
@@ -36,302 +242,269 @@ struct BreakRoutine: Identifiable, Equatable {
     let steps: [RoutineStep]
 
     var duration: Int { steps.reduce(0) { $0 + $1.duration } }
+    var moveIDs: [String] { steps.map(\.id) }
 
-    static let all: [BreakRoutine] = [
-        BreakRoutine(
-            id: "neck-shoulders",
-            title: "Neck + shoulders",
-            invitation: "A gentle reset for your neck and shoulders?",
-            focuses: [.neckShoulders, .upperBackPosture, .breathRelaxation],
-            steps: [
-                .init(title: "Arrive", instruction: "Sit comfortably. Let your hands rest. Move gently, and stop if anything hurts.", duration: 15, motion: .breathe),
-                .init(title: "Shoulder circles", instruction: "Slowly circle your shoulders back. Keep the movement easy.", duration: 20, motion: .roll),
-                .init(title: "Side release", instruction: "Let one ear drift toward one shoulder. Return to center, then change sides.", duration: 25, motion: .sideToSide),
-                .init(title: "Open", instruction: "Draw your shoulder blades softly together, then release.", duration: 25, motion: .breathe),
-                .init(title: "Soften", instruction: "Let your chin float slightly down. Keep the back of your neck long.", duration: 20, motion: .still),
-                .init(title: "One breath", instruction: "Take one unhurried breath, and let your shoulders settle.", duration: 15, motion: .breathe)
-            ]
-        ),
-        BreakRoutine(
-            id: "eyes-posture",
-            title: "Eyes + posture",
-            invitation: "How about two quiet minutes for your eyes and posture?",
-            focuses: [.eyesFace, .upperBackPosture, .neckShoulders],
-            steps: [
-                .init(title: "Look away", instruction: "Let your eyes leave the screen. Move gently, and stop if anything hurts.", duration: 15, motion: .still),
-                .init(title: "Far focus", instruction: "Rest your gaze on something far away. No need to stare.", duration: 30, motion: .sideToSide),
-                .init(title: "Blink", instruction: "Blink slowly a few times, then let your eyes soften.", duration: 15, motion: .blink),
-                .init(title: "Stack gently", instruction: "Let your head float over your ribs and your shoulders feel wide.", duration: 30, motion: .rise),
-                .init(title: "Soft focus", instruction: "Notice the edges of your view without moving your head.", duration: 20, motion: .breathe),
-                .init(title: "Return", instruction: "Take an easy breath before you return to the screen.", duration: 10, motion: .breathe)
-            ]
-        ),
-        BreakRoutine(
-            id: "standing-reset",
-            title: "Standing reset",
-            invitation: "Want a gentle two-minute standing reset?",
-            focuses: [.lowerLegsFeetAnkles, .upperBackPosture, .breathRelaxation],
-            steps: [
-                .init(title: "Stand", instruction: "Stand up in your own time. Use support if helpful. Stop if anything hurts.", duration: 15, motion: .rise),
-                .init(title: "Shift", instruction: "Shift your weight slowly from one foot to the other.", duration: 25, motion: .sideToSide),
-                .init(title: "Unwind", instruction: "Make a few easy shoulder circles. Keep your knees soft.", duration: 20, motion: .roll),
-                .init(title: "Lengthen", instruction: "Grow a little taller through the crown of your head, then soften.", duration: 25, motion: .rise),
-                .init(title: "Breathe", instruction: "Let your arms hang and take two comfortable breaths.", duration: 25, motion: .breathe),
-                .init(title: "Settle", instruction: "Notice the floor under your feet. You are done.", duration: 10, motion: .still)
-            ]
-        ),
-        BreakRoutine(
-            id: "hands-wrists",
-            title: "Hands + wrists",
-            invitation: "A gentle reset for your hands and wrists?",
-            focuses: [.handsWristsForearms],
-            steps: [
-                .init(title: "Unclench", instruction: "Let your hands rest loosely. Move gently, and stop if anything hurts.", duration: 15, motion: .breathe),
-                .init(title: "Open and close", instruction: "Slowly open your hands wide, then let your fingers curl in.", duration: 20, motion: .blink),
-                .init(title: "Wrist circles", instruction: "Make small, easy circles with both wrists.", duration: 20, motion: .roll),
-                .init(title: "Change direction", instruction: "Circle the other way, keeping your forearms soft.", duration: 20, motion: .roll),
-                .init(title: "Finger fan", instruction: "Spread your fingers comfortably, then release all effort.", duration: 25, motion: .breathe),
-                .init(title: "Settle", instruction: "Let your hands feel heavy and take one easy breath.", duration: 20, motion: .still)
-            ]
-        ),
-        BreakRoutine(
-            id: "seated-twist",
-            title: "Seated twist",
-            invitation: "Want a slow seated twist and reset?",
-            focuses: [.trunkMobility, .upperBackPosture],
-            steps: [
-                .init(title: "Sit tall", instruction: "Place both feet down. Move gently, and stop if anything hurts.", duration: 15, motion: .rise),
-                .init(title: "Turn right", instruction: "Slowly turn your ribs to the right. Keep your hips facing forward.", duration: 25, motion: .sideToSide),
-                .init(title: "Turn left", instruction: "Return through center, then slowly turn to the left.", duration: 25, motion: .sideToSide),
-                .init(title: "Center", instruction: "Come back to center and let your shoulders soften.", duration: 20, motion: .breathe),
-                .init(title: "Lengthen", instruction: "Let the crown of your head float upward without stiffening.", duration: 20, motion: .rise),
-                .init(title: "Breathe", instruction: "Take one comfortable breath and release the twist.", duration: 15, motion: .breathe)
-            ]
-        ),
-        BreakRoutine(
-            id: "breathing-reset",
-            title: "Breathing reset",
-            invitation: "How about two quiet minutes to breathe and settle?",
-            focuses: [.breathRelaxation],
-            steps: [
-                .init(title: "Arrive", instruction: "Settle into an easy position. Breathe gently, and stop if anything hurts or feels uncomfortable.", duration: 15, motion: .still),
-                .init(title: "Easy inhale", instruction: "Let a comfortable breath come in without trying to make it bigger.", duration: 25, motion: .breathe),
-                .init(title: "Easy exhale", instruction: "Let the breath leave slowly and allow your shoulders to drop.", duration: 25, motion: .breathe),
-                .init(title: "Find a rhythm", instruction: "Continue at your own pace. Nothing to count or achieve.", duration: 25, motion: .breathe),
-                .init(title: "Soften", instruction: "Unclench your jaw and notice the support beneath you.", duration: 20, motion: .still),
-                .init(title: "Return", instruction: "Take one final natural breath, then return when ready.", duration: 10, motion: .breathe)
-            ]
-        ),
-        BreakRoutine(
-            id: "feet-ankles",
-            title: "Feet + ankles",
-            invitation: "A small seated reset for your feet and ankles?",
-            focuses: [.lowerLegsFeetAnkles],
-            steps: [
-                .init(title: "Find the floor", instruction: "Sit securely with both feet supported. Move gently, and stop if anything hurts.", duration: 15, motion: .still),
-                .init(title: "Heel and toe", instruction: "Slowly lift your heels, lower them, then lift your toes.", duration: 20, motion: .rise),
-                .init(title: "Right ankle", instruction: "Lift one foot slightly and make small circles at the ankle.", duration: 20, motion: .roll),
-                .init(title: "Left ankle", instruction: "Set it down, then make easy circles with the other ankle.", duration: 20, motion: .roll),
-                .init(title: "Press and release", instruction: "Press both feet lightly into the floor, then let the effort go.", duration: 25, motion: .breathe),
-                .init(title: "Settle", instruction: "Notice the support under both feet and take one breath.", duration: 20, motion: .still)
-            ]
-        ),
-        BreakRoutine(
-            id: "jaw-face",
-            title: "Jaw + face",
-            invitation: "Want a gentle reset for your jaw and face?",
-            focuses: [.eyesFace, .breathRelaxation],
-            steps: [
-                .init(title: "Unclench", instruction: "Let your teeth part slightly. Move gently, and stop if anything hurts.", duration: 15, motion: .breathe),
-                .init(title: "Soften the jaw", instruction: "Let your lower jaw feel heavy without forcing it open.", duration: 20, motion: .still),
-                .init(title: "Small motion", instruction: "Move your jaw slowly a little from side to side.", duration: 20, motion: .sideToSide),
-                .init(title: "Relax the eyes", instruction: "Blink softly and smooth the space around your eyes.", duration: 20, motion: .blink),
-                .init(title: "Release the brow", instruction: "Let your forehead widen and your tongue rest easily.", duration: 25, motion: .breathe),
-                .init(title: "Return", instruction: "Take a comfortable breath and keep a little softness in your face.", duration: 20, motion: .breathe)
-            ]
-        ),
-        BreakRoutine(
-            id: "upper-back",
-            title: "Upper back",
-            invitation: "A gentle upper-back reset?",
-            focuses: [.upperBackPosture, .chestSideBody, .neckShoulders],
-            steps: [
-                .init(title: "Settle", instruction: "Sit or stand comfortably. Move gently, and stop if anything hurts.", duration: 15, motion: .breathe),
-                .init(title: "Self-hug", instruction: "Wrap your arms loosely around yourself and let your upper back widen.", duration: 25, motion: .breathe),
-                .init(title: "Reach forward", instruction: "Release the hug and reach both hands forward without straining.", duration: 20, motion: .rise),
-                .init(title: "Open", instruction: "Let your arms open comfortably and keep your ribs quiet.", duration: 20, motion: .breathe),
-                .init(title: "Shoulder circles", instruction: "Make a few slow shoulder circles and let the movement shrink.", duration: 25, motion: .roll),
-                .init(title: "Return", instruction: "Rest your arms and take one easy breath.", duration: 15, motion: .still)
-            ]
-        ),
-        BreakRoutine(
-            id: "side-stretch",
-            title: "Seated side stretch",
-            invitation: "Want a quiet seated side stretch?",
-            focuses: [.chestSideBody, .trunkMobility],
-            steps: [
-                .init(title: "Ground", instruction: "Sit securely with both feet down. Move gently, and stop if anything hurts.", duration: 15, motion: .still),
-                .init(title: "Reach right", instruction: "Let one arm reach up and lean slightly to the right.", duration: 25, motion: .sideToSide),
-                .init(title: "Reach left", instruction: "Return through center, change arms, and lean slightly left.", duration: 25, motion: .sideToSide),
-                .init(title: "Low reach", instruction: "Lower both arms and let your fingertips reach gently toward the floor.", duration: 20, motion: .rise),
-                .init(title: "Come back", instruction: "Slowly return upright and let your shoulders settle.", duration: 20, motion: .rise),
-                .init(title: "Breathe", instruction: "Take one comfortable breath in the center.", duration: 15, motion: .breathe)
-            ]
-        )
-    ]
-}
-
-enum RandomRoutineSelector {
-    static func next(
-        from routines: [BreakRoutine],
-        currentRoutineID: String,
-        chooseIndex: (Range<Int>) -> Int = { Int.random(in: $0) }
-    ) -> BreakRoutine? {
-        let alternatives = routines.filter { $0.id != currentRoutineID }
-        guard !alternatives.isEmpty else { return nil }
-        let index = chooseIndex(alternatives.indices)
-        guard alternatives.indices.contains(index) else { return nil }
-        return alternatives[index]
-    }
-}
-
-enum BalancedRoutineSelector {
-    static let completionWindowSize = 6
-
-    static func suggestion(
-        from routines: [BreakRoutine],
-        completionHistory: [String]
-    ) -> BreakRoutine? {
-        guard !routines.isEmpty else { return nil }
-
-        let recentRoutines = completionHistory
-            .suffix(completionWindowSize)
-            .compactMap { id in routines.first(where: { $0.id == id }) }
-        let lastCompletedID = recentRoutines.last?.id
-        let candidates = routines.count > 1
-            ? routines.filter { $0.id != lastCompletedID }
-            : routines
-        let taggedCandidates = candidates.filter { !$0.focuses.isEmpty }
-
-        guard !taggedCandidates.isEmpty else {
-            return RoutineSelectionPolicy.suggestion(
-                from: routines,
-                pendingRoutineID: nil,
-                lastCompletedRoutineID: lastCompletedID
-            )
+    static func composed(from moves: [BreakMove]) -> BreakRoutine? {
+        guard moves.count == SessionComposer.sessionMoveCount,
+              Set(moves.map(\.id)).count == moves.count,
+              moves.allSatisfy(\.supportsStanding) else {
+            return nil
         }
 
-        var counts = Dictionary(uniqueKeysWithValues: BodyFocus.allCases.map { ($0, 0) })
-        for routine in recentRoutines {
-            for focus in routine.focuses {
-                counts[focus, default: 0] += 1
+        let steps = moves.enumerated().map { index, move in
+            let standingLead = index == 0
+                ? "Stand when you’re ready, with support nearby if useful. Move gently and stop if anything hurts. "
+                : ""
+            return RoutineStep(
+                id: move.id,
+                title: move.title,
+                instruction: standingLead + move.instruction,
+                duration: SessionComposer.moveDuration,
+                motion: move.motion
+            )
+        }
+        return BreakRoutine(
+            id: moves.map(\.id).joined(separator: "+"),
+            title: "Standing reset",
+            invitation: "Ready to stand for a gentle two-minute reset?",
+            focuses: Set(moves.flatMap(\.focuses)),
+            steps: steps
+        )
+    }
+
+    static let fallback = composed(from: Array(MoveLibrary.all.prefix(SessionComposer.sessionMoveCount)))!
+}
+
+enum SessionComposer {
+    static let sessionMoveCount = 6
+    static let moveDuration = 20
+
+    static func compose(
+        from library: [BreakMove],
+        recentShownMoveIDs: [String],
+        recentCompletedMoveIDs: [String],
+        excluding currentMoveIDs: Set<String> = []
+    ) -> BreakRoutine? {
+        let uniqueLibrary = library.reduce(into: [BreakMove]()) { result, move in
+            if !result.contains(where: { $0.id == move.id }) {
+                result.append(move)
+            }
+        }
+        guard uniqueLibrary.count >= sessionMoveCount else { return nil }
+
+        let recentShown = Set(recentShownMoveIDs)
+        var attention = Dictionary(uniqueKeysWithValues: BodyFocus.allCases.map { ($0, 0) })
+        let movesByID = Dictionary(uniqueKeysWithValues: uniqueLibrary.map { ($0.id, $0) })
+        for id in recentCompletedMoveIDs {
+            for focus in movesByID[id]?.focuses ?? [] {
+                attention[focus, default: 0] += 1
             }
         }
 
-        return taggedCandidates.enumerated().min { left, right in
-            score(for: left.element, counts: counts, libraryIndex: left.offset)
-                < score(for: right.element, counts: counts, libraryIndex: right.offset)
-        }?.element
+        var selected: [BreakMove] = []
+        while selected.count < sessionMoveCount {
+            let selectedIDs = Set(selected.map(\.id))
+            let candidates = uniqueLibrary.enumerated().filter { !selectedIDs.contains($0.element.id) }
+            guard let choice = candidates.min(by: { left, right in
+                score(
+                    for: left.element,
+                    libraryIndex: left.offset,
+                    attention: attention,
+                    recentShown: recentShown,
+                    currentMoveIDs: currentMoveIDs
+                ) < score(
+                    for: right.element,
+                    libraryIndex: right.offset,
+                    attention: attention,
+                    recentShown: recentShown,
+                    currentMoveIDs: currentMoveIDs
+                )
+            })?.element else {
+                return nil
+            }
+            selected.append(choice)
+            for focus in choice.focuses {
+                attention[focus, default: 0] += 1
+            }
+        }
+
+        return BreakRoutine.composed(from: selected)
     }
 
     private static func score(
-        for routine: BreakRoutine,
-        counts: [BodyFocus: Int],
-        libraryIndex: Int
+        for move: BreakMove,
+        libraryIndex: Int,
+        attention: [BodyFocus: Int],
+        recentShown: Set<String>,
+        currentMoveIDs: Set<String>
     ) -> SelectionScore {
-        let focusCounts = routine.focuses.map { counts[$0, default: 0] }
+        let exclusionTier: Int
+        if !recentShown.contains(move.id) && !currentMoveIDs.contains(move.id) {
+            exclusionTier = 0
+        } else if !currentMoveIDs.contains(move.id) {
+            exclusionTier = 1
+        } else {
+            exclusionTier = 2
+        }
+        let counts = move.focuses.map { attention[$0, default: 0] }
         return SelectionScore(
-            leastRecentAttention: focusCounts.min() ?? Int.max,
-            averageRecentAttention: Double(focusCounts.reduce(0, +)) / Double(focusCounts.count),
+            exclusionTier: exclusionTier,
+            leastAttention: counts.min() ?? Int.max,
+            averageAttention: counts.isEmpty
+                ? Double.greatestFiniteMagnitude
+                : Double(counts.reduce(0, +)) / Double(counts.count),
             libraryIndex: libraryIndex
         )
     }
 
     private struct SelectionScore: Comparable {
-        let leastRecentAttention: Int
-        let averageRecentAttention: Double
+        let exclusionTier: Int
+        let leastAttention: Int
+        let averageAttention: Double
         let libraryIndex: Int
 
         static func < (left: SelectionScore, right: SelectionScore) -> Bool {
-            if left.leastRecentAttention != right.leastRecentAttention {
-                return left.leastRecentAttention < right.leastRecentAttention
+            if left.exclusionTier != right.exclusionTier {
+                return left.exclusionTier < right.exclusionTier
             }
-            if left.averageRecentAttention != right.averageRecentAttention {
-                return left.averageRecentAttention < right.averageRecentAttention
+            if left.leastAttention != right.leastAttention {
+                return left.leastAttention < right.leastAttention
+            }
+            if left.averageAttention != right.averageAttention {
+                return left.averageAttention < right.averageAttention
             }
             return left.libraryIndex < right.libraryIndex
         }
     }
 }
 
-enum RoutineSelectionPolicy {
-    static func suggestion(
-        from routines: [BreakRoutine],
-        pendingRoutineID: String?,
-        lastCompletedRoutineID: String?
-    ) -> BreakRoutine? {
-        guard !routines.isEmpty else { return nil }
+struct SessionSelectionStore {
+    static let shownHistoryLimit = 18
+    static let completedHistoryLimit = 24
 
-        if let pendingRoutineID,
-           let pending = routines.first(where: { $0.id == pendingRoutineID }) {
-            return pending
-        }
-
-        if let lastCompletedRoutineID,
-           let completedIndex = routines.firstIndex(where: { $0.id == lastCompletedRoutineID }) {
-            return routines[(completedIndex + 1) % routines.count]
-        }
-
-        return routines[0]
-    }
-}
-
-struct RoutineSelectionStore {
     private enum Key {
-        static let pendingRoutineID = "routine.pendingID"
-        static let lastCompletedRoutineID = "routine.lastCompletedID"
-        static let recentCompletionHistory = "routine.recentCompletionHistory"
+        static let pendingMoveIDs = "session.pendingMoveIDs"
+        static let recentShownMoveIDs = "session.recentShownMoveIDs"
+        static let recentCompletedMoveIDs = "session.recentCompletedMoveIDs"
+        static let migratedLegacyState = "session.migratedLegacyRoutineState"
+        static let legacyPendingRoutineID = "routine.pendingID"
+        static let legacyLastCompletedRoutineID = "routine.lastCompletedID"
+        static let legacyCompletionHistory = "routine.recentCompletionHistory"
     }
 
     let defaults: UserDefaults
 
-    func suggestion(from routines: [BreakRoutine]) -> BreakRoutine? {
-        let history = completionHistory(from: routines)
-        let pendingRoutineID = defaults.string(forKey: Key.pendingRoutineID)
-        let pending = routines.first(where: {
-            $0.id == pendingRoutineID && $0.id != history.last
-        })
-        let suggestion = pending ?? BalancedRoutineSelector.suggestion(
-            from: routines,
-            completionHistory: history
-        )
-        if let suggestion {
-            defaults.set(suggestion.id, forKey: Key.pendingRoutineID)
+    func suggestion(from moves: [BreakMove]) -> BreakRoutine? {
+        migrateLegacyStateIfNeeded()
+        if let pending = pendingRoutine(from: moves) {
+            return pending
         }
+        guard let suggestion = SessionComposer.compose(
+            from: moves,
+            recentShownMoveIDs: recentShownMoveIDs(from: moves),
+            recentCompletedMoveIDs: recentCompletedMoveIDs(from: moves)
+        ) else {
+            return nil
+        }
+        persistAsShown(suggestion)
         return suggestion
     }
 
-    func markCompleted(_ routine: BreakRoutine, among routines: [BreakRoutine] = BreakRoutine.all) {
-        var history = completionHistory(from: routines)
-        history.append(routine.id)
-        history = Array(history.suffix(BalancedRoutineSelector.completionWindowSize))
-        defaults.set(history, forKey: Key.recentCompletionHistory)
-        defaults.set(routine.id, forKey: Key.lastCompletedRoutineID)
-        defaults.removeObject(forKey: Key.pendingRoutineID)
+    func nextSession(after current: BreakRoutine, from moves: [BreakMove]) -> BreakRoutine? {
+        migrateLegacyStateIfNeeded()
+        guard let suggestion = SessionComposer.compose(
+            from: moves,
+            recentShownMoveIDs: recentShownMoveIDs(from: moves),
+            recentCompletedMoveIDs: recentCompletedMoveIDs(from: moves),
+            excluding: Set(current.moveIDs)
+        ) else {
+            return nil
+        }
+        persistAsShown(suggestion)
+        return suggestion
     }
 
-    private func completionHistory(from routines: [BreakRoutine]) -> [String] {
-        let validIDs = Set(routines.map(\.id))
-        let stored = defaults.stringArray(forKey: Key.recentCompletionHistory) ?? []
-        let validStored = stored.filter { validIDs.contains($0) }
-        if !validStored.isEmpty {
-            return Array(validStored.suffix(BalancedRoutineSelector.completionWindowSize))
+    func markCompleted(_ routine: BreakRoutine, among moves: [BreakMove] = MoveLibrary.all) {
+        migrateLegacyStateIfNeeded()
+        let validIDs = Set(moves.map(\.id))
+        var history = recentCompletedMoveIDs(from: moves)
+        history.append(contentsOf: routine.moveIDs.filter { validIDs.contains($0) })
+        defaults.set(Array(history.suffix(Self.completedHistoryLimit)), forKey: Key.recentCompletedMoveIDs)
+        defaults.removeObject(forKey: Key.pendingMoveIDs)
+    }
+
+    func clearPendingSession() {
+        defaults.removeObject(forKey: Key.pendingMoveIDs)
+    }
+
+    private func pendingRoutine(from moves: [BreakMove]) -> BreakRoutine? {
+        let pendingIDs = defaults.stringArray(forKey: Key.pendingMoveIDs) ?? []
+        guard pendingIDs.count == SessionComposer.sessionMoveCount,
+              Set(pendingIDs).count == pendingIDs.count else {
+            defaults.removeObject(forKey: Key.pendingMoveIDs)
+            return nil
+        }
+        let movesByID = Dictionary(uniqueKeysWithValues: moves.map { ($0.id, $0) })
+        let pendingMoves = pendingIDs.compactMap { movesByID[$0] }
+        guard pendingMoves.count == pendingIDs.count else {
+            defaults.removeObject(forKey: Key.pendingMoveIDs)
+            return nil
+        }
+        return BreakRoutine.composed(from: pendingMoves)
+    }
+
+    private func persistAsShown(_ routine: BreakRoutine) {
+        var history = defaults.stringArray(forKey: Key.recentShownMoveIDs) ?? []
+        history.append(contentsOf: routine.moveIDs)
+        defaults.set(Array(history.suffix(Self.shownHistoryLimit)), forKey: Key.recentShownMoveIDs)
+        defaults.set(routine.moveIDs, forKey: Key.pendingMoveIDs)
+    }
+
+    private func recentShownMoveIDs(from moves: [BreakMove]) -> [String] {
+        validHistory(for: Key.recentShownMoveIDs, from: moves, limit: Self.shownHistoryLimit)
+    }
+
+    private func recentCompletedMoveIDs(from moves: [BreakMove]) -> [String] {
+        validHistory(for: Key.recentCompletedMoveIDs, from: moves, limit: Self.completedHistoryLimit)
+    }
+
+    private func validHistory(for key: String, from moves: [BreakMove], limit: Int) -> [String] {
+        let validIDs = Set(moves.map(\.id))
+        let stored = defaults.stringArray(forKey: key) ?? []
+        return Array(stored.filter { validIDs.contains($0) }.suffix(limit))
+    }
+
+    private func migrateLegacyStateIfNeeded() {
+        guard !defaults.bool(forKey: Key.migratedLegacyState) else { return }
+
+        let legacyRoutineMoves: [String: [String]] = [
+            "neck-shoulders": ["shoulder-rolls", "neck-turns", "upper-back-open"],
+            "eyes-posture": ["far-gaze", "slow-blinks", "shoulder-rolls"],
+            "standing-reset": ["weight-shifts", "calf-raises", "easy-breath"],
+            "hands-wrists": ["hand-shake", "wrist-circles", "finger-fan"],
+            "seated-twist": ["standing-twist", "upper-back-open", "easy-breath"],
+            "breathing-reset": ["easy-breath", "jaw-soften", "slow-blinks"],
+            "feet-ankles": ["heel-toe-rock", "ankle-circles", "calf-raises"],
+            "jaw-face": ["jaw-soften", "slow-blinks", "easy-breath"],
+            "upper-back": ["upper-back-open", "chest-open", "shoulder-rolls"],
+            "side-stretch": ["side-reach", "overhead-reach", "arm-sweep"]
+        ]
+        var legacyIDs = defaults.stringArray(forKey: Key.legacyCompletionHistory) ?? []
+        if legacyIDs.isEmpty,
+           let last = defaults.string(forKey: Key.legacyLastCompletedRoutineID) {
+            legacyIDs = [last]
+        }
+        let migrated = legacyIDs.flatMap { legacyRoutineMoves[$0] ?? [] }
+        if !migrated.isEmpty {
+            defaults.set(
+                Array(migrated.suffix(Self.completedHistoryLimit)),
+                forKey: Key.recentCompletedMoveIDs
+            )
         }
 
-        if let legacyLastCompleted = defaults.string(forKey: Key.lastCompletedRoutineID),
-           validIDs.contains(legacyLastCompleted) {
-            return [legacyLastCompleted]
-        }
-        return []
+        defaults.removeObject(forKey: Key.legacyPendingRoutineID)
+        defaults.removeObject(forKey: Key.legacyLastCompletedRoutineID)
+        defaults.removeObject(forKey: Key.legacyCompletionHistory)
+        defaults.set(true, forKey: Key.migratedLegacyState)
     }
 }

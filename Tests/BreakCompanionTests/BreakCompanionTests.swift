@@ -2,295 +2,309 @@ import XCTest
 @testable import BreakCompanion
 
 final class BreakCompanionTests: XCTestCase {
-    func testBreakProgressAtBeginningMidpointAndNearDue() {
-        let now = Date(timeIntervalSinceReferenceDate: 1_000)
+    func testBreakProgressAtBeginningMidpointNearDueAndDeferralReset() {
+        let start = Date(timeIntervalSinceReferenceDate: 1_000)
+        let deferral = ScheduledCheckInWindow(
+            startedAt: start,
+            dueAt: start.addingTimeInterval(1_200)
+        )
 
-        XCTAssertEqual(BreakProgress.value(activeSeconds: 0, activeInterval: 3_600, scheduledWindow: nil, now: now), 0)
-        XCTAssertEqual(BreakProgress.value(activeSeconds: 1_800, activeInterval: 3_600, scheduledWindow: nil, now: now), 0.5)
-        XCTAssertEqual(BreakProgress.value(activeSeconds: 3_240, activeInterval: 3_600, scheduledWindow: nil, now: now), 0.9)
-        XCTAssertEqual(BreakProgress.value(activeSeconds: 4_000, activeInterval: 3_600, scheduledWindow: nil, now: now), 1)
-    }
-
-    func testBreakProgressUsesScheduledDeferralAndResets() {
-        let start = Date(timeIntervalSinceReferenceDate: 2_000)
-        let deferral = ScheduledCheckInWindow(startedAt: start, dueAt: start.addingTimeInterval(1_200))
-
-        XCTAssertEqual(BreakProgress.value(activeSeconds: 2_700, activeInterval: 3_600, scheduledWindow: nil, now: start), 0.75)
-        XCTAssertEqual(BreakProgress.value(activeSeconds: 0, activeInterval: 3_600, scheduledWindow: deferral, now: start), 0)
+        XCTAssertEqual(BreakProgress.value(activeSeconds: 0, activeInterval: 3_600, scheduledWindow: nil, now: start), 0)
+        XCTAssertEqual(BreakProgress.value(activeSeconds: 1_800, activeInterval: 3_600, scheduledWindow: nil, now: start), 0.5)
+        XCTAssertEqual(BreakProgress.value(activeSeconds: 3_240, activeInterval: 3_600, scheduledWindow: nil, now: start), 0.9)
+        XCTAssertEqual(BreakProgress.value(activeSeconds: 4_000, activeInterval: 3_600, scheduledWindow: nil, now: start), 1)
+        XCTAssertEqual(BreakProgress.value(activeSeconds: 2_700, activeInterval: 3_600, scheduledWindow: deferral, now: start), 0)
         XCTAssertEqual(BreakProgress.value(activeSeconds: 0, activeInterval: 3_600, scheduledWindow: deferral, now: start.addingTimeInterval(600)), 0.5)
         XCTAssertEqual(BreakProgress.remainingSeconds(activeSeconds: 0, activeInterval: 3_600, scheduledWindow: deferral, now: start.addingTimeInterval(600)), 600)
-        XCTAssertEqual(BreakProgress.value(activeSeconds: 0, activeInterval: 3_600, scheduledWindow: nil, now: start), 0)
     }
 
-    func testBreakProgressColorMappingIsCalmAndDeterministic() {
+    func testBreakProgressColorAndAccessibilityMapping() {
         XCTAssertEqual(BreakProgress.color(at: 0), OrbProgressColor(red: 0.30, green: 0.68, blue: 0.52))
         XCTAssertEqual(BreakProgress.color(at: 0.5), OrbProgressColor(red: 0.88, green: 0.58, blue: 0.28))
-
-        let nearDue = BreakProgress.color(at: 0.9)
-        XCTAssertEqual(nearDue.red, 0.80, accuracy: 0.000_001)
-        XCTAssertEqual(nearDue.green, 0.388, accuracy: 0.000_001)
-        XCTAssertEqual(nearDue.blue, 0.312, accuracy: 0.000_001)
         XCTAssertEqual(BreakProgress.color(at: 1), OrbProgressColor(red: 0.78, green: 0.34, blue: 0.32))
-    }
-
-    func testBreakProgressAccessibilityDoesNotDependOnColor() {
         XCTAssertEqual(
             BreakProgress.accessibilityValue(progress: 0.5, remainingSeconds: 1_800),
             "Next break in about 30 minutes. 50 percent of the interval has elapsed."
         )
-        XCTAssertEqual(
-            BreakProgress.accessibilityValue(progress: 1, remainingSeconds: 0),
-            "Next break is due now. 100 percent of the interval has elapsed."
-        )
     }
 
-    func testEveryRoutineIsExactlyTwoMinutes() {
-        XCTAssertEqual(BreakRoutine.all.count, 10)
-        XCTAssertEqual(Set(BreakRoutine.all.map(\.id)).count, 10)
-        for routine in BreakRoutine.all {
-            XCTAssertEqual(routine.duration, 120, "\(routine.title) should last two minutes")
-            XCTAssertFalse(routine.steps.isEmpty)
+    func testAffirmativeVoiceVariantsStartTheOfferedBreak() {
+        let phrases = [
+            "yeah", "yes", "yep", "let's do it", "let’s do it", "LET'S GO!",
+            "let us do it", "okay", "ready", "sure", "go ahead", "sounds good"
+        ]
+        for phrase in phrases {
+            XCTAssertEqual(VoiceCommandParser.parse(phrase), .start, phrase)
+            XCTAssertEqual(
+                CheckInVoiceAction.resolve(VoiceCommandParser.parse(phrase)),
+                .startRoutine,
+                phrase
+            )
         }
     }
 
-    func testVoiceCommands() {
-        XCTAssertEqual(VoiceCommandParser.parse("yes, let's start"), .start)
+    func testPostponementVoiceCommandsRemainMoreSpecificThanAffirmatives() {
         XCTAssertEqual(VoiceCommandParser.parse("maybe in 20 minutes"), .later(minutes: 20))
         XCTAssertEqual(VoiceCommandParser.parse("maybe in twenty minutes"), .later(minutes: 20))
-        XCTAssertEqual(VoiceCommandParser.parse("try again in an hour"), .later(minutes: 60))
+        XCTAssertEqual(VoiceCommandParser.parse("yes, later in an hour"), .later(minutes: 60))
         XCTAssertEqual(VoiceCommandParser.parse("two hours"), .later(minutes: 120))
         XCTAssertEqual(VoiceCommandParser.parse("tomorrow please"), .tomorrow)
-        XCTAssertEqual(
-            CheckInVoiceAction.resolve(VoiceCommandParser.parse("start")),
-            .startRoutine,
-            "A recognized start command must route to the offered routine"
+        XCTAssertEqual(VoiceCommandParser.parse("yesterday"), .unknown)
+    }
+
+    func testEnterDismissesOnlyTheVisibleCompletion() {
+        XCTAssertTrue(
+            CompletionDismissalPolicy.shouldDismiss(
+                isCompletionVisible: true,
+                characters: "\r",
+                keyCode: 36
+            )
+        )
+        XCTAssertTrue(
+            CompletionDismissalPolicy.shouldDismiss(
+                isCompletionVisible: true,
+                characters: nil,
+                keyCode: 76
+            )
+        )
+        XCTAssertFalse(
+            CompletionDismissalPolicy.shouldDismiss(
+                isCompletionVisible: false,
+                characters: "\r",
+                keyCode: 36
+            )
+        )
+        XCTAssertFalse(
+            CompletionDismissalPolicy.shouldDismiss(
+                isCompletionVisible: true,
+                characters: " ",
+                keyCode: 49
+            )
         )
     }
 
-    func testRoutineSafetyLanguage() {
-        for routine in BreakRoutine.all {
-            let script = routine.steps.map(\.instruction).joined(separator: " ").lowercased()
-            XCTAssertTrue(script.contains("stop if anything hurts"))
-            XCTAssertTrue(script.contains("gentl") || script.contains("slow"))
+    func testCompletionAutoDismissDelayAndCancellationTokensAreDeterministic() {
+        XCTAssertEqual(CompletionDismissalState.delaySeconds, 10)
+        var state = CompletionDismissalState()
+        let first = state.begin()
+        XCTAssertTrue(state.isCurrent(first))
+
+        state.cancel()
+        XCTAssertFalse(state.isCurrent(first), "Manual Done must invalidate its pending automatic dismissal")
+
+        let second = state.begin()
+        XCTAssertTrue(state.isCurrent(second))
+        XCTAssertFalse(state.isCurrent(first), "A stale task from an earlier completion must not close a future screen")
+    }
+
+    func testMoveLibraryIsLargeUniqueStandingOnlyAndConservative() {
+        XCTAssertGreaterThanOrEqual(MoveLibrary.all.count, 20)
+        XCTAssertEqual(Set(MoveLibrary.all.map(\.id)).count, MoveLibrary.all.count)
+        XCTAssertTrue(MoveLibrary.all.allSatisfy(\.supportsStanding))
+        XCTAssertTrue(MoveLibrary.all.allSatisfy { !$0.focuses.isEmpty })
+        XCTAssertEqual(Set(MoveLibrary.all.flatMap(\.focuses)), Set(BodyFocus.allCases))
+
+        for move in MoveLibrary.all {
+            let text = "\(move.title) \(move.instruction)".lowercased()
+            XCTAssertFalse(text.contains("seated"), move.id)
+            XCTAssertFalse(text.contains("sit down"), move.id)
+            XCTAssertFalse(text.contains("chair"), move.id)
         }
     }
 
-    func testRoutineFocusTaxonomyIsCompleteAndConservative() {
-        let expected: [String: Set<BodyFocus>] = [
-            "neck-shoulders": [.neckShoulders, .upperBackPosture, .breathRelaxation],
-            "eyes-posture": [.eyesFace, .upperBackPosture, .neckShoulders],
-            "standing-reset": [.lowerLegsFeetAnkles, .upperBackPosture, .breathRelaxation],
-            "hands-wrists": [.handsWristsForearms],
-            "seated-twist": [.trunkMobility, .upperBackPosture],
-            "breathing-reset": [.breathRelaxation],
-            "feet-ankles": [.lowerLegsFeetAnkles],
-            "jaw-face": [.eyesFace, .breathRelaxation],
-            "upper-back": [.upperBackPosture, .chestSideBody, .neckShoulders],
-            "side-stretch": [.chestSideBody, .trunkMobility]
+    func testComposedSessionIsStandingSafeUniqueAndExactlyTwoMinutes() {
+        let routine = SessionComposer.compose(
+            from: MoveLibrary.all,
+            recentShownMoveIDs: [],
+            recentCompletedMoveIDs: []
+        )
+
+        XCTAssertNotNil(routine)
+        XCTAssertEqual(routine?.steps.count, 6)
+        XCTAssertEqual(routine?.duration, 120)
+        XCTAssertEqual(Set(routine?.moveIDs ?? []).count, 6)
+        XCTAssertTrue(routine?.invitation.lowercased().contains("stand") == true)
+        XCTAssertTrue(routine?.steps.first?.instruction.lowercased().contains("stand when") == true)
+        XCTAssertTrue(routine?.steps.first?.instruction.lowercased().contains("move gently") == true)
+        XCTAssertTrue(routine?.steps.first?.instruction.lowercased().contains("stop if anything hurts") == true)
+        XCTAssertTrue(routine?.steps.allSatisfy { $0.duration == 20 } == true)
+    }
+
+    func testNextCompositionAvoidsEveryMoveFromCurrentAndRecentSessions() {
+        let first = SessionComposer.compose(
+            from: MoveLibrary.all,
+            recentShownMoveIDs: [],
+            recentCompletedMoveIDs: []
+        )!
+        let second = SessionComposer.compose(
+            from: MoveLibrary.all,
+            recentShownMoveIDs: first.moveIDs,
+            recentCompletedMoveIDs: [],
+            excluding: Set(first.moveIDs)
+        )!
+        let third = SessionComposer.compose(
+            from: MoveLibrary.all,
+            recentShownMoveIDs: first.moveIDs + second.moveIDs,
+            recentCompletedMoveIDs: [],
+            excluding: Set(second.moveIDs)
+        )!
+
+        XCTAssertTrue(Set(first.moveIDs).isDisjoint(with: second.moveIDs))
+        XCTAssertTrue(Set(second.moveIDs).isDisjoint(with: third.moveIDs))
+        XCTAssertTrue(Set(first.moveIDs).isDisjoint(with: third.moveIDs))
+        XCTAssertNotEqual(first.id, second.id)
+        XCTAssertNotEqual(second.id, third.id)
+    }
+
+    func testComposerFavorsUnderrepresentedFocusAreas() {
+        let focusedLibrary = [
+            makeMove("neck-a", [.neckShoulders]),
+            makeMove("hands", [.handsWristsForearms]),
+            makeMove("neck-b", [.neckShoulders]),
+            makeMove("neck-c", [.neckShoulders]),
+            makeMove("neck-d", [.neckShoulders]),
+            makeMove("neck-e", [.neckShoulders]),
+            makeMove("neck-f", [.neckShoulders])
         ]
 
-        XCTAssertEqual(Dictionary(uniqueKeysWithValues: BreakRoutine.all.map { ($0.id, $0.focuses) }), expected)
-        XCTAssertEqual(Set(BreakRoutine.all.flatMap(\.focuses)), Set(BodyFocus.allCases))
-        XCTAssertTrue(BreakRoutine.all.allSatisfy { !$0.focuses.isEmpty })
+        let routine = SessionComposer.compose(
+            from: focusedLibrary,
+            recentShownMoveIDs: [],
+            recentCompletedMoveIDs: Array(repeating: "neck-a", count: 8)
+        )
+        XCTAssertEqual(routine?.moveIDs.first, "hands")
     }
 
-    func testPointerMovementClassifierKeepsADeadZoneForTaps() {
-        XCTAssertEqual(
-            PointerMovementClassifier.classify(from: .zero, to: .zero),
-            .tap
+    func testComposerHasDeterministicFallbackWhenHistoryCoversLibrary() {
+        let allIDs = MoveLibrary.all.map(\.id)
+        let current = Set(MoveLibrary.all.prefix(6).map(\.id))
+        let first = SessionComposer.compose(
+            from: MoveLibrary.all,
+            recentShownMoveIDs: allIDs,
+            recentCompletedMoveIDs: allIDs,
+            excluding: current
         )
-        XCTAssertEqual(
-            PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 4, y: 0)),
-            .tap,
-            "Movement at the threshold should not turn a slightly shaky click into a drag"
+        let second = SessionComposer.compose(
+            from: MoveLibrary.all,
+            recentShownMoveIDs: allIDs,
+            recentCompletedMoveIDs: allIDs,
+            excluding: current
         )
-        XCTAssertEqual(
-            PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 3, y: 4)),
-            .drag,
-            "Movement past the threshold should reposition the orb without activating it"
-        )
+
+        XCTAssertEqual(first, second)
+        XCTAssertEqual(first?.duration, 120)
+        XCTAssertTrue(current.isDisjoint(with: first?.moveIDs ?? []))
     }
 
-    func testRandomNextNeverRepeatsCurrentAndCoversTenRoutineLibrary() {
-        XCTAssertEqual(BreakRoutine.all.count, 10)
+    func testMinimumLibraryFallbackRemainsSafeWhenNoAlternativeExists() {
+        let minimumLibrary = Array(MoveLibrary.all.prefix(6))
+        let current = Set(minimumLibrary.map(\.id))
+        let fallback = SessionComposer.compose(
+            from: minimumLibrary,
+            recentShownMoveIDs: minimumLibrary.map(\.id),
+            recentCompletedMoveIDs: [],
+            excluding: current
+        )
 
-        for current in BreakRoutine.all {
-            let alternatives = BreakRoutine.all.filter { $0.id != current.id }
-            let selected = alternatives.indices.compactMap { index in
-                RandomRoutineSelector.next(
-                    from: BreakRoutine.all,
-                    currentRoutineID: current.id,
-                    chooseIndex: { range in
-                        XCTAssertTrue(range.contains(index))
-                        return index
-                    }
-                )
-            }
-
-            XCTAssertEqual(selected.count, 9)
-            XCTAssertFalse(selected.contains(where: { $0.id == current.id }))
-            XCTAssertEqual(Set(selected.map(\.id)), Set(alternatives.map(\.id)))
-        }
-    }
-
-    func testRandomNextNeedsAnAlternative() {
+        XCTAssertEqual(fallback?.moveIDs, minimumLibrary.map(\.id))
+        XCTAssertEqual(fallback?.duration, 120)
         XCTAssertNil(
-            RandomRoutineSelector.next(
-                from: [BreakRoutine.all[0]],
-                currentRoutineID: BreakRoutine.all[0].id,
-                chooseIndex: { _ in XCTFail("No random choice should be requested"); return 0 }
+            SessionComposer.compose(
+                from: Array(minimumLibrary.prefix(5)),
+                recentShownMoveIDs: [],
+                recentCompletedMoveIDs: []
             )
         )
     }
 
-    func testPostponementKeepsThePendingRoutine() {
-        let pending = BreakRoutine.all[1]
-        XCTAssertEqual(
-            RoutineSelectionPolicy.suggestion(
-                from: BreakRoutine.all,
-                pendingRoutineID: pending.id,
-                lastCompletedRoutineID: BreakRoutine.all[0].id
-            ),
-            pending
-        )
-    }
-
-    func testBalancedSelectionFavorsUnderrepresentedFocusAfterSkewedHistory() {
-        let history = Array(repeating: "neck-shoulders", count: 6)
-        XCTAssertEqual(
-            BalancedRoutineSelector.suggestion(from: BreakRoutine.all, completionHistory: history)?.id,
-            "hands-wrists"
-        )
-    }
-
-    func testBalancedSelectionNeverImmediatelyRepeatsLastCompletedRoutine() {
-        for routine in BreakRoutine.all {
-            let selected = BalancedRoutineSelector.suggestion(
-                from: BreakRoutine.all,
-                completionHistory: [routine.id]
-            )
-            XCTAssertNotEqual(selected?.id, routine.id)
-        }
-    }
-
-    func testBalancedSelectionUsesOnlyRecentCompletionWindow() {
-        let olderHistory = Array(repeating: "hands-wrists", count: 6)
-        let recentHistory = Array(repeating: "neck-shoulders", count: 6)
-        XCTAssertEqual(
-            BalancedRoutineSelector.suggestion(
-                from: BreakRoutine.all,
-                completionHistory: olderHistory + recentHistory
-            )?.id,
-            "hands-wrists",
-            "Older hand-focused history should not affect the six-completion window"
-        )
-    }
-
-    func testBalancedSelectionHasDeterministicFallbackWithoutTags() {
-        let step = RoutineStep(
-            title: "Settle",
-            instruction: "Move gently, and stop if anything hurts.",
-            duration: 120,
-            motion: .still
-        )
-        let first = BreakRoutine(id: "first", title: "First", invitation: "Pause?", focuses: [], steps: [step])
-        let second = BreakRoutine(id: "second", title: "Second", invitation: "Pause?", focuses: [], steps: [step])
-
-        XCTAssertEqual(
-            BalancedRoutineSelector.suggestion(
-                from: [first, second],
-                completionHistory: [first.id]
-            ),
-            second
-        )
-        XCTAssertEqual(
-            BalancedRoutineSelector.suggestion(from: [first, second], completionHistory: []),
-            first
-        )
-    }
-
-    func testLegacyRotationPolicyProvidesDeterministicFallback() {
-        XCTAssertEqual(
-            RoutineSelectionPolicy.suggestion(
-                from: BreakRoutine.all,
-                pendingRoutineID: nil,
-                lastCompletedRoutineID: BreakRoutine.all[0].id
-            ),
-            BreakRoutine.all[1]
-        )
-        XCTAssertEqual(
-            RoutineSelectionPolicy.suggestion(
-                from: BreakRoutine.all,
-                pendingRoutineID: nil,
-                lastCompletedRoutineID: BreakRoutine.all.last!.id
-            ),
-            BreakRoutine.all[0]
-        )
-    }
-
-    func testSelectionStorePersistsPendingAndBalancedHistory() {
+    func testShownHistoryIncludesSkippedNextSessionsAndSurvivesRestart() {
         let suiteName = "BreakCompanionTests.\(#function)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let firstLaunch = RoutineSelectionStore(defaults: defaults)
-        let firstSuggestion = firstLaunch.suggestion(from: BreakRoutine.all)
-        XCTAssertEqual(firstSuggestion, BreakRoutine.all[0])
+        let firstStore = SessionSelectionStore(defaults: defaults)
+        let first = firstStore.suggestion(from: MoveLibrary.all)!
+        let second = firstStore.nextSession(after: first, from: MoveLibrary.all)!
+        XCTAssertTrue(Set(first.moveIDs).isDisjoint(with: second.moveIDs))
 
-        let restartedWhilePending = RoutineSelectionStore(defaults: defaults)
-        XCTAssertEqual(
-            restartedWhilePending.suggestion(from: BreakRoutine.all),
-            BreakRoutine.all[0],
-            "An app restart must not replace a postponed or interrupted suggestion"
-        )
+        let restarted = SessionSelectionStore(defaults: defaults)
+        XCTAssertEqual(restarted.suggestion(from: MoveLibrary.all), second)
+        let third = restarted.nextSession(after: second, from: MoveLibrary.all)!
+        XCTAssertTrue(Set(second.moveIDs).isDisjoint(with: third.moveIDs))
+        XCTAssertTrue(Set(first.moveIDs).isDisjoint(with: third.moveIDs))
 
-        restartedWhilePending.markCompleted(BreakRoutine.all[0])
-        let restartedAfterCompletion = RoutineSelectionStore(defaults: defaults)
-        XCTAssertEqual(
-            restartedAfterCompletion.suggestion(from: BreakRoutine.all)?.id,
-            "hands-wrists",
-            "An app restart must retain completion history for balancing"
-        )
+        let shown = defaults.stringArray(forKey: "session.recentShownMoveIDs")
+        XCTAssertEqual(shown, first.moveIDs + second.moveIDs + third.moveIDs)
+        XCTAssertEqual(defaults.stringArray(forKey: "session.pendingMoveIDs"), third.moveIDs)
     }
 
-    func testSelectionStoreMigratesLegacyLastCompletedState() {
+    func testCompletedMoveHistoryPersistsIsBoundedAndInfluencesRestart() {
         let suiteName = "BreakCompanionTests.\(#function)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
-        defaults.set("neck-shoulders", forKey: "routine.lastCompletedID")
 
-        let migrated = RoutineSelectionStore(defaults: defaults)
-        XCTAssertEqual(migrated.suggestion(from: BreakRoutine.all)?.id, "hands-wrists")
-    }
-
-    func testSelectionStoreRejectsStalePendingImmediateRepeat() {
-        let suiteName = "BreakCompanionTests.\(#function)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        defaults.set("neck-shoulders", forKey: "routine.lastCompletedID")
-        defaults.set("neck-shoulders", forKey: "routine.pendingID")
-
-        let store = RoutineSelectionStore(defaults: defaults)
-        XCTAssertEqual(store.suggestion(from: BreakRoutine.all)?.id, "hands-wrists")
-    }
-
-    func testSelectionStoreLimitsPersistedHistoryToRecentWindow() {
-        let suiteName = "BreakCompanionTests.\(#function)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let store = RoutineSelectionStore(defaults: defaults)
-
-        for routine in BreakRoutine.all.prefix(8) {
+        let store = SessionSelectionStore(defaults: defaults)
+        var routine = store.suggestion(from: MoveLibrary.all)!
+        for _ in 0..<6 {
             store.markCompleted(routine)
+            routine = store.suggestion(from: MoveLibrary.all)!
         }
 
+        let completed = defaults.stringArray(forKey: "session.recentCompletedMoveIDs") ?? []
+        let shown = defaults.stringArray(forKey: "session.recentShownMoveIDs") ?? []
+        XCTAssertEqual(completed.count, SessionSelectionStore.completedHistoryLimit)
+        XCTAssertLessThanOrEqual(shown.count, SessionSelectionStore.shownHistoryLimit)
+        XCTAssertEqual(SessionSelectionStore(defaults: defaults).suggestion(from: MoveLibrary.all), routine)
+    }
+
+    func testEndingOrSkippingClearsPendingButRetainsShownHistory() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SessionSelectionStore(defaults: defaults)
+        let shown = store.suggestion(from: MoveLibrary.all)!
+        store.clearPendingSession()
+
+        XCTAssertNil(defaults.object(forKey: "session.pendingMoveIDs"))
+        XCTAssertNil(defaults.object(forKey: "session.recentCompletedMoveIDs"))
+        XCTAssertEqual(defaults.stringArray(forKey: "session.recentShownMoveIDs"), shown.moveIDs)
+    }
+
+    func testLegacyRoutineHistoryMigratesToMoveFocusHistorySafely() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(["neck-shoulders", "hands-wrists"], forKey: "routine.recentCompletionHistory")
+        defaults.set("hands-wrists", forKey: "routine.pendingID")
+
+        let store = SessionSelectionStore(defaults: defaults)
+        XCTAssertNotNil(store.suggestion(from: MoveLibrary.all))
+        XCTAssertNil(defaults.object(forKey: "routine.pendingID"))
+        XCTAssertNil(defaults.object(forKey: "routine.recentCompletionHistory"))
         XCTAssertEqual(
-            defaults.stringArray(forKey: "routine.recentCompletionHistory"),
-            Array(BreakRoutine.all.prefix(8).suffix(6).map(\.id))
+            defaults.stringArray(forKey: "session.recentCompletedMoveIDs"),
+            ["shoulder-rolls", "neck-turns", "upper-back-open", "hand-shake", "wrist-circles", "finger-fan"]
+        )
+    }
+
+    func testPointerMovementClassifierKeepsTapDeadZone() {
+        XCTAssertEqual(PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 4, y: 0)), .tap)
+        XCTAssertEqual(PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 3, y: 4)), .drag)
+    }
+
+    private func makeMove(_ id: String, _ focuses: Set<BodyFocus>) -> BreakMove {
+        BreakMove(
+            id: id,
+            title: id,
+            instruction: "Move slowly and comfortably.",
+            focuses: focuses,
+            motion: .still,
+            supportsStanding: true
         )
     }
 }

@@ -1,11 +1,17 @@
 import AppKit
 import SwiftUI
 
+private final class CompanionPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+}
+
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let store = CompanionStore()
     private var panel: NSPanel?
     private var statusItem: NSStatusItem?
+    private var keyMonitor: Any?
+    private weak var previouslyActiveApplication: NSRunningApplication?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -14,10 +20,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.onSizeChange = { [weak self] mode in
             self?.resizePanel(for: mode)
         }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            return self.store.handleCompletionKey(
+                characters: event.charactersIgnoringModifiers,
+                keyCode: event.keyCode
+            ) ? nil : event
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if let keyMonitor {
+            NSEvent.removeMonitor(keyMonitor)
+        }
     }
 
     private func buildPanel() {
-        let panel = NSPanel(
+        let panel = CompanionPanel(
             contentRect: NSRect(origin: .zero, size: size(for: .idle)),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
@@ -69,7 +88,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         frame.origin.x = min(max(frame.origin.x, visible.minX + 12), visible.maxX - newSize.width - 12)
         frame.origin.y = min(max(frame.origin.y, visible.minY + 12), visible.maxY - newSize.height - 12)
         panel.setFrame(frame, display: true, animate: true)
-        panel.orderFrontRegardless()
+        if mode == .complete {
+            let frontmost = NSWorkspace.shared.frontmostApplication
+            if frontmost?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+                previouslyActiveApplication = frontmost
+            }
+            NSApp.activate(ignoringOtherApps: true)
+            panel.makeKeyAndOrderFront(nil)
+        } else {
+            panel.orderFrontRegardless()
+            if mode == .idle, let previouslyActiveApplication {
+                previouslyActiveApplication.activate(options: [])
+                self.previouslyActiveApplication = nil
+            }
+        }
     }
 
     private func size(for mode: CompanionStore.Mode) -> NSSize {
