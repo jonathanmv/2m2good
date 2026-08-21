@@ -19,6 +19,12 @@ enum SelfCheck {
                 failures.append("\(routine.title) is missing safety language")
             }
         }
+        if Set(BreakRoutine.all.flatMap(\.focuses)) != Set(BodyFocus.allCases) {
+            failures.append("routine focus tags should cover the internal taxonomy")
+        }
+        if BreakRoutine.all.contains(where: { $0.focuses.isEmpty }) {
+            failures.append("every routine should have at least one body focus")
+        }
 
         let voiceCases: [(String, VoiceCommand)] = [
             ("yes, let's start", .start),
@@ -61,6 +67,7 @@ enum SelfCheck {
 
         let firstRoutine = BreakRoutine.all[0]
         let secondRoutine = BreakRoutine.all[1]
+        let handsRoutine = BreakRoutine.all.first(where: { $0.id == "hands-wrists" })!
         let lastRoutine = BreakRoutine.all.last!
         if RoutineSelectionPolicy.suggestion(
             from: BreakRoutine.all,
@@ -83,6 +90,38 @@ enum SelfCheck {
         ) != firstRoutine {
             failures.append("routine suggestions should wrap after the final routine")
         }
+        if BalancedRoutineSelector.suggestion(
+            from: BreakRoutine.all,
+            completionHistory: Array(repeating: firstRoutine.id, count: 6)
+        ) != handsRoutine {
+            failures.append("balanced selection should favor an underrepresented focus")
+        }
+        for completed in BreakRoutine.all where BalancedRoutineSelector.suggestion(
+            from: BreakRoutine.all,
+            completionHistory: [completed.id]
+        ) == completed {
+            failures.append("balanced selection immediately repeated \(completed.title)")
+        }
+        let untaggedFirst = BreakRoutine(
+            id: "untagged-first",
+            title: "First",
+            invitation: "Pause?",
+            focuses: [],
+            steps: firstRoutine.steps
+        )
+        let untaggedSecond = BreakRoutine(
+            id: "untagged-second",
+            title: "Second",
+            invitation: "Pause?",
+            focuses: [],
+            steps: secondRoutine.steps
+        )
+        if BalancedRoutineSelector.suggestion(
+            from: [untaggedFirst, untaggedSecond],
+            completionHistory: [untaggedFirst.id]
+        ) != untaggedSecond {
+            failures.append("balanced selection should fall back to deterministic rotation")
+        }
 
         let suiteName = "local.break-companion.pilot.self-check.\(ProcessInfo.processInfo.processIdentifier)"
         if let defaults = UserDefaults(suiteName: suiteName) {
@@ -95,7 +134,7 @@ enum SelfCheck {
             }
             restartedWhilePending.markCompleted(firstRoutine)
             let restartedAfterCompletion = RoutineSelectionStore(defaults: defaults)
-            if restartedAfterCompletion.suggestion(from: BreakRoutine.all) != secondRoutine {
+            if restartedAfterCompletion.suggestion(from: BreakRoutine.all) != handsRoutine {
                 failures.append("completed routine state should survive a selection-store restart")
             }
             defaults.removePersistentDomain(forName: suiteName)
@@ -104,7 +143,7 @@ enum SelfCheck {
         }
 
         if failures.isEmpty {
-            print("Self-check passed: ten routines, timing, safety language, voice command routing, random next, pointer movement, and persisted selection.")
+            print("Self-check passed: ten routines, focus taxonomy, balanced history, safe fallback, random next, voice routing, pointer movement, and persistence.")
             return true
         }
 

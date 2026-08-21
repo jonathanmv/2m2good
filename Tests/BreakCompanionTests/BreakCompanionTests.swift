@@ -33,6 +33,25 @@ final class BreakCompanionTests: XCTestCase {
         }
     }
 
+    func testRoutineFocusTaxonomyIsCompleteAndConservative() {
+        let expected: [String: Set<BodyFocus>] = [
+            "neck-shoulders": [.neckShoulders, .upperBackPosture, .breathRelaxation],
+            "eyes-posture": [.eyesFace, .upperBackPosture, .neckShoulders],
+            "standing-reset": [.lowerLegsFeetAnkles, .upperBackPosture, .breathRelaxation],
+            "hands-wrists": [.handsWristsForearms],
+            "seated-twist": [.trunkMobility, .upperBackPosture],
+            "breathing-reset": [.breathRelaxation],
+            "feet-ankles": [.lowerLegsFeetAnkles],
+            "jaw-face": [.eyesFace, .breathRelaxation],
+            "upper-back": [.upperBackPosture, .chestSideBody, .neckShoulders],
+            "side-stretch": [.chestSideBody, .trunkMobility]
+        ]
+
+        XCTAssertEqual(Dictionary(uniqueKeysWithValues: BreakRoutine.all.map { ($0.id, $0.focuses) }), expected)
+        XCTAssertEqual(Set(BreakRoutine.all.flatMap(\.focuses)), Set(BodyFocus.allCases))
+        XCTAssertTrue(BreakRoutine.all.allSatisfy { !$0.focuses.isEmpty })
+    }
+
     func testPointerMovementClassifierKeepsADeadZoneForTaps() {
         XCTAssertEqual(
             PointerMovementClassifier.classify(from: .zero, to: .zero),
@@ -94,7 +113,61 @@ final class BreakCompanionTests: XCTestCase {
         )
     }
 
-    func testCompletionAdvancesAndWrapsRoutineSelection() {
+    func testBalancedSelectionFavorsUnderrepresentedFocusAfterSkewedHistory() {
+        let history = Array(repeating: "neck-shoulders", count: 6)
+        XCTAssertEqual(
+            BalancedRoutineSelector.suggestion(from: BreakRoutine.all, completionHistory: history)?.id,
+            "hands-wrists"
+        )
+    }
+
+    func testBalancedSelectionNeverImmediatelyRepeatsLastCompletedRoutine() {
+        for routine in BreakRoutine.all {
+            let selected = BalancedRoutineSelector.suggestion(
+                from: BreakRoutine.all,
+                completionHistory: [routine.id]
+            )
+            XCTAssertNotEqual(selected?.id, routine.id)
+        }
+    }
+
+    func testBalancedSelectionUsesOnlyRecentCompletionWindow() {
+        let olderHistory = Array(repeating: "hands-wrists", count: 6)
+        let recentHistory = Array(repeating: "neck-shoulders", count: 6)
+        XCTAssertEqual(
+            BalancedRoutineSelector.suggestion(
+                from: BreakRoutine.all,
+                completionHistory: olderHistory + recentHistory
+            )?.id,
+            "hands-wrists",
+            "Older hand-focused history should not affect the six-completion window"
+        )
+    }
+
+    func testBalancedSelectionHasDeterministicFallbackWithoutTags() {
+        let step = RoutineStep(
+            title: "Settle",
+            instruction: "Move gently, and stop if anything hurts.",
+            duration: 120,
+            motion: .still
+        )
+        let first = BreakRoutine(id: "first", title: "First", invitation: "Pause?", focuses: [], steps: [step])
+        let second = BreakRoutine(id: "second", title: "Second", invitation: "Pause?", focuses: [], steps: [step])
+
+        XCTAssertEqual(
+            BalancedRoutineSelector.suggestion(
+                from: [first, second],
+                completionHistory: [first.id]
+            ),
+            second
+        )
+        XCTAssertEqual(
+            BalancedRoutineSelector.suggestion(from: [first, second], completionHistory: []),
+            first
+        )
+    }
+
+    func testLegacyRotationPolicyProvidesDeterministicFallback() {
         XCTAssertEqual(
             RoutineSelectionPolicy.suggestion(
                 from: BreakRoutine.all,
@@ -113,7 +186,7 @@ final class BreakCompanionTests: XCTestCase {
         )
     }
 
-    func testSelectionStorePersistsPendingAndCompletedState() {
+    func testSelectionStorePersistsPendingAndBalancedHistory() {
         let suiteName = "BreakCompanionTests.\(#function)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
@@ -133,9 +206,49 @@ final class BreakCompanionTests: XCTestCase {
         restartedWhilePending.markCompleted(BreakRoutine.all[0])
         let restartedAfterCompletion = RoutineSelectionStore(defaults: defaults)
         XCTAssertEqual(
-            restartedAfterCompletion.suggestion(from: BreakRoutine.all),
-            BreakRoutine.all[1],
-            "An app restart after completion must advance to the next routine"
+            restartedAfterCompletion.suggestion(from: BreakRoutine.all)?.id,
+            "hands-wrists",
+            "An app restart must retain completion history for balancing"
+        )
+    }
+
+    func testSelectionStoreMigratesLegacyLastCompletedState() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set("neck-shoulders", forKey: "routine.lastCompletedID")
+
+        let migrated = RoutineSelectionStore(defaults: defaults)
+        XCTAssertEqual(migrated.suggestion(from: BreakRoutine.all)?.id, "hands-wrists")
+    }
+
+    func testSelectionStoreRejectsStalePendingImmediateRepeat() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set("neck-shoulders", forKey: "routine.lastCompletedID")
+        defaults.set("neck-shoulders", forKey: "routine.pendingID")
+
+        let store = RoutineSelectionStore(defaults: defaults)
+        XCTAssertEqual(store.suggestion(from: BreakRoutine.all)?.id, "hands-wrists")
+    }
+
+    func testSelectionStoreLimitsPersistedHistoryToRecentWindow() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = RoutineSelectionStore(defaults: defaults)
+
+        for routine in BreakRoutine.all.prefix(8) {
+            store.markCompleted(routine)
+        }
+
+        XCTAssertEqual(
+            defaults.stringArray(forKey: "routine.recentCompletionHistory"),
+            Array(BreakRoutine.all.prefix(8).suffix(6).map(\.id))
         )
     }
 }

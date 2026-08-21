@@ -9,9 +9,10 @@ A deliberately small, local macOS break companion. After 60 minutes of active ke
 - Warm check-ins with **Start**, **Later** (one hour), and **Tomorrow**.
 - Speech recognition for “start,” “later,” “tomorrow,” “in 20 minutes,” or “in two hours.”
 - Ten rotating desk-friendly routines covering neck, eyes, standing, hands, seated mobility, breathing, feet, jaw, upper back, and side stretching.
+- Normal check-ins quietly favor movement-focus areas that have appeared less often in the last six completed breaks, without exposing scores or body data in the interface.
 - Every routine is exactly 120 seconds, with spoken guidance, simple motion cues, Pause, Next, End, and safety wording.
-- **Next** immediately starts a different randomly chosen routine from 2:00. The abandoned routine is not recorded as complete; the routine ultimately completed or ended sets the next ordinary check-in in the persisted cycle.
-- All processing uses Apple’s on-device/system frameworks; the app has no network integration or analytics.
+- **Next** immediately starts a different randomly chosen routine from 2:00. The abandoned routine is not recorded as complete; only the routine ultimately completed or ended enters the local history used for future check-ins.
+- Selection history is limited to six routine identifiers in local macOS preferences. All processing uses Apple’s on-device/system frameworks; the app has no network integration or analytics.
 
 ## Build and run
 

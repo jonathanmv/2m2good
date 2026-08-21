@@ -17,10 +17,22 @@ enum MotionCue: Equatable {
     case still
 }
 
+enum BodyFocus: String, CaseIterable, Hashable {
+    case neckShoulders
+    case upperBackPosture
+    case chestSideBody
+    case trunkMobility
+    case handsWristsForearms
+    case lowerLegsFeetAnkles
+    case breathRelaxation
+    case eyesFace
+}
+
 struct BreakRoutine: Identifiable, Equatable {
     let id: String
     let title: String
     let invitation: String
+    let focuses: Set<BodyFocus>
     let steps: [RoutineStep]
 
     var duration: Int { steps.reduce(0) { $0 + $1.duration } }
@@ -30,6 +42,7 @@ struct BreakRoutine: Identifiable, Equatable {
             id: "neck-shoulders",
             title: "Neck + shoulders",
             invitation: "A gentle reset for your neck and shoulders?",
+            focuses: [.neckShoulders, .upperBackPosture, .breathRelaxation],
             steps: [
                 .init(title: "Arrive", instruction: "Sit comfortably. Let your hands rest. Move gently, and stop if anything hurts.", duration: 15, motion: .breathe),
                 .init(title: "Shoulder circles", instruction: "Slowly circle your shoulders back. Keep the movement easy.", duration: 20, motion: .roll),
@@ -43,6 +56,7 @@ struct BreakRoutine: Identifiable, Equatable {
             id: "eyes-posture",
             title: "Eyes + posture",
             invitation: "How about two quiet minutes for your eyes and posture?",
+            focuses: [.eyesFace, .upperBackPosture, .neckShoulders],
             steps: [
                 .init(title: "Look away", instruction: "Let your eyes leave the screen. Move gently, and stop if anything hurts.", duration: 15, motion: .still),
                 .init(title: "Far focus", instruction: "Rest your gaze on something far away. No need to stare.", duration: 30, motion: .sideToSide),
@@ -56,6 +70,7 @@ struct BreakRoutine: Identifiable, Equatable {
             id: "standing-reset",
             title: "Standing reset",
             invitation: "Want a gentle two-minute standing reset?",
+            focuses: [.lowerLegsFeetAnkles, .upperBackPosture, .breathRelaxation],
             steps: [
                 .init(title: "Stand", instruction: "Stand up in your own time. Use support if helpful. Stop if anything hurts.", duration: 15, motion: .rise),
                 .init(title: "Shift", instruction: "Shift your weight slowly from one foot to the other.", duration: 25, motion: .sideToSide),
@@ -69,6 +84,7 @@ struct BreakRoutine: Identifiable, Equatable {
             id: "hands-wrists",
             title: "Hands + wrists",
             invitation: "A gentle reset for your hands and wrists?",
+            focuses: [.handsWristsForearms],
             steps: [
                 .init(title: "Unclench", instruction: "Let your hands rest loosely. Move gently, and stop if anything hurts.", duration: 15, motion: .breathe),
                 .init(title: "Open and close", instruction: "Slowly open your hands wide, then let your fingers curl in.", duration: 20, motion: .blink),
@@ -82,6 +98,7 @@ struct BreakRoutine: Identifiable, Equatable {
             id: "seated-twist",
             title: "Seated twist",
             invitation: "Want a slow seated twist and reset?",
+            focuses: [.trunkMobility, .upperBackPosture],
             steps: [
                 .init(title: "Sit tall", instruction: "Place both feet down. Move gently, and stop if anything hurts.", duration: 15, motion: .rise),
                 .init(title: "Turn right", instruction: "Slowly turn your ribs to the right. Keep your hips facing forward.", duration: 25, motion: .sideToSide),
@@ -95,6 +112,7 @@ struct BreakRoutine: Identifiable, Equatable {
             id: "breathing-reset",
             title: "Breathing reset",
             invitation: "How about two quiet minutes to breathe and settle?",
+            focuses: [.breathRelaxation],
             steps: [
                 .init(title: "Arrive", instruction: "Settle into an easy position. Breathe gently, and stop if anything hurts or feels uncomfortable.", duration: 15, motion: .still),
                 .init(title: "Easy inhale", instruction: "Let a comfortable breath come in without trying to make it bigger.", duration: 25, motion: .breathe),
@@ -108,6 +126,7 @@ struct BreakRoutine: Identifiable, Equatable {
             id: "feet-ankles",
             title: "Feet + ankles",
             invitation: "A small seated reset for your feet and ankles?",
+            focuses: [.lowerLegsFeetAnkles],
             steps: [
                 .init(title: "Find the floor", instruction: "Sit securely with both feet supported. Move gently, and stop if anything hurts.", duration: 15, motion: .still),
                 .init(title: "Heel and toe", instruction: "Slowly lift your heels, lower them, then lift your toes.", duration: 20, motion: .rise),
@@ -121,6 +140,7 @@ struct BreakRoutine: Identifiable, Equatable {
             id: "jaw-face",
             title: "Jaw + face",
             invitation: "Want a gentle reset for your jaw and face?",
+            focuses: [.eyesFace, .breathRelaxation],
             steps: [
                 .init(title: "Unclench", instruction: "Let your teeth part slightly. Move gently, and stop if anything hurts.", duration: 15, motion: .breathe),
                 .init(title: "Soften the jaw", instruction: "Let your lower jaw feel heavy without forcing it open.", duration: 20, motion: .still),
@@ -134,6 +154,7 @@ struct BreakRoutine: Identifiable, Equatable {
             id: "upper-back",
             title: "Upper back",
             invitation: "A gentle upper-back reset?",
+            focuses: [.upperBackPosture, .chestSideBody, .neckShoulders],
             steps: [
                 .init(title: "Settle", instruction: "Sit or stand comfortably. Move gently, and stop if anything hurts.", duration: 15, motion: .breathe),
                 .init(title: "Self-hug", instruction: "Wrap your arms loosely around yourself and let your upper back widen.", duration: 25, motion: .breathe),
@@ -147,6 +168,7 @@ struct BreakRoutine: Identifiable, Equatable {
             id: "side-stretch",
             title: "Seated side stretch",
             invitation: "Want a quiet seated side stretch?",
+            focuses: [.chestSideBody, .trunkMobility],
             steps: [
                 .init(title: "Ground", instruction: "Sit securely with both feet down. Move gently, and stop if anything hurts.", duration: 15, motion: .still),
                 .init(title: "Reach right", instruction: "Let one arm reach up and lean slightly to the right.", duration: 25, motion: .sideToSide),
@@ -170,6 +192,75 @@ enum RandomRoutineSelector {
         let index = chooseIndex(alternatives.indices)
         guard alternatives.indices.contains(index) else { return nil }
         return alternatives[index]
+    }
+}
+
+enum BalancedRoutineSelector {
+    static let completionWindowSize = 6
+
+    static func suggestion(
+        from routines: [BreakRoutine],
+        completionHistory: [String]
+    ) -> BreakRoutine? {
+        guard !routines.isEmpty else { return nil }
+
+        let recentRoutines = completionHistory
+            .suffix(completionWindowSize)
+            .compactMap { id in routines.first(where: { $0.id == id }) }
+        let lastCompletedID = recentRoutines.last?.id
+        let candidates = routines.count > 1
+            ? routines.filter { $0.id != lastCompletedID }
+            : routines
+        let taggedCandidates = candidates.filter { !$0.focuses.isEmpty }
+
+        guard !taggedCandidates.isEmpty else {
+            return RoutineSelectionPolicy.suggestion(
+                from: routines,
+                pendingRoutineID: nil,
+                lastCompletedRoutineID: lastCompletedID
+            )
+        }
+
+        var counts = Dictionary(uniqueKeysWithValues: BodyFocus.allCases.map { ($0, 0) })
+        for routine in recentRoutines {
+            for focus in routine.focuses {
+                counts[focus, default: 0] += 1
+            }
+        }
+
+        return taggedCandidates.enumerated().min { left, right in
+            score(for: left.element, counts: counts, libraryIndex: left.offset)
+                < score(for: right.element, counts: counts, libraryIndex: right.offset)
+        }?.element
+    }
+
+    private static func score(
+        for routine: BreakRoutine,
+        counts: [BodyFocus: Int],
+        libraryIndex: Int
+    ) -> SelectionScore {
+        let focusCounts = routine.focuses.map { counts[$0, default: 0] }
+        return SelectionScore(
+            leastRecentAttention: focusCounts.min() ?? Int.max,
+            averageRecentAttention: Double(focusCounts.reduce(0, +)) / Double(focusCounts.count),
+            libraryIndex: libraryIndex
+        )
+    }
+
+    private struct SelectionScore: Comparable {
+        let leastRecentAttention: Int
+        let averageRecentAttention: Double
+        let libraryIndex: Int
+
+        static func < (left: SelectionScore, right: SelectionScore) -> Bool {
+            if left.leastRecentAttention != right.leastRecentAttention {
+                return left.leastRecentAttention < right.leastRecentAttention
+            }
+            if left.averageRecentAttention != right.averageRecentAttention {
+                return left.averageRecentAttention < right.averageRecentAttention
+            }
+            return left.libraryIndex < right.libraryIndex
+        }
     }
 }
 
@@ -199,15 +290,20 @@ struct RoutineSelectionStore {
     private enum Key {
         static let pendingRoutineID = "routine.pendingID"
         static let lastCompletedRoutineID = "routine.lastCompletedID"
+        static let recentCompletionHistory = "routine.recentCompletionHistory"
     }
 
     let defaults: UserDefaults
 
     func suggestion(from routines: [BreakRoutine]) -> BreakRoutine? {
-        let suggestion = RoutineSelectionPolicy.suggestion(
+        let history = completionHistory(from: routines)
+        let pendingRoutineID = defaults.string(forKey: Key.pendingRoutineID)
+        let pending = routines.first(where: {
+            $0.id == pendingRoutineID && $0.id != history.last
+        })
+        let suggestion = pending ?? BalancedRoutineSelector.suggestion(
             from: routines,
-            pendingRoutineID: defaults.string(forKey: Key.pendingRoutineID),
-            lastCompletedRoutineID: defaults.string(forKey: Key.lastCompletedRoutineID)
+            completionHistory: history
         )
         if let suggestion {
             defaults.set(suggestion.id, forKey: Key.pendingRoutineID)
@@ -215,8 +311,27 @@ struct RoutineSelectionStore {
         return suggestion
     }
 
-    func markCompleted(_ routine: BreakRoutine) {
+    func markCompleted(_ routine: BreakRoutine, among routines: [BreakRoutine] = BreakRoutine.all) {
+        var history = completionHistory(from: routines)
+        history.append(routine.id)
+        history = Array(history.suffix(BalancedRoutineSelector.completionWindowSize))
+        defaults.set(history, forKey: Key.recentCompletionHistory)
         defaults.set(routine.id, forKey: Key.lastCompletedRoutineID)
         defaults.removeObject(forKey: Key.pendingRoutineID)
+    }
+
+    private func completionHistory(from routines: [BreakRoutine]) -> [String] {
+        let validIDs = Set(routines.map(\.id))
+        let stored = defaults.stringArray(forKey: Key.recentCompletionHistory) ?? []
+        let validStored = stored.filter { validIDs.contains($0) }
+        if !validStored.isEmpty {
+            return Array(validStored.suffix(BalancedRoutineSelector.completionWindowSize))
+        }
+
+        if let legacyLastCompleted = defaults.string(forKey: Key.lastCompletedRoutineID),
+           validIDs.contains(legacyLastCompleted) {
+            return [legacyLastCompleted]
+        }
+        return []
     }
 }
