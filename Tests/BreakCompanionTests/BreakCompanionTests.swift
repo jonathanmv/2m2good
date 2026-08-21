@@ -26,4 +26,21 @@ final class BreakCompanionTests: XCTestCase {
             XCTAssertTrue(script.contains("gentl") || script.contains("slow"))
         }
     }
+
+    func testPointerMovementClassifierKeepsADeadZoneForTaps() {
+        XCTAssertEqual(
+            PointerMovementClassifier.classify(from: .zero, to: .zero),
+            .tap
+        )
+        XCTAssertEqual(
+            PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 4, y: 0)),
+            .tap,
+            "Movement at the threshold should not turn a slightly shaky click into a drag"
+        )
+        XCTAssertEqual(
+            PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 3, y: 4)),
+            .drag,
+            "Movement past the threshold should reposition the orb without activating it"
+        )
+    }
 }

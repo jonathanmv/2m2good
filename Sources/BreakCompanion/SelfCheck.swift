@@ -29,8 +29,15 @@ enum SelfCheck {
             failures.append("voice phrase failed: \(phrase)")
         }
 
+        if PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 4, y: 0)) != .tap {
+            failures.append("movement at the threshold should remain a tap")
+        }
+        if PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 3, y: 4)) != .drag {
+            failures.append("movement past the threshold should become a drag")
+        }
+
         if failures.isEmpty {
-            print("Self-check passed: routines, timing, safety language, and voice commands.")
+            print("Self-check passed: routines, timing, safety language, voice commands, and pointer movement.")
             return true
         }
 

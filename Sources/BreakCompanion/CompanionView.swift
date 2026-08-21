@@ -30,15 +30,18 @@ struct CompanionView: View {
     }
 
     private var idleView: some View {
-        Button(action: store.offerBreakNow) {
-            CompanionOrb(motion: .breathe, warmth: 0.28, active: hovered)
-                .frame(width: 58, height: 58)
-                .padding(10)
-        }
-        .buttonStyle(.plain)
+        CompanionOrb(motion: .breathe, warmth: 0.28, active: hovered)
+            .frame(width: 58, height: 58)
+            .padding(10)
+            .overlay {
+                OrbPointerInteraction(onTap: store.offerBreakNow)
+            }
         .onHover { hovered = $0 }
         .help("Break Companion — click for a pause")
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Break Companion. Offer a wellbeing break now.")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { store.offerBreakNow() }
     }
 
     private var checkInView: some View {
