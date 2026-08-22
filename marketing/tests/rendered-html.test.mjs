@@ -51,6 +51,24 @@ test("server-renders the 2M2Better landing page and early-access dialog", async 
   );
 });
 
+test("declared og:image dimensions match the shipped image bytes", async () => {
+  const bytes = await readFile(new URL("../public/og.png", import.meta.url));
+  assert.equal(bytes.subarray(12, 16).toString("ascii"), "IHDR");
+  const width = bytes.readUInt32BE(16);
+  const height = bytes.readUInt32BE(20);
+
+  const html = await (await render()).text();
+  const declared = (property) =>
+    Number(
+      html.match(
+        new RegExp(`<meta property="${property}" content="(\\d+)"`, "i"),
+      )?.[1],
+    );
+
+  assert.equal(declared("og:image:width"), width);
+  assert.equal(declared("og:image:height"), height);
+});
+
 test("source preserves the minimal private product story", async () => {
   const [css, page, layout] = await Promise.all([
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),

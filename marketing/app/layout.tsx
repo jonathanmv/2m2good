@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     title: "2M2Better · A two-minute reset for your body",
     description:
       "A gentle, private macOS desktop companion for short standing breaks that protect your flow.",
-    images: [{ url: "/og.png", width: 1698, height: 909 }],
+    images: [{ url: "/og.png", width: 1730, height: 909 }],
     type: "website",
   },
   twitter: {
