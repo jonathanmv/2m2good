@@ -133,8 +133,7 @@ final class BreakCompanionTests: XCTestCase {
     func testEveryMotionCueMatchesTheDirectionItsInstructionAsks() {
         for move in MoveLibrary.all {
             let text = move.instruction.lowercased()
-            let lateral = text.contains("right and left")
-                || text.contains("left and right")
+            let lateral = (text.contains("right") && text.contains("left"))
                 || text.contains("side to side")
                 || text.contains("one foot to the other")
             let forwardBack = text.contains("forward and back")

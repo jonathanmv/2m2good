@@ -127,8 +127,8 @@ struct CompanionView: View {
             if store.offersBalancedChoice {
                 Button(store.mode == .setup ? "Use balanced for now" : "Use balanced instead", action: store.continueWithBalancedDefaults)
                     .buttonStyle(QuietButtonStyle())
-                    .keyboardShortcut(store.mode == .setup ? KeyboardShortcut.cancelAction : nil)
-                    .accessibilityHint("Use the existing balanced movement selection without choosing an area")
+                    .keyboardShortcut("b", modifiers: .command)
+                    .accessibilityHint("Press Command B to use the existing balanced movement selection without choosing an area")
             }
 
             if store.mode == .configuration {
