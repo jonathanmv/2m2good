@@ -507,6 +507,32 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertTrue(reopened.selectedAreas.isEmpty)
     }
 
+    @MainActor
+    func testNextRequestsAPanelRefitForTheNewSessionContent() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults
+        )
+        store.continueWithBalancedDefaults()
+        store.startRoutine()
+
+        var resizedModes: [CompanionStore.Mode] = []
+        store.onSizeChange = { resizedModes.append($0) }
+        let current = store.routine
+        store.nextRoutine()
+
+        XCTAssertNotEqual(store.routine, current)
+        XCTAssertEqual(store.stepIndex, 0)
+        XCTAssertEqual(resizedModes, [.routine])
+
+        store.endRoutine()
+    }
+
     func testPointerMovementClassifierKeepsTapDeadZone() {
         XCTAssertEqual(PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 4, y: 0)), .tap)
         XCTAssertEqual(PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 3, y: 4)), .drag)

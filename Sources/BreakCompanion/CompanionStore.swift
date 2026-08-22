@@ -176,6 +176,7 @@ final class CompanionStore: ObservableObject {
         elapsedInStep = 0
         isPaused = false
         statusText = nil
+        notifySizeChange()
         speaker.speak(currentStep.instruction)
     }
 
