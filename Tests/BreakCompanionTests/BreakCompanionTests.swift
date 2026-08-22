@@ -130,6 +130,24 @@ final class BreakCompanionTests: XCTestCase {
         }
     }
 
+    func testEveryMotionCueMatchesTheDirectionItsInstructionAsks() {
+        for move in MoveLibrary.all {
+            let text = move.instruction.lowercased()
+            let lateral = text.contains("right and left")
+                || text.contains("left and right")
+                || text.contains("side to side")
+                || text.contains("one foot to the other")
+            let forwardBack = text.contains("forward and back")
+
+            if forwardBack {
+                XCTAssertNotEqual(move.motion, .sideToSide, move.id)
+            }
+            if lateral, move.motion != .still, move.motion != .breathe {
+                XCTAssertEqual(move.motion, .sideToSide, move.id)
+            }
+        }
+    }
+
     func testSelectedAreasPrioritizeAtLeastThreeMatchingMoves() {
         for area in [BodyArea.lowerBack, .neck, .shoulders, .handsWrists] {
             let matchingIDs = Set(
@@ -263,6 +281,7 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertTrue(first.instruction.lowercased().contains("you feel unwell"))
 
         XCTAssertTrue(first.spokenInstruction.lowercased().contains("stand when you’re ready"))
+        XCTAssertTrue(first.spokenInstruction.lowercased().contains("with support nearby if useful"))
         XCTAssertTrue(first.spokenInstruction.lowercased().contains("move gently"))
         XCTAssertTrue(first.spokenInstruction.lowercased().contains("stop if anything hurts"))
         XCTAssertLessThan(first.spokenInstruction.count, first.instruction.count)

@@ -302,7 +302,7 @@ enum MoveLibrary {
             instruction: "Shift your weight a little forward and back while both feet stay grounded. Keep it comfortable.",
             focuses: [.trunkMobility, .lowerBack],
             bodyAreas: [.lowerBack],
-            motion: .sideToSide,
+            motion: .rise,
             supportsStanding: true
         ),
         .init(
@@ -385,7 +385,7 @@ struct BreakRoutine: Identifiable, Equatable {
                 ? "This is a standing reset. Stand when you’re ready, with support nearby if useful. Move gently, stay in a comfortable range, and stop if anything hurts or you feel unwell. "
                 : ""
             let spokenLead = index == 0
-                ? "Stand when you’re ready. Move gently and stop if anything hurts. "
+                ? "Stand when you’re ready, with support nearby if useful. Move gently and stop if anything hurts. "
                 : ""
             return RoutineStep(
                 id: move.id,
