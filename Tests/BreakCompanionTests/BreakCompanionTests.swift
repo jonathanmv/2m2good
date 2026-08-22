@@ -198,6 +198,24 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertEqual(Set(moveIDs).intersection(["hands", "eyes", "breath"]).count, 3)
     }
 
+    func testNextSessionAvoidsCurrentMovesEvenWhenTheAreaHasFewTaggedMoves() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let taggedNeckMoves = MoveLibrary.all.filter { $0.bodyAreas.contains(.neck) }
+        XCTAssertLessThan(taggedNeckMoves.count, SessionComposer.sessionMoveCount)
+
+        let store = SessionSelectionStore(defaults: defaults)
+        let current = store.suggestion(from: MoveLibrary.all, selectedAreas: [.neck])!
+        let next = store.nextSession(after: current, from: MoveLibrary.all, selectedAreas: [.neck])!
+
+        XCTAssertTrue(Set(current.moveIDs).isDisjoint(with: next.moveIDs))
+        XCTAssertEqual(Set(next.moveIDs).count, SessionComposer.sessionMoveCount)
+        XCTAssertEqual(next.duration, 120)
+    }
+
     func testComposedSessionIsStandingSafeUniqueAndExactlyTwoMinutes() {
         let routine = SessionComposer.compose(
             from: MoveLibrary.all,

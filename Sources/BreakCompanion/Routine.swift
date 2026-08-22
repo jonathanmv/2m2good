@@ -442,12 +442,13 @@ enum SessionComposer {
         while selected.count < sessionMoveCount {
             let selectedIDs = Set(selected.map(\.id))
             let remaining = uniqueLibrary.enumerated().filter { !selectedIDs.contains($0.element.id) }
-            let matchingRemaining = remaining.filter {
+            let quotaCandidates = remaining.filter {
                 !$0.element.bodyAreas.isDisjoint(with: selectedAreas)
+                    && !currentMoveIDs.contains($0.element.id)
             }
             let candidates: [(offset: Int, element: BreakMove)]
-            if selectedAreaMatchCount < targetAreaMatches, !matchingRemaining.isEmpty {
-                candidates = matchingRemaining
+            if selectedAreaMatchCount < targetAreaMatches, !quotaCandidates.isEmpty {
+                candidates = quotaCandidates
             } else {
                 candidates = remaining
             }
