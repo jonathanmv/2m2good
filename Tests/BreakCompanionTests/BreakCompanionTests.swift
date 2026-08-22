@@ -138,13 +138,15 @@ final class BreakCompanionTests: XCTestCase {
                 || text.contains("side to side")
                 || text.contains("one foot to the other")
             let forwardBack = text.contains("forward and back")
+                || (text.contains("toes") && text.contains("heels"))
 
             if forwardBack {
-                XCTAssertNotEqual(move.motion, .sideToSide, move.id)
+                XCTAssertTrue([.rise, .breathe].contains(move.motion), move.id)
             }
-            if lateral, move.motion != .still, move.motion != .breathe {
+            if lateral {
                 XCTAssertEqual(move.motion, .sideToSide, move.id)
             }
+            XCTAssertFalse(lateral && forwardBack, move.id)
         }
     }
 

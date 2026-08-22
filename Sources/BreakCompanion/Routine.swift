@@ -196,7 +196,7 @@ enum MoveLibrary {
             title: "Heel-to-toe rock",
             instruction: "With support if useful, rock gently toward your toes and back toward your heels.",
             focuses: [.lowerLegsFeetAnkles],
-            motion: .sideToSide,
+            motion: .rise,
             supportsStanding: true
         ),
         .init(

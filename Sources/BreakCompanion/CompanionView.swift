@@ -85,7 +85,7 @@ struct CompanionView: View {
             }
 
             VStack(spacing: 7) {
-                ForEach(BodyArea.allCases, id: \.self) { area in
+                ForEach(Array(BodyArea.allCases.enumerated()), id: \.element) { index, area in
                     Button {
                         toggle(area)
                     } label: {
@@ -104,7 +104,9 @@ struct CompanionView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(AreaOptionButtonStyle(selected: draftAreas.contains(area)))
+                    .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: [])
                     .accessibilityValue(draftAreas.contains(area) ? "Selected" : "Not selected")
+                    .accessibilityHint("Press \(index + 1) to turn this area on or off")
                 }
             }
 
@@ -118,18 +120,21 @@ struct CompanionView: View {
                 store.saveSelectedAreas(draftAreas)
             }
             .buttonStyle(PrimaryButtonStyle())
+            .keyboardShortcut(.defaultAction)
             .disabled(draftAreas.isEmpty)
             .opacity(draftAreas.isEmpty ? 0.5 : 1)
 
             if store.offersBalancedChoice {
                 Button(store.mode == .setup ? "Use balanced for now" : "Use balanced instead", action: store.continueWithBalancedDefaults)
                     .buttonStyle(QuietButtonStyle())
+                    .keyboardShortcut(store.mode == .setup ? KeyboardShortcut.cancelAction : nil)
                     .accessibilityHint("Use the existing balanced movement selection without choosing an area")
             }
 
             if store.mode == .configuration {
                 Button("Cancel", action: store.cancelAreaConfiguration)
                     .buttonStyle(QuietButtonStyle())
+                    .keyboardShortcut(.cancelAction)
             }
         }
     }
