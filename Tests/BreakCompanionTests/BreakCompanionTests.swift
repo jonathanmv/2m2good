@@ -250,6 +250,33 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertTrue(routine?.steps.allSatisfy { $0.duration == 20 } == true)
     }
 
+    func testSpokenGuidanceFitsAStepWhileTheScreenKeepsTheFullBoundary() {
+        let routine = SessionComposer.compose(
+            from: MoveLibrary.all,
+            recentShownMoveIDs: [],
+            recentCompletedMoveIDs: []
+        )!
+        let first = routine.steps[0]
+
+        XCTAssertTrue(first.instruction.contains("This is a standing reset."))
+        XCTAssertTrue(first.instruction.lowercased().contains("stay in a comfortable range"))
+        XCTAssertTrue(first.instruction.lowercased().contains("you feel unwell"))
+
+        XCTAssertTrue(first.spokenInstruction.lowercased().contains("stand when you’re ready"))
+        XCTAssertTrue(first.spokenInstruction.lowercased().contains("move gently"))
+        XCTAssertTrue(first.spokenInstruction.lowercased().contains("stop if anything hurts"))
+        XCTAssertLessThan(first.spokenInstruction.count, first.instruction.count)
+        XCTAssertLessThanOrEqual(
+            first.spokenInstruction.split(separator: " ").count,
+            50,
+            "step one speech must fit inside its twenty-second step"
+        )
+
+        for step in routine.steps.dropFirst() {
+            XCTAssertEqual(step.spokenInstruction, step.instruction, step.id)
+        }
+    }
+
     func testNextCompositionAvoidsEveryMoveFromCurrentAndRecentSessions() {
         let first = SessionComposer.compose(
             from: MoveLibrary.all,

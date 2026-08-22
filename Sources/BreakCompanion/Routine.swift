@@ -339,8 +339,25 @@ struct RoutineStep: Identifiable, Equatable {
     let id: String
     let title: String
     let instruction: String
+    let spokenInstruction: String
     let duration: Int
     let motion: MotionCue
+
+    init(
+        id: String,
+        title: String,
+        instruction: String,
+        spokenInstruction: String? = nil,
+        duration: Int,
+        motion: MotionCue
+    ) {
+        self.id = id
+        self.title = title
+        self.instruction = instruction
+        self.spokenInstruction = spokenInstruction ?? instruction
+        self.duration = duration
+        self.motion = motion
+    }
 }
 
 struct BreakRoutine: Identifiable, Equatable {
@@ -367,10 +384,14 @@ struct BreakRoutine: Identifiable, Equatable {
             let standingLead = index == 0
                 ? "This is a standing reset. Stand when you’re ready, with support nearby if useful. Move gently, stay in a comfortable range, and stop if anything hurts or you feel unwell. "
                 : ""
+            let spokenLead = index == 0
+                ? "Stand when you’re ready. Move gently and stop if anything hurts. "
+                : ""
             return RoutineStep(
                 id: move.id,
                 title: move.title,
                 instruction: standingLead + move.instruction,
+                spokenInstruction: spokenLead + move.instruction,
                 duration: SessionComposer.moveDuration,
                 motion: move.motion
             )

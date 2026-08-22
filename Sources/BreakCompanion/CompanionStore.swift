@@ -129,7 +129,7 @@ final class CompanionStore: ObservableObject {
         isPaused = false
         statusText = nil
         notifySizeChange()
-        speaker.speak(currentStep.instruction)
+        speaker.speak(currentStep.spokenInstruction)
     }
 
     func postpone(minutes: Int) {
@@ -159,7 +159,7 @@ final class CompanionStore: ObservableObject {
 
     func togglePause() {
         isPaused.toggle()
-        if isPaused { speaker.stop() } else { speaker.speak(currentStep.instruction) }
+        if isPaused { speaker.stop() } else { speaker.speak(currentStep.spokenInstruction) }
     }
 
     func nextRoutine() {
@@ -177,7 +177,7 @@ final class CompanionStore: ObservableObject {
         isPaused = false
         statusText = nil
         notifySizeChange()
-        speaker.speak(currentStep.instruction)
+        speaker.speak(currentStep.spokenInstruction)
     }
 
     func endRoutine() {
@@ -286,7 +286,7 @@ final class CompanionStore: ObservableObject {
         if stepIndex + 1 < routine.steps.count {
             stepIndex += 1
             elapsedInStep = 0
-            speaker.speak(currentStep.instruction)
+            speaker.speak(currentStep.spokenInstruction)
         } else {
             finishRoutine(countAsCompleted: true)
         }
