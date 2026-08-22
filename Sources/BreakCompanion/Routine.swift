@@ -457,6 +457,8 @@ enum SessionComposer {
         let areaMatches = uniqueLibrary.filter {
             !$0.bodyAreas.isDisjoint(with: selectedAreas)
         }
+        // At least half the session should carry a selected-area tag, but the quota bends to the
+        // eligible content so a session always reaches six unique moves rather than failing.
         let targetAreaMatches = min(3, areaMatches.count)
         var selected: [BreakMove] = []
         var selectedAreaMatchCount = 0
@@ -598,6 +600,8 @@ struct BodyAreaPreferences {
         ].contains { defaults.object(forKey: $0) != nil }
     }
 
+    // Only a legacy value that maps onto a shipped area is adopted. An unrecognized one is left
+    // in place untouched, so the setup screen asks instead of guessing what the user meant.
     private func migrateLegacySelectionIfNeeded() {
         guard !defaults.bool(forKey: Self.migrationKey) else { return }
         if defaults.object(forKey: Self.selectedAreasKey) == nil,
