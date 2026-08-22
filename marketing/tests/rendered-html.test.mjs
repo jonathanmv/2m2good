@@ -23,7 +23,7 @@ async function render() {
   );
 }
 
-test("server-renders the 2mintogood landing page", async () => {
+test("server-renders the 2m2good landing page and early-access dialog", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
@@ -33,12 +33,18 @@ test("server-renders the 2mintogood landing page", async () => {
     .replace(/<!--.*?-->/g, "")
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ");
-  assert.match(html, /<title>2mintogood · A two-minute reset for your body<\/title>/i);
+  assert.match(html, /<title>2m2good · A two-minute reset for your body<\/title>/i);
   assert.match(renderedText, /A two-minute reset that helps your body keep up with your mind\./);
   assert.match(renderedText, /A nudge, not a negotiation\./);
   assert.match(renderedText, /Your breaks stay on your Mac\./);
   assert.match(renderedText, /No account to create\. No network connection\. No analytics/);
+  assert.match(renderedText, /Coming soon/);
+  assert.match(renderedText, /Not public yet\./);
+  assert.match(renderedText, /Join early access/);
+  assert.match(html, /href="https:\/\/forms\.gle\/ALeWYDcoYHvXYNBo6"/);
   assert.doesNotMatch(html, /pricing|testimonial|subscribe|sign in/i);
+  assert.doesNotMatch(html, /<input|<form/i);
+  assert.doesNotMatch(html, /2mintogood|Break Companion/);
 });
 
 test("source preserves the minimal private product story", async () => {
@@ -54,9 +60,19 @@ test("source preserves the minimal private product story", async () => {
   assert.match(normalizedPage, /Voice-first, never voice-only/);
   assert.match(normalizedPage, /No coaching\. No keeping score\./);
   assert.match(normalizedPage, /No account to create\. No network connection\. No analytics/);
+  assert.match(normalizedPage, /dialogRef\.current\?\.showModal\(\)/);
+  assert.match(normalizedPage, /event\.key === "Escape"/);
+  assert.match(normalizedPage, /onCancel=\{\(event\) =>/);
+  assert.match(normalizedPage, /onClose=\{\(\) => openerRef\.current\?\.focus\(\)\}/);
+  assert.match(normalizedPage, /aria-labelledby="coming-soon-title"/);
+  assert.match(normalizedPage, /https:\/\/forms\.gle\/ALeWYDcoYHvXYNBo6/);
   assert.match(layout, /openGraph/);
   assert.match(layout, /\/og\.png/);
   assert.match(css, /@keyframes orb-breathe/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
-  assert.doesNotMatch(page, /https?:\/\//);
+  assert.match(css, /\.coming-soon::backdrop/);
+  assert.deepEqual(
+    page.match(/https?:\/\/[^"]+/g),
+    ["https://forms.gle/ALeWYDcoYHvXYNBo6"],
+  );
 });

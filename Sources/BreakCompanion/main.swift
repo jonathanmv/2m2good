@@ -57,12 +57,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildMenuBarItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "leaf.fill", accessibilityDescription: "Break Companion")
+        item.button?.image = NSImage(systemSymbolName: "leaf.fill", accessibilityDescription: "2m2good")
 
         let menu = NSMenu()
         menu.addItem(withTitle: "Offer a break now", action: #selector(offerBreak), keyEquivalent: "")
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(withTitle: "Quit Break Companion", action: #selector(quit), keyEquivalent: "q")
+        menu.addItem(withTitle: "Quit 2m2good", action: #selector(quit), keyEquivalent: "q")
         menu.items.forEach { $0.target = self }
         item.menu = menu
         statusItem = item

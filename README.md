@@ -1,6 +1,6 @@
-# Break Companion
+# 2m2good
 
-A deliberately small, local macOS break companion. After 60 minutes of active keyboard or mouse use, its quiet floating orb offers one two-minute reset. It accepts a short spoken response or the always-visible buttons, guides the routine with voice and motion, and then gets out of the way.
+A deliberately small, local macOS break companion. After 60 minutes of active keyboard or mouse use, 2m2good's quiet floating orb offers one two-minute reset. It accepts a short spoken response or the always-visible buttons, guides the routine with voice and motion, and then gets out of the way.
 
 ## What is in the pilot
 
@@ -21,7 +21,7 @@ Requires macOS 14 or newer and Apple Command Line Tools (or Xcode).
 
 ```sh
 ./scripts/build-app.sh
-open ".build/app/Break Companion.app"
+open ".build/app/2m2good.app"
 ```
 
 The app appears as a small orb near the upper-right of the screen and as a leaf in the menu bar. Click either to trigger a break immediately.
@@ -43,7 +43,7 @@ The app does not need Accessibility permission. It reads only macOS’s aggregat
 The normal active-work interval is 3,600 seconds. Override it when launching the executable:
 
 ```sh
-BREAK_INTERVAL_SECONDS=5 ".build/app/Break Companion.app/Contents/MacOS/BreakCompanion"
+BREAK_INTERVAL_SECONDS=5 ".build/app/2m2good.app/Contents/MacOS/BreakCompanion"
 ```
 
 `BREAK_IDLE_THRESHOLD_SECONDS` can also replace the default 60-second idle threshold. Values are clamped to sensible testing minimums.
@@ -51,7 +51,7 @@ BREAK_INTERVAL_SECONDS=5 ".build/app/Break Companion.app/Contents/MacOS/BreakCom
 Run the packaged logic checks with:
 
 ```sh
-".build/app/Break Companion.app/Contents/MacOS/BreakCompanion" --self-check
+".build/app/2m2good.app/Contents/MacOS/BreakCompanion" --self-check
 ```
 
 The Swift package and XCTest target are included for use in a standard Xcode toolchain (`swift test`).

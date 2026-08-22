@@ -48,9 +48,9 @@ struct CompanionView: View {
                 OrbPointerInteraction(onTap: store.offerBreakNow)
             }
         .onHover { hovered = $0 }
-        .help("Break Companion — click for a pause")
+        .help("2m2good — click for a pause")
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Break Companion. Offer a wellbeing break now.")
+        .accessibilityLabel("2m2good. Offer a wellbeing break now.")
         .accessibilityValue(store.checkInAccessibilityValue)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { store.offerBreakNow() }

@@ -1,8 +1,8 @@
-# 2mintogood — Brand Direction
+# 2m2good — Brand Direction
 
 ## The idea
 
-2mintogood is a desktop companion that helps people take a short, body-supporting break before long computer sessions turn into stiffness, fatigue, or disconnection.
+2m2good is a desktop companion that helps people take a short, body-supporting break before long computer sessions turn into stiffness, fatigue, or disconnection.
 
 Its promise is deliberately small: two minutes is enough to reset without losing the thread of the work.
 
@@ -10,7 +10,7 @@ This is not a productivity coach. Better work can be a welcome outcome, but the 
 
 ## What the name means
 
-**2mintogood** means two minutes toward feeling good again: a small return to the body, not a demand to improve oneself.
+**2m2good** means two minutes toward feeling good again: a small return to the body, not a demand to improve oneself.
 
 The two-minute limit exists to protect flow. A person should not have to negotiate with themselves about an elaborate routine, a context switch, or a lost train of thought. The break is short enough to say yes to.
 
@@ -97,4 +97,4 @@ Every new feature, screen, routine, campaign, and piece of copy should pass thes
 4. Does it serve wellbeing before productivity?
 5. Does it still make sense if the product remains only a two-minute desktop companion?
 
-If the answer is no, it is probably outside 2mintogood.
+If the answer is no, it is probably outside 2m2good.

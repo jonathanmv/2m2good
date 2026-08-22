@@ -1,19 +1,23 @@
-# 2mintogood marketing page
+# 2m2good marketing page
 
-The self-contained local landing page for Break Companion. Its visual and copy
+The self-contained local landing page for 2m2good. Its visual and copy
 direction comes from [`../docs/BRAND_DIRECTION.md`](../docs/BRAND_DIRECTION.md).
 
-## Run locally
+## Run the local preview
 
 Requires Node.js 22.13 or newer.
 
 ```bash
 npm install
-npm run dev
+npm run build
+npm run start -- --host 127.0.0.1 --port 3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000). If that port is occupied,
-the terminal will print the alternate local address.
+Keep that terminal open, then visit
+[http://127.0.0.1:3000](http://127.0.0.1:3000). The preview is available only
+while the server process is running.
+
+For live editing with automatic refresh, use `npm run dev` instead.
 
 ## Validate
 

@@ -1,21 +1,52 @@
+"use client";
+
+import { type KeyboardEvent, type MouseEvent, useRef } from "react";
+
+const earlyAccessForm = "https://forms.gle/ALeWYDcoYHvXYNBo6";
 const Arrow = () => <span aria-hidden="true">↘</span>;
 
 export default function Home() {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const openerRef = useRef<HTMLButtonElement | null>(null);
+
+  function openComingSoon(event: MouseEvent<HTMLButtonElement>) {
+    openerRef.current = event.currentTarget;
+    dialogRef.current?.showModal();
+  }
+
+  function closeComingSoon() {
+    dialogRef.current?.close();
+  }
+
+  function closeFromBackdrop(event: MouseEvent<HTMLDialogElement>) {
+    if (event.target === event.currentTarget) {
+      closeComingSoon();
+    }
+  }
+
+  function closeFromKeyboard(event: KeyboardEvent<HTMLDialogElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeComingSoon();
+    }
+  }
+
   return (
-    <main>
+    <>
+      <main>
       <nav className="nav shell" aria-label="Primary navigation">
-        <a className="wordmark" href="#top" aria-label="2mintogood home">
+        <a className="wordmark" href="#top" aria-label="2m2good home">
           <span className="wordmark-dot" aria-hidden="true" />
-          2min<span>to</span>good
+          2m<span>2</span>good
         </a>
         <div className="nav-links">
           <a href="#how-it-feels">How it feels</a>
           <a href="#principles">Principles</a>
           <a href="#privacy">Privacy</a>
         </div>
-        <a className="nav-action" href="#two-minutes">
-          Take two minutes <Arrow />
-        </a>
+        <button className="nav-action nav-button" type="button" onClick={openComingSoon}>
+          Download <Arrow />
+        </button>
       </nav>
 
       <section className="hero shell" id="top">
@@ -40,7 +71,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="orb-stage" aria-label="Break Companion preview">
+        <div className="orb-stage" aria-label="2m2good preview">
           <div className="stage-note note-one">
             <span>small enough to stay</span>
             <strong>out of your way</strong>
@@ -201,20 +232,68 @@ export default function Home() {
           </div>
           <p>Two minutes for your body.</p>
           <h2>Then back to what matters.</h2>
-          <a className="button button-light" href="#top">
-            Meet 2mintogood <span aria-hidden="true">↑</span>
-          </a>
+          <button className="button button-light" type="button" onClick={openComingSoon}>
+            Download 2m2good <span aria-hidden="true">↗</span>
+          </button>
         </div>
       </section>
 
       <footer className="shell footer">
         <a className="wordmark footer-mark" href="#top">
           <span className="wordmark-dot" aria-hidden="true" />
-          2min<span>to</span>good
+          2m<span>2</span>good
         </a>
-        <p>Break Companion for macOS · gentle by design</p>
+        <p>2m2good for macOS · gentle by design</p>
         <p>Local. Private. Yours.</p>
       </footer>
-    </main>
+      </main>
+
+      <dialog
+        className="coming-soon"
+        ref={dialogRef}
+        aria-labelledby="coming-soon-title"
+        aria-describedby="coming-soon-description"
+        onClick={closeFromBackdrop}
+        onKeyDown={closeFromKeyboard}
+        onCancel={(event) => {
+          event.preventDefault();
+          closeComingSoon();
+        }}
+        onClose={() => openerRef.current?.focus()}
+      >
+        <div className="dialog-card">
+          <button
+            className="dialog-close"
+            type="button"
+            aria-label="Close coming soon dialog"
+            onClick={closeComingSoon}
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+          <div className="dialog-orb" aria-hidden="true">
+            <i />
+            <i />
+          </div>
+          <p className="eyebrow">Coming soon</p>
+          <h2 id="coming-soon-title">Not public yet.</h2>
+          <p id="coming-soon-description">
+            2m2good is still in early access. If you&apos;d like to hear when it
+            is ready, leave your email through the short Google Form.
+          </p>
+          <a
+            className="button dialog-primary"
+            href={earlyAccessForm}
+            target="_blank"
+            rel="noopener noreferrer"
+            autoFocus
+          >
+            Join early access <span aria-hidden="true">↗</span>
+          </a>
+          <p className="dialog-note">
+            This opens Google Forms. No email is collected on this site.
+          </p>
+        </div>
+      </dialog>
+    </>
   );
 }

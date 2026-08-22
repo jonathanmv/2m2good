@@ -46,6 +46,16 @@ button {
   color: inherit;
 }
 
+button,
+[role="button"] {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 3px solid var(--orange);
+  outline-offset: 4px;
+}
+
 .shell {
   width: min(1180px, calc(100% - 64px));
   margin-inline: auto;
@@ -121,6 +131,12 @@ button {
   display: flex;
   align-items: center;
   gap: 9px;
+}
+
+.nav-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .hero {
@@ -717,6 +733,7 @@ h1 {
 
 .button-light {
   margin-top: 38px;
+  border: 0;
   background: var(--cream);
   color: var(--ink);
   box-shadow: 0 12px 25px rgba(93, 55, 35, 0.15);
@@ -742,6 +759,130 @@ h1 {
 
 .footer-mark {
   color: var(--ink);
+}
+
+.coming-soon {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 16px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.coming-soon[open] {
+  display: grid;
+  place-items: center;
+}
+
+.coming-soon::backdrop {
+  background: rgba(23, 38, 33, 0.48);
+  backdrop-filter: blur(7px);
+}
+
+.dialog-card {
+  position: relative;
+  width: min(500px, calc(100vw - 32px));
+  padding: 48px;
+  overflow: hidden;
+  border: 1px solid rgba(31, 48, 43, 0.16);
+  border-radius: 34px;
+  background: var(--paper);
+  box-shadow: 0 40px 100px rgba(20, 34, 29, 0.28);
+}
+
+.dialog-card::after {
+  content: "";
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  right: -95px;
+  top: -105px;
+  border: 1px solid rgba(45, 81, 68, 0.13);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 34px rgba(45, 81, 68, 0.045),
+    0 0 0 68px rgba(45, 81, 68, 0.025);
+  pointer-events: none;
+}
+
+.dialog-close {
+  position: absolute;
+  z-index: 2;
+  top: 20px;
+  right: 20px;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(31, 48, 43, 0.14);
+  border-radius: 50%;
+  background: rgba(255, 250, 240, 0.64);
+  color: var(--ink);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.dialog-orb {
+  width: 58px;
+  height: 58px;
+  margin-bottom: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background:
+    radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.46), transparent 34%),
+    linear-gradient(145deg, #6f9978, var(--green-dark));
+  box-shadow: inset -5px -7px 14px rgba(35, 69, 55, 0.18);
+}
+
+.dialog-orb i {
+  width: 5px;
+  height: 12px;
+  border-radius: 99px;
+  background: rgba(255, 250, 240, 0.88);
+}
+
+.coming-soon .eyebrow {
+  margin-bottom: 12px;
+}
+
+.coming-soon h2 {
+  margin: 0;
+  max-width: 390px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(44px, 8vw, 62px);
+  font-weight: 400;
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+}
+
+#coming-soon-description {
+  margin: 22px 0 0;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.dialog-primary {
+  width: 100%;
+  margin-top: 30px;
+  background: var(--green-dark);
+  color: var(--cream);
+  box-shadow: 0 12px 24px rgba(31, 48, 43, 0.16);
+}
+
+.dialog-note {
+  margin: 14px 0 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
 }
 
 @keyframes orb-breathe {
@@ -851,11 +992,6 @@ h1 {
   }
 
   .nav-action {
-    font-size: 0;
-  }
-
-  .nav-action::before {
-    content: "Take 2 min";
     font-size: 12px;
   }
 
@@ -989,6 +1125,11 @@ h1 {
 
   .closing h2 {
     font-size: 18vw;
+  }
+
+  .dialog-card {
+    padding: 42px 24px 28px;
+    border-radius: 26px;
   }
 
   .footer {

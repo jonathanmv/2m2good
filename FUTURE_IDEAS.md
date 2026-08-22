@@ -4,7 +4,7 @@
 
 Product hypothesis: a voluntary financial consequence for skipping an agreed break might help some users follow through on their own wellbeing intention.
 
-This is only a concept for later research. Break Companion does not currently include payments, pricing, completion tracking, enforcement, penalties, accounts, or related interface.
+This is only a concept for later research. 2m2good does not currently include payments, pricing, completion tracking, enforcement, penalties, accounts, or related interface.
 
 Questions that must be answered before considering it:
 
