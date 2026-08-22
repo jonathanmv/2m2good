@@ -151,9 +151,25 @@ final class BreakCompanionTests: XCTestCase {
                 area.label
             )
             XCTAssertTrue(routine?.invitation.lowercased().contains(area.invitationNoun) == true)
+            XCTAssertTrue(routine?.invitation.lowercased().contains("stand") == true, area.label)
+            XCTAssertTrue(routine?.title.lowercased().contains("standing reset") == true, area.label)
             XCTAssertEqual(routine?.duration, 120)
             XCTAssertEqual(Set(routine?.moveIDs ?? []).count, 6)
         }
+    }
+
+    func testMultipleSelectedAreasStillAnnounceAStandingReset() {
+        let routine = SessionComposer.compose(
+            from: MoveLibrary.all,
+            recentShownMoveIDs: [],
+            recentCompletedMoveIDs: [],
+            selectedAreas: [.lowerBack, .handsWrists]
+        )!
+
+        XCTAssertTrue(routine.invitation.lowercased().contains("stand"))
+        XCTAssertTrue(routine.invitation.lowercased().contains("lower-back"))
+        XCTAssertTrue(routine.invitation.lowercased().contains("hands-and-wrists"))
+        XCTAssertEqual(routine.title, "Standing reset")
     }
 
     func testSelectedCopyStaysSupportiveAndNonDiagnostic() {

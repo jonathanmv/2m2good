@@ -389,7 +389,7 @@ struct BreakRoutine: Identifiable, Equatable {
               let area = BodyArea.allCases.first(where: { selectedAreas.contains($0) }) else {
             return "Standing reset"
         }
-        return "\(area.label) reset"
+        return "\(area.label) standing reset"
     }
 
     private static func invitation(for selectedAreas: Set<BodyArea>) -> String {
@@ -397,10 +397,10 @@ struct BreakRoutine: Identifiable, Equatable {
         guard !areas.isEmpty else { return "Ready to stand for a gentle two-minute reset?" }
         let nouns = areas.map(\.invitationNoun)
         if nouns.count == 1 {
-            return "Want a gentle \(nouns[0]) reset?"
+            return "Ready to stand for a gentle \(nouns[0]) reset?"
         }
         let list = nouns.dropLast().joined(separator: ", ") + " and " + nouns.last!
-        return "Want a gentle reset for \(list)?"
+        return "Ready to stand for a gentle reset for \(list)?"
     }
 
     static let fallback = composed(from: Array(MoveLibrary.all.prefix(SessionComposer.sessionMoveCount)))!

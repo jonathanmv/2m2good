@@ -119,11 +119,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func size(for mode: CompanionStore.Mode) -> NSSize {
         switch mode {
         case .idle: return NSSize(width: 92, height: 92)
-        case .setup, .configuration: return NSSize(width: 370, height: 480)
-        case .checkIn: return NSSize(width: 370, height: 300)
-        case .routine: return NSSize(width: 370, height: 390)
-        case .complete: return NSSize(width: 300, height: 270)
+        case .setup, .configuration: return fittedSize(width: 370, minimumHeight: 480)
+        case .checkIn: return fittedSize(width: 370, minimumHeight: 300)
+        case .routine: return fittedSize(width: 370, minimumHeight: 390)
+        case .complete: return fittedSize(width: 300, minimumHeight: 270)
         }
+    }
+
+    private func fittedSize(width: CGFloat, minimumHeight: CGFloat) -> NSSize {
+        let measuring = NSHostingController(
+            rootView: CompanionView(store: store).fixedSize(horizontal: false, vertical: true)
+        )
+        let needed = measuring.sizeThatFits(in: NSSize(width: width, height: 10_000)).height
+        let available = (NSScreen.main?.visibleFrame.height ?? 600) - 44
+        return NSSize(width: width, height: min(max(minimumHeight, needed.rounded(.up)), available))
     }
 
     private func origin(for size: NSSize) -> NSPoint {

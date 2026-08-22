@@ -61,6 +61,14 @@ struct CompanionView: View {
     }
 
     private var areaConfigurationView: some View {
+        ScrollView {
+            areaConfigurationContent
+                .padding(23)
+        }
+        .onAppear { draftAreas = store.selectedAreas }
+    }
+
+    private var areaConfigurationContent: some View {
         VStack(spacing: 14) {
             HStack(spacing: 12) {
                 CompanionOrb(motion: .breathe, warmth: 0.72, active: true)
@@ -124,8 +132,6 @@ struct CompanionView: View {
                     .buttonStyle(QuietButtonStyle())
             }
         }
-        .padding(23)
-        .onAppear { draftAreas = store.selectedAreas }
     }
 
     private func toggle(_ area: BodyArea) {
