@@ -37,7 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildPanel() {
         let panel = CompanionPanel(
-            contentRect: NSRect(origin: .zero, size: size(for: .idle)),
+            contentRect: NSRect(origin: .zero, size: size(for: store.mode)),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -57,12 +57,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildMenuBarItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "leaf.fill", accessibilityDescription: "2m2good")
+        item.button?.image = NSImage(systemSymbolName: "leaf.fill", accessibilityDescription: ProductIdentity.name)
 
         let menu = NSMenu()
         menu.addItem(withTitle: "Offer a break now", action: #selector(offerBreak), keyEquivalent: "")
+        menu.addItem(withTitle: ProductIdentity.configureAreasMenuTitle, action: #selector(configureAreas), keyEquivalent: "")
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(withTitle: "Quit 2m2good", action: #selector(quit), keyEquivalent: "q")
+        menu.addItem(withTitle: "Quit \(ProductIdentity.name)", action: #selector(quit), keyEquivalent: "q")
         menu.items.forEach { $0.target = self }
         item.menu = menu
         statusItem = item
@@ -71,6 +72,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func offerBreak() {
         panel?.orderFrontRegardless()
         store.offerBreakNow()
+    }
+
+    @objc private func configureAreas() {
+        panel?.orderFrontRegardless()
+        store.openAreaConfiguration()
     }
 
     @objc private func quit() {
@@ -107,6 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func size(for mode: CompanionStore.Mode) -> NSSize {
         switch mode {
         case .idle: return NSSize(width: 92, height: 92)
+        case .setup, .configuration: return NSSize(width: 370, height: 480)
         case .checkIn: return NSSize(width: 370, height: 300)
         case .routine: return NSSize(width: 370, height: 390)
         case .complete: return NSSize(width: 300, height: 270)

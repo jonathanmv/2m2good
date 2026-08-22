@@ -97,6 +97,24 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertFalse(state.isCurrent(first), "A stale task from an earlier completion must not close a future screen")
     }
 
+    func testBodyAreaOptionsMatchTheScoutRecommendation() {
+        XCTAssertEqual(
+            BodyArea.allCases.map(\.label),
+            ["Lower back", "Neck", "Shoulders", "Hands + wrists"]
+        )
+        XCTAssertEqual(BodyArea.allCases.count, 4)
+        XCTAssertGreaterThanOrEqual(
+            MoveLibrary.all.filter { $0.bodyAreas.contains(.lowerBack) }.count,
+            6
+        )
+        XCTAssertGreaterThanOrEqual(
+            MoveLibrary.all.filter { $0.bodyAreas.contains(.handsWrists) }.count,
+            6
+        )
+        XCTAssertFalse(BodyArea.allCases.map(\.label).contains("Upper back"))
+        XCTAssertFalse(BodyArea.allCases.map(\.label).contains("Eyes"))
+    }
+
     func testMoveLibraryIsLargeUniqueStandingOnlyAndConservative() {
         XCTAssertGreaterThanOrEqual(MoveLibrary.all.count, 20)
         XCTAssertEqual(Set(MoveLibrary.all.map(\.id)).count, MoveLibrary.all.count)
@@ -109,6 +127,47 @@ final class BreakCompanionTests: XCTestCase {
             XCTAssertFalse(text.contains("seated"), move.id)
             XCTAssertFalse(text.contains("sit down"), move.id)
             XCTAssertFalse(text.contains("chair"), move.id)
+        }
+    }
+
+    func testSelectedAreasPrioritizeAtLeastThreeMatchingMoves() {
+        for area in [BodyArea.lowerBack, .neck, .shoulders, .handsWrists] {
+            let matchingIDs = Set(
+                MoveLibrary.all
+                    .filter { $0.bodyAreas.contains(area) }
+                    .map(\.id)
+            )
+            let routine = SessionComposer.compose(
+                from: MoveLibrary.all,
+                recentShownMoveIDs: [],
+                recentCompletedMoveIDs: [],
+                selectedAreas: [area]
+            )
+
+            XCTAssertNotNil(routine, area.label)
+            XCTAssertGreaterThanOrEqual(
+                Set(routine?.moveIDs ?? []).intersection(matchingIDs).count,
+                3,
+                area.label
+            )
+            XCTAssertTrue(routine?.invitation.lowercased().contains(area.invitationNoun) == true)
+            XCTAssertEqual(routine?.duration, 120)
+            XCTAssertEqual(Set(routine?.moveIDs ?? []).count, 6)
+        }
+    }
+
+    func testSelectedCopyStaysSupportiveAndNonDiagnostic() {
+        let routine = SessionComposer.compose(
+            from: MoveLibrary.all,
+            recentShownMoveIDs: [],
+            recentCompletedMoveIDs: [],
+            selectedAreas: [.lowerBack, .handsWrists]
+        )!
+        let text = ([routine.title, routine.invitation] + routine.steps.map(\.instruction))
+            .joined(separator: " ")
+            .lowercased()
+        for forbidden in ["treat", "cure", "prevent rsi", "fix posture", "eliminate pain", "sciatica", "carpal tunnel", "diagnose"] {
+            XCTAssertFalse(text.contains(forbidden), forbidden)
         }
     }
 
@@ -292,17 +351,74 @@ final class BreakCompanionTests: XCTestCase {
         )
     }
 
+    func testBodyAreaPreferencesDefaultPersistAndMigrateSafely() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let fresh = BodyAreaPreferences(defaults: defaults)
+        XCTAssertTrue(fresh.shouldPresentFirstRunSetup)
+        XCTAssertTrue(fresh.selectedAreas.isEmpty)
+
+        fresh.save(selectedAreas: [.neck, .handsWrists])
+        let restarted = BodyAreaPreferences(defaults: defaults)
+        XCTAssertEqual(restarted.selectedAreas, [.neck, .handsWrists])
+        XCTAssertTrue(restarted.onboardingCompleted)
+        XCTAssertFalse(restarted.shouldPresentFirstRunSetup)
+
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set("lowerBack", forKey: BodyAreaPreferences.legacyPreferredAreaKey)
+        let migrated = BodyAreaPreferences(defaults: defaults)
+        XCTAssertEqual(migrated.selectedAreas, [.lowerBack])
+        XCTAssertTrue(migrated.onboardingCompleted)
+        XCTAssertEqual(defaults.string(forKey: BodyAreaPreferences.legacyPreferredAreaKey), "lowerBack")
+
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set(["shoulder-rolls"], forKey: "session.recentShownMoveIDs")
+        let existing = BodyAreaPreferences(defaults: defaults)
+        XCTAssertTrue(existing.selectedAreas.isEmpty)
+        XCTAssertFalse(existing.shouldPresentFirstRunSetup)
+    }
+
+    @MainActor
+    func testBodyAreaConfigurationCanBeReopenedFromMenuBarPath() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        XCTAssertEqual(ProductIdentity.configureAreasMenuTitle, "Choose body areas…")
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults
+        )
+        XCTAssertEqual(store.mode, .setup)
+        store.saveSelectedAreas([.neck])
+        XCTAssertEqual(store.mode, .idle)
+        store.openAreaConfiguration()
+        XCTAssertEqual(store.mode, .configuration)
+        store.saveSelectedAreas([.lowerBack, .handsWrists])
+        XCTAssertEqual(store.mode, .idle)
+        XCTAssertEqual(store.selectedAreas, [.lowerBack, .handsWrists])
+    }
+
     func testPointerMovementClassifierKeepsTapDeadZone() {
         XCTAssertEqual(PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 4, y: 0)), .tap)
         XCTAssertEqual(PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 3, y: 4)), .drag)
     }
 
-    private func makeMove(_ id: String, _ focuses: Set<BodyFocus>) -> BreakMove {
+    private func makeMove(
+        _ id: String,
+        _ focuses: Set<BodyFocus>,
+        bodyAreas: Set<BodyArea> = []
+    ) -> BreakMove {
         BreakMove(
             id: id,
             title: id,
             instruction: "Move slowly and comfortably.",
             focuses: focuses,
+            bodyAreas: bodyAreas,
             motion: .still,
             supportsStanding: true
         )

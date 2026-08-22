@@ -5,6 +5,8 @@ import Foundation
 final class CompanionStore: ObservableObject {
     enum Mode: Equatable {
         case idle
+        case setup
+        case configuration
         case checkIn
         case routine
         case complete
@@ -18,6 +20,7 @@ final class CompanionStore: ObservableObject {
     @Published private(set) var statusText: String?
     @Published private(set) var checkInProgress: Double = 0
     @Published private(set) var nextCheckInRemainingSeconds: TimeInterval = 0
+    @Published private(set) var selectedAreas: Set<BodyArea>
 
     let voice = VoiceService()
     var onSizeChange: ((Mode) -> Void)?
@@ -26,6 +29,7 @@ final class CompanionStore: ObservableObject {
     private let workInterval: TimeInterval
     private let idleThreshold: TimeInterval
     private let sessionSelection: SessionSelectionStore
+    private let bodyAreaPreferences: BodyAreaPreferences
     private var accumulatedActiveTime: TimeInterval = 0
     private var scheduledCheckIn: ScheduledCheckInWindow?
     private var lastTick = Date()
@@ -42,8 +46,11 @@ final class CompanionStore: ObservableObject {
         let configuredIdle = Double(environment["BREAK_IDLE_THRESHOLD_SECONDS"] ?? "")
         idleThreshold = max(10, configuredIdle ?? 60)
         sessionSelection = SessionSelectionStore(defaults: defaults)
+        bodyAreaPreferences = BodyAreaPreferences(defaults: defaults)
+        selectedAreas = bodyAreaPreferences.selectedAreas
         routine = BreakRoutine.fallback
         nextCheckInRemainingSeconds = workInterval
+        mode = bodyAreaPreferences.shouldPresentFirstRunSetup ? .setup : .idle
 
         voice.onCommand = { [weak self] command in
             self?.handle(command)
@@ -76,6 +83,37 @@ final class CompanionStore: ObservableObject {
 
     func offerBreakNow() {
         showCheckIn()
+    }
+
+    func openAreaConfiguration() {
+        guard mode == .idle else { return }
+        mode = .configuration
+        notifySizeChange()
+    }
+
+    func saveSelectedAreas(_ areas: Set<BodyArea>) {
+        guard !areas.isEmpty else { return }
+        bodyAreaPreferences.save(selectedAreas: areas)
+        selectedAreas = bodyAreaPreferences.selectedAreas
+        sessionSelection.clearPendingSession()
+        guard mode == .setup || mode == .configuration else { return }
+        mode = .idle
+        notifySizeChange()
+    }
+
+    func continueWithBalancedDefaults() {
+        bodyAreaPreferences.continueWithBalancedDefaults()
+        selectedAreas = []
+        sessionSelection.clearPendingSession()
+        guard mode == .setup || mode == .configuration else { return }
+        mode = .idle
+        notifySizeChange()
+    }
+
+    func cancelAreaConfiguration() {
+        guard mode == .configuration else { return }
+        mode = .idle
+        notifySizeChange()
     }
 
     func startRoutine() {
@@ -124,7 +162,8 @@ final class CompanionStore: ObservableObject {
         guard mode == .routine,
               let next = sessionSelection.nextSession(
                 after: routine,
-                from: MoveLibrary.all
+                from: MoveLibrary.all,
+                selectedAreas: selectedAreas
               ) else { return }
 
         speaker.stop()
@@ -210,7 +249,10 @@ final class CompanionStore: ObservableObject {
         guard mode == .idle else { return }
         cancelCompletionAutoDismiss()
         accumulatedActiveTime = 0
-        guard let suggestion = sessionSelection.suggestion(from: MoveLibrary.all) else { return }
+        guard let suggestion = sessionSelection.suggestion(
+            from: MoveLibrary.all,
+            selectedAreas: selectedAreas
+        ) else { return }
         routine = suggestion
         statusText = nil
         mode = .checkIn

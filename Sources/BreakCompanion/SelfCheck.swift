@@ -12,7 +12,7 @@ enum SelfCheck {
         checkPointer(&failures)
 
         if failures.isEmpty {
-            print("Self-check passed: standing session composition, recent-shown persistence, focus balance, voice variants, completion dismissal, progress color, and pointer movement.")
+            print("Self-check passed: 2M2Better standing session composition, body-area selection, recent-shown persistence, focus balance, voice variants, completion dismissal, progress color, and pointer movement.")
             return true
         }
 
@@ -114,6 +114,27 @@ enum SelfCheck {
         if Set(MoveLibrary.all.flatMap(\.focuses)) != Set(BodyFocus.allCases) {
             failures.append("movement focus tags should cover the internal taxonomy")
         }
+        if BodyArea.allCases.map(\.label) != ["Lower back", "Neck", "Shoulders", "Hands + wrists"] {
+            failures.append("body-area labels should match the approved v1 set")
+        }
+        for area in BodyArea.allCases {
+            let matching = MoveLibrary.all.filter { !$0.bodyAreas.isDisjoint(with: [area]) }
+            guard let areaRoutine = SessionComposer.compose(
+                from: MoveLibrary.all,
+                recentShownMoveIDs: [],
+                recentCompletedMoveIDs: [],
+                selectedAreas: [area]
+            ) else {
+                failures.append("could not compose a selected-area session for \(area.label)")
+                continue
+            }
+            if matching.count < 3
+                || Set(areaRoutine.moveIDs).intersection(Set(matching.map(\.id))).count < 3
+                || areaRoutine.duration != 120
+                || areaRoutine.steps.count != 6 {
+                failures.append("selected-area composition failed for \(area.label)")
+            }
+        }
         for move in MoveLibrary.all {
             let text = "\(move.title) \(move.instruction)".lowercased()
             if text.contains("seated") || text.contains("sit down") || text.contains("chair") {
@@ -204,6 +225,15 @@ enum SelfCheck {
         }
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let freshPreferences = BodyAreaPreferences(defaults: defaults)
+        if !freshPreferences.shouldPresentFirstRunSetup || !freshPreferences.selectedAreas.isEmpty {
+            failures.append("fresh preferences should request body-area setup")
+        }
+        freshPreferences.save(selectedAreas: [.neck, .shoulders])
+        if BodyAreaPreferences(defaults: defaults).selectedAreas != [.neck, .shoulders] {
+            failures.append("selected body areas should survive a restart")
+        }
 
         let firstStore = SessionSelectionStore(defaults: defaults)
         guard let first = firstStore.suggestion(from: MoveLibrary.all),

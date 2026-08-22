@@ -1,6 +1,6 @@
-# 2m2good marketing page
+# 2M2Better marketing page
 
-The self-contained local landing page for 2m2good. Its visual and copy
+The self-contained local landing page for 2M2Better. Its visual and copy
 direction comes from [`../docs/BRAND_DIRECTION.md`](../docs/BRAND_DIRECTION.md).
 
 ## Run the local preview

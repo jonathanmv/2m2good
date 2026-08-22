@@ -23,7 +23,7 @@ async function render() {
   );
 }
 
-test("server-renders the 2m2good landing page and early-access dialog", async () => {
+test("server-renders the 2M2Better landing page and early-access dialog", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
@@ -33,7 +33,7 @@ test("server-renders the 2m2good landing page and early-access dialog", async ()
     .replace(/<!--.*?-->/g, "")
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ");
-  assert.match(html, /<title>2m2good · A two-minute reset for your body<\/title>/i);
+  assert.match(html, /<title>2M2Better · A two-minute reset for your body<\/title>/i);
   assert.match(renderedText, /A two-minute reset that helps your body keep up with your mind\./);
   assert.match(renderedText, /A nudge, not a negotiation\./);
   assert.match(renderedText, /Your breaks stay on your Mac\./);
