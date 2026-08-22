@@ -457,15 +457,13 @@ enum SessionComposer {
                     libraryIndex: left.offset,
                     attention: attention,
                     recentShown: recentShown,
-                    currentMoveIDs: currentMoveIDs,
-                    selectedAreas: selectedAreas
+                    currentMoveIDs: currentMoveIDs
                 ) < score(
                     for: right.element,
                     libraryIndex: right.offset,
                     attention: attention,
                     recentShown: recentShown,
-                    currentMoveIDs: currentMoveIDs,
-                    selectedAreas: selectedAreas
+                    currentMoveIDs: currentMoveIDs
                 )
             })?.element else {
                 return nil
@@ -487,8 +485,7 @@ enum SessionComposer {
         libraryIndex: Int,
         attention: [BodyFocus: Int],
         recentShown: Set<String>,
-        currentMoveIDs: Set<String>,
-        selectedAreas: Set<BodyArea>
+        currentMoveIDs: Set<String>
     ) -> SelectionScore {
         let exclusionTier: Int
         if !recentShown.contains(move.id) && !currentMoveIDs.contains(move.id) {
@@ -499,10 +496,8 @@ enum SessionComposer {
             exclusionTier = 2
         }
         let counts = move.focuses.map { attention[$0, default: 0] }
-        let areaMismatch = selectedAreas.isEmpty || !move.bodyAreas.isDisjoint(with: selectedAreas) ? 0 : 1
         return SelectionScore(
             exclusionTier: exclusionTier,
-            areaMismatch: areaMismatch,
             leastAttention: counts.min() ?? Int.max,
             averageAttention: counts.isEmpty
                 ? Double.greatestFiniteMagnitude
@@ -513,7 +508,6 @@ enum SessionComposer {
 
     private struct SelectionScore: Comparable {
         let exclusionTier: Int
-        let areaMismatch: Int
         let leastAttention: Int
         let averageAttention: Double
         let libraryIndex: Int
@@ -521,9 +515,6 @@ enum SessionComposer {
         static func < (left: SelectionScore, right: SelectionScore) -> Bool {
             if left.exclusionTier != right.exclusionTier {
                 return left.exclusionTier < right.exclusionTier
-            }
-            if left.areaMismatch != right.areaMismatch {
-                return left.areaMismatch < right.areaMismatch
             }
             if left.leastAttention != right.leastAttention {
                 return left.leastAttention < right.leastAttention

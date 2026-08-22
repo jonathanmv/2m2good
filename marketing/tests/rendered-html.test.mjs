@@ -45,6 +45,10 @@ test("server-renders the 2M2Better landing page and early-access dialog", async 
   assert.doesNotMatch(html, /pricing|testimonial|subscribe|sign in/i);
   assert.doesNotMatch(html, /<input|<form/i);
   assert.doesNotMatch(html, /2mintogood|Break Companion/);
+  assert.doesNotMatch(
+    renderedText,
+    /\b(pain|injur\w*|treat\w*|cure[sd]?|curing|diagnos\w*|therap\w*|posture|RSI|carpal tunnel|sciatica|prevent\w*|symptom\w*|medical|clinical)\b/i,
+  );
 });
 
 test("source preserves the minimal private product story", async () => {

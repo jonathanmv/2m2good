@@ -113,11 +113,13 @@ struct CompanionView: View {
             .disabled(draftAreas.isEmpty)
             .opacity(draftAreas.isEmpty ? 0.5 : 1)
 
-            if store.mode == .setup {
-                Button("Use balanced for now", action: store.continueWithBalancedDefaults)
+            if store.offersBalancedChoice {
+                Button(store.mode == .setup ? "Use balanced for now" : "Use balanced instead", action: store.continueWithBalancedDefaults)
                     .buttonStyle(QuietButtonStyle())
                     .accessibilityHint("Use the existing balanced movement selection without choosing an area")
-            } else {
+            }
+
+            if store.mode == .configuration {
                 Button("Cancel", action: store.cancelAreaConfiguration)
                     .buttonStyle(QuietButtonStyle())
             }

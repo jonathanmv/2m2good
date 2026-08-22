@@ -85,8 +85,12 @@ final class CompanionStore: ObservableObject {
         showCheckIn()
     }
 
+    var canOpenAreaConfiguration: Bool { mode == .idle }
+
+    var offersBalancedChoice: Bool { mode == .setup || mode == .configuration }
+
     func openAreaConfiguration() {
-        guard mode == .idle else { return }
+        guard canOpenAreaConfiguration else { return }
         mode = .configuration
         notifySizeChange()
     }
@@ -96,7 +100,7 @@ final class CompanionStore: ObservableObject {
         bodyAreaPreferences.save(selectedAreas: areas)
         selectedAreas = bodyAreaPreferences.selectedAreas
         sessionSelection.clearPendingSession()
-        guard mode == .setup || mode == .configuration else { return }
+        guard offersBalancedChoice else { return }
         mode = .idle
         notifySizeChange()
     }
@@ -105,7 +109,7 @@ final class CompanionStore: ObservableObject {
         bodyAreaPreferences.continueWithBalancedDefaults()
         selectedAreas = []
         sessionSelection.clearPendingSession()
-        guard mode == .setup || mode == .configuration else { return }
+        guard offersBalancedChoice else { return }
         mode = .idle
         notifySizeChange()
     }

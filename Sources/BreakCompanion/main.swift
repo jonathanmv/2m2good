@@ -6,7 +6,7 @@ private final class CompanionPanel: NSPanel {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private let store = CompanionStore()
     private var panel: NSPanel?
     private var statusItem: NSStatusItem?
@@ -51,8 +51,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         panel.contentView = NSHostingView(rootView: CompanionView(store: store))
         panel.setFrameOrigin(origin(for: panel.frame.size))
-        panel.orderFrontRegardless()
         self.panel = panel
+        resizePanel(for: store.mode)
     }
 
     private func buildMenuBarItem() {
@@ -79,6 +79,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.openAreaConfiguration()
     }
 
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        guard menuItem.action == #selector(configureAreas) else { return true }
+        return store.canOpenAreaConfiguration
+    }
+
     @objc private func quit() {
         NSApp.terminate(nil)
     }
@@ -94,14 +99,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         frame.origin.x = min(max(frame.origin.x, visible.minX + 12), visible.maxX - newSize.width - 12)
         frame.origin.y = min(max(frame.origin.y, visible.minY + 12), visible.maxY - newSize.height - 12)
         panel.setFrame(frame, display: true, animate: true)
-        if mode == .complete {
+        switch mode {
+        case .complete, .setup, .configuration:
             let frontmost = NSWorkspace.shared.frontmostApplication
             if frontmost?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
                 previouslyActiveApplication = frontmost
             }
             NSApp.activate(ignoringOtherApps: true)
             panel.makeKeyAndOrderFront(nil)
-        } else {
+        default:
             panel.orderFrontRegardless()
             if mode == .idle, let previouslyActiveApplication {
                 previouslyActiveApplication.activate(options: [])

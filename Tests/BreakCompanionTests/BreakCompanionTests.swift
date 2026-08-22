@@ -163,12 +163,39 @@ final class BreakCompanionTests: XCTestCase {
             recentCompletedMoveIDs: [],
             selectedAreas: [.lowerBack, .handsWrists]
         )!
-        let text = ([routine.title, routine.invitation] + routine.steps.map(\.instruction))
+        let productCopy = [ProductIdentity.name, ProductIdentity.configureAreasMenuTitle]
+            + BodyArea.allCases.flatMap { [$0.label, $0.setupDescription, $0.invitationNoun] }
+        let text = ([routine.title, routine.invitation] + routine.steps.map(\.instruction) + productCopy)
             .joined(separator: " ")
             .lowercased()
-        for forbidden in ["treat", "cure", "prevent rsi", "fix posture", "eliminate pain", "sciatica", "carpal tunnel", "diagnose"] {
+        for forbidden in [
+            "treat", "cure", "prevent", "posture", "pain", "injur", "diagnos",
+            "therap", "symptom", "rsi", "sciatica", "carpal tunnel", "medical", "clinic"
+        ] {
             XCTAssertFalse(text.contains(forbidden), forbidden)
         }
+    }
+
+    func testAreaBiasStopsAtTheQuotaSoOtherContentStillReachesTheSession() {
+        let library = (1...6).map { makeMove("back-\($0)", [.lowerBack], bodyAreas: [.lowerBack]) }
+            + [
+                makeMove("hands", [.handsWristsForearms]),
+                makeMove("eyes", [.eyesFace]),
+                makeMove("breath", [.breathRelaxation]),
+                makeMove("feet", [.lowerLegsFeetAnkles])
+            ]
+
+        let routine = SessionComposer.compose(
+            from: library,
+            recentShownMoveIDs: [],
+            recentCompletedMoveIDs: [],
+            selectedAreas: [.lowerBack]
+        )
+
+        let moveIDs = routine?.moveIDs ?? []
+        XCTAssertEqual(moveIDs.count, 6)
+        XCTAssertEqual(moveIDs.filter { $0.hasPrefix("back-") }.count, 3)
+        XCTAssertEqual(Set(moveIDs).intersection(["hands", "eyes", "breath"]).count, 3)
     }
 
     func testComposedSessionIsStandingSafeUniqueAndExactlyTwoMinutes() {
@@ -401,6 +428,49 @@ final class BreakCompanionTests: XCTestCase {
         store.saveSelectedAreas([.lowerBack, .handsWrists])
         XCTAssertEqual(store.mode, .idle)
         XCTAssertEqual(store.selectedAreas, [.lowerBack, .handsWrists])
+    }
+
+    @MainActor
+    func testConfigurationAvailabilityFollowsIdleAndOffersBalancedReturn() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults
+        )
+        XCTAssertEqual(store.mode, .setup)
+        XCTAssertFalse(store.canOpenAreaConfiguration)
+        XCTAssertTrue(store.offersBalancedChoice)
+
+        store.saveSelectedAreas([.neck])
+        XCTAssertEqual(store.mode, .idle)
+        XCTAssertEqual(store.selectedAreas, [.neck])
+        XCTAssertTrue(store.canOpenAreaConfiguration)
+        XCTAssertFalse(store.offersBalancedChoice)
+
+        store.openAreaConfiguration()
+        XCTAssertEqual(store.mode, .configuration)
+        XCTAssertFalse(store.canOpenAreaConfiguration)
+        XCTAssertTrue(store.offersBalancedChoice)
+
+        store.continueWithBalancedDefaults()
+        XCTAssertEqual(store.mode, .idle)
+        XCTAssertTrue(store.selectedAreas.isEmpty)
+
+        let restarted = BodyAreaPreferences(defaults: defaults)
+        XCTAssertTrue(restarted.selectedAreas.isEmpty)
+        XCTAssertTrue(restarted.onboardingCompleted)
+        XCTAssertFalse(restarted.shouldPresentFirstRunSetup)
+
+        let reopened = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults
+        )
+        XCTAssertEqual(reopened.mode, .idle)
+        XCTAssertTrue(reopened.selectedAreas.isEmpty)
     }
 
     func testPointerMovementClassifierKeepsTapDeadZone() {
