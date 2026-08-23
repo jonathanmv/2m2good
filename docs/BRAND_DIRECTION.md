@@ -16,6 +16,10 @@ The two-minute limit exists to protect flow. A person should not have to negotia
 
 Do not frame the name through the "two-minute rule," Atomic Habits, habit-stacking, streaks, or self-optimization. That is not the idea.
 
+### Written form
+
+Marketing surfaces write the name all lowercase as **2m2better**; `marketing/tests/rendered-html.test.mjs` fails if the rendered landing page contains any other casing. The macOS app keeps `2M2Better` in its bundle name, `Info.plist` strings, and in-app labels, and repository paths and internal identifiers are unchanged.
+
 ## Product character
 
 The product is a friendly, expressive companion—not a coach, tracker, therapist, or productivity dashboard.
