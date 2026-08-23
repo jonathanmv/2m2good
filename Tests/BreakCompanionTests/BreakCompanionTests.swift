@@ -251,6 +251,39 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertEqual(next.duration, 120)
     }
 
+    func testFollowUpSessionOnlyClaimsAnAreaItStillCarriesMovesFor() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let neckIDs = Set(MoveLibrary.all.filter { $0.bodyAreas.contains(.neck) }.map(\.id))
+        let store = SessionSelectionStore(defaults: defaults)
+        let current = store.suggestion(from: MoveLibrary.all, selectedAreas: [.neck])!
+        XCTAssertEqual(current.title, "Neck standing reset")
+
+        let next = store.nextSession(after: current, from: MoveLibrary.all, selectedAreas: [.neck])!
+        XCTAssertTrue(Set(next.moveIDs).isDisjoint(with: neckIDs))
+        XCTAssertEqual(next.title, "Standing reset")
+        XCTAssertFalse(next.invitation.lowercased().contains("neck"))
+        XCTAssertTrue(next.invitation.lowercased().contains("stand"))
+        XCTAssertEqual(next.duration, 120)
+    }
+
+    func testRoutineDropsSelectedAreasThatTheComposedMovesDoNotCover() {
+        let library = (1...6).map { makeMove("hands-\($0)", [.handsWristsForearms], bodyAreas: [.handsWrists]) }
+        let routine = SessionComposer.compose(
+            from: library,
+            recentShownMoveIDs: [],
+            recentCompletedMoveIDs: [],
+            selectedAreas: [.neck, .handsWrists]
+        )!
+
+        XCTAssertEqual(routine.title, "Hands + wrists standing reset")
+        XCTAssertTrue(routine.invitation.lowercased().contains("hands-and-wrists"))
+        XCTAssertFalse(routine.invitation.lowercased().contains("neck"))
+    }
+
     func testComposedSessionIsStandingSafeUniqueAndExactlyTwoMinutes() {
         let routine = SessionComposer.compose(
             from: MoveLibrary.all,

@@ -137,6 +137,25 @@ enum SelfCheck {
                 failures.append("selected-area composition failed for \(area.label)")
             }
         }
+        if let neckSession = SessionComposer.compose(
+            from: MoveLibrary.all,
+            recentShownMoveIDs: [],
+            recentCompletedMoveIDs: [],
+            selectedAreas: [.neck]
+        ), let neckFollowUp = SessionComposer.compose(
+            from: MoveLibrary.all,
+            recentShownMoveIDs: neckSession.moveIDs,
+            recentCompletedMoveIDs: [],
+            excluding: Set(neckSession.moveIDs),
+            selectedAreas: [.neck]
+        ) {
+            let neckIDs = Set(MoveLibrary.all.filter { $0.bodyAreas.contains(.neck) }.map(\.id))
+            if Set(neckFollowUp.moveIDs).isDisjoint(with: neckIDs),
+               neckFollowUp.title.lowercased().contains("neck")
+                   || neckFollowUp.invitation.lowercased().contains("neck") {
+                failures.append("a session should not announce an area it carries no movements for")
+            }
+        }
         for move in MoveLibrary.all {
             let text = "\(move.title) \(move.instruction)".lowercased()
             if text.contains("seated") || text.contains("sit down") || text.contains("chair") {

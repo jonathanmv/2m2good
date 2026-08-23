@@ -306,12 +306,12 @@ enum MoveLibrary {
             supportsStanding: true
         ),
         .init(
-            id: "pelvic-shifts",
-            title: "Small pelvic shifts",
-            instruction: "Keep your feet easy and shift your pelvis a little right and left. Stay in a comfortable range.",
+            id: "pelvic-tilts",
+            title: "Small pelvic tilts",
+            instruction: "Tip your pelvis back a small amount, then let it return to neutral. Keep the change small and comfortable.",
             focuses: [.trunkMobility, .lowerBack],
             bodyAreas: [.lowerBack],
-            motion: .sideToSide,
+            motion: .breathe,
             supportsStanding: true
         ),
         .init(
@@ -396,10 +396,13 @@ struct BreakRoutine: Identifiable, Equatable {
                 motion: move.motion
             )
         }
+        let representedAreas = selectedAreas.filter { area in
+            moves.contains { $0.bodyAreas.contains(area) }
+        }
         return BreakRoutine(
             id: moves.map(\.id).joined(separator: "+"),
-            title: title(for: selectedAreas),
-            invitation: invitation(for: selectedAreas),
+            title: title(for: representedAreas),
+            invitation: invitation(for: representedAreas),
             focuses: Set(moves.flatMap(\.focuses)),
             steps: steps
         )
