@@ -25,21 +25,6 @@ fail_after_destination() {
     fail "$1 What was already written was left intact for inspection: $destination"
 }
 
-# Discards only the repository this run just initialized, and only while it is
-# the destination's single entry, so the documented empty-destination reuse also
-# applies before anything has been checked out.
-discard_initialized_repository() {
-    [ -d "$destination/.git" ] || return 0
-    for entry in "$destination"/* "$destination"/.*; do
-        case "${entry##*/}" in
-            '*'|'.*'|.|..|.git) continue ;;
-        esac
-        [ -e "$entry" ] || [ -L "$entry" ] || continue
-        return 0
-    done
-    rm -rf "$destination/.git"
-}
-
 usage() {
     cat <<'EOF'
 2m2good early developer-preview installer
@@ -286,8 +271,7 @@ printf '%s\n' 'Fetching source...'
 if [ "$ref_is_revision" -eq 1 ]; then
     if ! (cd "$destination" && git init --quiet . && git remote add origin "$repository" && \
         GIT_TERMINAL_PROMPT=0 git fetch --depth 1 origin "$ref"); then
-        discard_initialized_repository
-        fail_after_destination "revision '$ref' could not be fetched; Git reported the cause above."
+        fail_after_destination "revision '$ref' could not be fetched; Git reported the cause above. Nothing was checked out, so this destination holds only the empty repository the fetch was attempted in; remove it yourself or choose another path to retry."
     fi
     if ! (cd "$destination" && git checkout --detach FETCH_HEAD); then
         fail_after_destination "revision '$ref' was fetched but could not be checked out; Git reported the cause above."
@@ -306,6 +290,11 @@ exact_revision=$(git -C "$destination" rev-parse HEAD 2>/dev/null || true)
 [ -n "$exact_revision" ] || fail "source checkout completed without a readable revision; destination left intact: $destination"
 printf 'Checked out revision: %s\n' "$exact_revision"
 
+# The plan promised an app bundle inside this checkout, so compare against both
+# spellings of it: the build script resolves symlinks in its own location.
+destination_real=$(CDPATH= cd "$destination" && pwd -P) || \
+    fail "the new checkout could not be resolved: $destination"
+
 [ -x "$destination/scripts/build-app.sh" ] || \
     fail "source checkout has no executable scripts/build-app.sh; destination left intact: $destination"
 printf '%s\n' 'Building with the repository script...'
@@ -317,8 +306,9 @@ if ! build_report=$(cd "$destination" && ./scripts/build-app.sh); then
 fi
 app_path=$(printf '%s\n' "$build_report" | tail -n 1)
 case "$app_path" in
-    /*) ;;
-    *) fail "scripts/build-app.sh did not report an absolute app bundle path (got '$app_path'); destination left intact: $destination" ;;
+    */../*|*/..) fail "scripts/build-app.sh reported an app bundle path that leaves the new checkout (got '$app_path'); destination left intact: $destination" ;;
+    "$destination"/*|"$destination_real"/*) ;;
+    *) fail "scripts/build-app.sh reported an app bundle outside the new checkout (got '$app_path'); nothing was verified or opened, and the destination was left intact: $destination" ;;
 esac
 [ -d "$app_path/Contents/MacOS" ] || \
     fail "build did not produce the expected app bundle: $app_path"

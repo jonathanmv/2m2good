@@ -57,11 +57,17 @@ clones into an existing checkout. It may create missing parent directories,
 but it does not use `sudo`, ask for credentials, overwrite files, remove files,
 write to `/Applications`, install a login item, or add an update service. A
 failed checkout or build is left in place for inspection rather than being
-silently deleted. The only exception is scaffolding this run created and nothing
-else: a destination left completely empty is removed, and on the full-SHA path a
-repository that was initialized but never fetched into is discarded when it is
-the destination's only entry, so the same path can be reused after a checkout
-that wrote nothing. A partial checkout is always preserved.
+silently deleted. The one removal it performs is a plain `rmdir` of a
+destination this run created and left completely empty, so the same path can be
+reused after a checkout that wrote nothing; nothing is ever removed
+recursively. A failed branch or tag clone leaves the destination empty and
+therefore reusable. A failed full-SHA fetch leaves behind the empty repository
+it was attempted in, so that path has to be removed by hand or a different one
+chosen. Any partial checkout is always preserved.
+
+The app bundle the installer verifies and opens is the one `scripts/build-app.sh`
+reports, and it must be inside the new checkout: a build script that reports a
+path elsewhere is refused before anything is verified or opened.
 
 ## Requirements
 

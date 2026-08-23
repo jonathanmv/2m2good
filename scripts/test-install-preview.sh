@@ -154,9 +154,9 @@ cat > "$stub_repo/build-app.sh" <<'EOF'
 #!/bin/sh
 set -eu
 project_dir=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
-app_dir="$project_dir/.build/app/${PREVIEW_TEST_APP_BUNDLE_NAME:-2M2Better.app}"
+app_dir="${PREVIEW_TEST_APP_BUNDLE_PATH:-$project_dir/.build/app/${PREVIEW_TEST_APP_BUNDLE_NAME:-2M2Better.app}}"
 executable="$app_dir/Contents/MacOS/${PREVIEW_TEST_APP_EXECUTABLE_NAME:-BreakCompanion}"
-if [ -z "${PREVIEW_TEST_BUILD_PRODUCES_NOTHING:-}" ]; then
+if [ -z "${PREVIEW_TEST_BUILD_PRODUCES_NOTHING:-}${PREVIEW_TEST_APP_BUNDLE_PATH:-}" ]; then
     mkdir -p "$app_dir/Contents/MacOS"
     printf '#!/bin/sh\nexit 0\n' > "$executable"
     chmod +x "$executable"
@@ -324,16 +324,16 @@ assert_contains "$output" "$revision/.build/app/2M2Better.app"
 assert_contains "$(cat "$git_log")" "fetch --depth 1 origin $full_sha"
 assert_lacks "$(cat "$git_log")" 'clone'
 
-# A full-SHA fetch that fails has written nothing but the repository the
-# installer itself initialized, so the destination must stay reusable.
+# A failed full-SHA fetch must be reported and left alone: the installer only
+# ever plain-rmdirs a destination that is still completely empty.
 fetch_failure="$test_root/revision-fetch-failure"
 if output=$(PREVIEW_TEST_GIT_REVISION_FAILURE=fetch \
     run_installer --confirm --no-launch --ref "$full_sha" --destination "$fetch_failure" 2>&1); then
     fail_test 'a failed full-SHA fetch unexpectedly succeeded'
 fi
 assert_contains "$output" "revision '$full_sha' could not be fetched"
-assert_contains "$output" 'the same path can be reused'
-[ ! -e "$fetch_failure" ] || fail_test 'a failed full-SHA fetch orphaned its destination'
+assert_contains "$output" 'remove it yourself or choose another path'
+[ -d "$fetch_failure/.git" ] || fail_test 'a failed full-SHA fetch deleted what it had created'
 
 # A checkout that wrote something is a partial checkout and must be preserved.
 checkout_failure="$test_root/revision-checkout-failure"
@@ -346,6 +346,32 @@ assert_contains "$output" 'left intact for inspection'
 [ "$(cat "$checkout_failure/partial-marker.txt")" = 'partial checkout' ] || \
     fail_test 'a failed full-SHA checkout did not preserve its partial content'
 [ -d "$checkout_failure/.git" ] || fail_test 'a failed full-SHA checkout discarded a partial repository'
+
+# A build script that reports a bundle outside the new checkout must be refused
+# before anything is verified or opened.
+outside="$test_root/outside-bundle-preview"
+outside_bundle="$test_root/elsewhere.app"
+mkdir -p "$outside_bundle/Contents/MacOS"
+printf '#!/bin/sh\nexit 0\n' > "$outside_bundle/Contents/MacOS/Impostor"
+chmod +x "$outside_bundle/Contents/MacOS/Impostor"
+outside_open_log="$test_root/outside-open-log.txt"
+if output=$(PREVIEW_TEST_GIT_STUB_REPO="$test_root/stub-repo" \
+    PREVIEW_TEST_APP_BUNDLE_PATH="$outside_bundle" \
+    PREVIEW_TEST_OPEN_LOG="$outside_open_log" \
+    run_installer --confirm --destination "$outside" 2>&1); then
+    fail_test 'an app bundle reported outside the checkout unexpectedly succeeded'
+fi
+assert_contains "$output" 'reported an app bundle outside the new checkout'
+[ ! -e "$outside_open_log" ] || \
+    fail_test "installer opened a bundle outside the checkout: $(cat "$outside_open_log")"
+
+escaping="$test_root/escaping-bundle-preview"
+if output=$(PREVIEW_TEST_GIT_STUB_REPO="$test_root/stub-repo" \
+    PREVIEW_TEST_APP_BUNDLE_PATH="$escaping/.build/app/../../../elsewhere.app" \
+    run_installer --confirm --no-launch --destination "$escaping" 2>&1); then
+    fail_test 'an app bundle path escaping the checkout unexpectedly succeeded'
+fi
+assert_contains "$output" 'leaves the new checkout'
 
 missing="$test_root/missing-bundle-preview"
 if output=$(PREVIEW_TEST_GIT_STUB_REPO="$test_root/stub-repo" \
