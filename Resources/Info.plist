@@ -5,7 +5,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleDisplayName</key>
-    <string>2M2Better</string>
+    <string>2m2better</string>
     <key>CFBundleExecutable</key>
     <string>BreakCompanion</string>
     <key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>2M2Better</string>
+    <string>2m2better</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -27,8 +27,8 @@
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSMicrophoneUsageDescription</key>
-    <string>2M2Better listens only while a break invitation is visible so you can answer by voice.</string>
+    <string>2m2better listens only while a break invitation is visible so you can answer by voice.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
-    <string>2M2Better recognizes short local responses such as Start, Later, or Tomorrow.</string>
+    <string>2m2better recognizes short local responses such as Start, Later, or Tomorrow.</string>
 </dict>
 </plist>

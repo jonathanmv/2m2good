@@ -1,6 +1,6 @@
-# 2M2Better
+# 2m2better
 
-A deliberately small, local macOS break companion. After 60 minutes of active keyboard or mouse use, 2M2Better's quiet floating orb offers one two-minute reset. It accepts a short spoken response or the always-visible buttons, guides the routine with voice and motion, and then gets out of the way.
+A deliberately small, local macOS break companion. After 60 minutes of active keyboard or mouse use, 2m2better's quiet floating orb offers one two-minute reset. It accepts a short spoken response or the always-visible buttons, guides the routine with voice and motion, and then gets out of the way.
 
 ## What is in the pilot
 
@@ -22,7 +22,7 @@ newer or the matching Apple Command Line Tools.
 
 ```sh
 ./scripts/build-app.sh
-open ".build/app/2M2Better.app"
+open ".build/app/2m2better.app"
 ```
 
 The app appears as a small orb near the upper-right of the screen and as a leaf in the menu bar. On a fresh install, a compact setup asks which body areas the standing reset should support; every shipped movement is standing-only, so the reset is presented as a standing one rather than a seated alternative. Click the orb or **Offer a break now** in the menu bar to trigger a break immediately; use **Choose body areas…** there to review or change the selection, which stays available while the orb is idle so an offered or running reset is never discarded.
@@ -71,7 +71,7 @@ The app does not need Accessibility permission. It reads only macOS’s aggregat
 The normal active-work interval is 3,600 seconds. Override it when launching the executable:
 
 ```sh
-BREAK_INTERVAL_SECONDS=5 ".build/app/2M2Better.app/Contents/MacOS/BreakCompanion"
+BREAK_INTERVAL_SECONDS=5 ".build/app/2m2better.app/Contents/MacOS/BreakCompanion"
 ```
 
 `BREAK_IDLE_THRESHOLD_SECONDS` can also replace the default 60-second idle threshold. Values are clamped to sensible testing minimums.
@@ -79,7 +79,7 @@ BREAK_INTERVAL_SECONDS=5 ".build/app/2M2Better.app/Contents/MacOS/BreakCompanion
 Run the packaged logic checks with:
 
 ```sh
-".build/app/2M2Better.app/Contents/MacOS/BreakCompanion" --self-check
+".build/app/2m2better.app/Contents/MacOS/BreakCompanion" --self-check
 ```
 
 The Swift package and XCTest target are included for use in a standard Xcode toolchain (`swift test`).

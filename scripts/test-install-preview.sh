@@ -154,7 +154,7 @@ cat > "$stub_repo/build-app.sh" <<'EOF'
 #!/bin/sh
 set -eu
 project_dir=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
-app_dir="${PREVIEW_TEST_APP_BUNDLE_PATH:-$project_dir/.build/app/${PREVIEW_TEST_APP_BUNDLE_NAME:-2M2Better.app}}"
+app_dir="${PREVIEW_TEST_APP_BUNDLE_PATH:-$project_dir/.build/app/${PREVIEW_TEST_APP_BUNDLE_NAME:-2m2better.app}}"
 executable="$app_dir/Contents/MacOS/${PREVIEW_TEST_APP_EXECUTABLE_NAME:-BreakCompanion}"
 if [ -z "${PREVIEW_TEST_BUILD_PRODUCES_NOTHING:-}${PREVIEW_TEST_APP_BUNDLE_PATH:-}" ]; then
     mkdir -p "$app_dir/Contents/MacOS"
@@ -180,7 +180,7 @@ plan_output=$(run_installer \
     --ref feature/preview \
     --destination "$plan_destination" \
     --no-launch 2>&1)
-assert_contains "$plan_output" '2m2good EARLY DEVELOPER PREVIEW'
+assert_contains "$plan_output" '2m2better EARLY DEVELOPER PREVIEW'
 assert_contains "$plan_output" 'https://github.com/example/2m2good.git'
 assert_contains "$plan_output" 'feature/preview'
 assert_contains "$plan_output" "$plan_destination"
@@ -288,20 +288,20 @@ built="$test_root/built-preview"
 output=$(PREVIEW_TEST_GIT_STUB_REPO="$test_root/stub-repo" \
     run_installer --confirm --no-launch --destination "$built" 2>&1) || \
     fail_test "post-build run failed: $output"
-assert_contains "$output" "$built/.build/app/2M2Better.app"
+assert_contains "$output" "$built/.build/app/2m2better.app"
 assert_contains "$output" 'Built without launching'
-[ -x "$built/.build/app/2M2Better.app/Contents/MacOS/BreakCompanion" ] || \
+[ -x "$built/.build/app/2m2better.app/Contents/MacOS/BreakCompanion" ] || \
     fail_test 'stub build did not leave its app bundle in place'
 
 renamed="$test_root/renamed-preview"
 open_log="$test_root/open-log.txt"
 output=$(PREVIEW_TEST_GIT_STUB_REPO="$test_root/stub-repo" \
-    PREVIEW_TEST_APP_BUNDLE_NAME=2m2better.app \
+    PREVIEW_TEST_APP_BUNDLE_NAME=Renamed.app \
     PREVIEW_TEST_OPEN_LOG="$open_log" \
     run_installer --confirm --destination "$renamed" 2>&1) || \
     fail_test "post-build run with a renamed bundle failed: $output"
-assert_contains "$output" "$renamed/.build/app/2m2better.app"
-[ "$(cat "$open_log")" = "$renamed/.build/app/2m2better.app" ] || \
+assert_contains "$output" "$renamed/.build/app/Renamed.app"
+[ "$(cat "$open_log")" = "$renamed/.build/app/Renamed.app" ] || \
     fail_test "installer launched the wrong path: $(cat "$open_log")"
 
 renamed_executable="$test_root/renamed-executable-preview"
@@ -320,7 +320,7 @@ output=$(PREVIEW_TEST_GIT_STUB_REPO="$test_root/stub-repo" \
     PREVIEW_TEST_GIT_LOG="$git_log" \
     run_installer --confirm --no-launch --ref "$full_sha" --destination "$revision" 2>&1) || \
     fail_test "full-SHA post-build run failed: $output"
-assert_contains "$output" "$revision/.build/app/2M2Better.app"
+assert_contains "$output" "$revision/.build/app/2m2better.app"
 assert_contains "$(cat "$git_log")" "fetch --depth 1 origin $full_sha"
 assert_lacks "$(cat "$git_log")" 'clone'
 
