@@ -73,7 +73,7 @@ button,
 .wordmark-dot {
   width: 12px;
   height: 12px;
-  margin-right: var(--space-2);
+  margin-right: var(--space-wordmark-gap);
   border-radius: var(--radius-orb);
   background: var(--color-pigment-moss);
   box-shadow: inset -3px -3px 0 var(--color-pigment-moss-deep);
@@ -265,6 +265,7 @@ h1 {
   align-items: center;
   justify-content: center;
   gap: 19px;
+  --orb-surface: var(--orb-surface-hero);
   --orb-shadow: var(--shadow-orb-hero);
   animation: orb-breathe var(--motion-duration-orb) var(--motion-ease-gentle) infinite;
   z-index: 2;
@@ -317,7 +318,7 @@ h1 {
   align-items: center;
   gap: 11px;
   background: var(--color-caption-surface);
-  border: var(--border-quiet);
+  border: var(--border-faint);
   border-radius: var(--radius-control);
   box-shadow: var(--shadow-card);
   backdrop-filter: blur(10px);
@@ -386,7 +387,7 @@ h1 {
   width: min(100%, var(--layout-card-max));
   justify-self: end;
   padding: 34px;
-  border: var(--border-quiet);
+  border: var(--border-card);
   border-radius: var(--radius-card);
   background: var(--color-surface-card);
   box-shadow: var(--shadow);
@@ -516,7 +517,7 @@ h1 {
 
 .two-minutes {
   min-height: 720px;
-  padding-block: var(--space-15);
+  padding-block: var(--space-section-tall);
   display: grid;
   grid-template-columns: 0.9fr 1.1fr;
   align-items: center;
@@ -625,7 +626,7 @@ h1 {
 .privacy-orbit::after {
   content: "";
   position: absolute;
-  border: var(--border-quiet);
+  border: var(--border-orbit-path);
   border-radius: var(--radius-orb);
 }
 
@@ -643,6 +644,7 @@ h1 {
 .privacy-orb {
   width: 105px;
   height: 105px;
+  --orb-shadow: var(--shadow-orb-small);
   z-index: 2;
   animation: orb-breathe var(--motion-duration-orb) var(--motion-ease-gentle) infinite;
 }
@@ -660,7 +662,7 @@ h1 {
 
 .privacy-notes span {
   padding: 9px 14px;
-  border: var(--border-subtle);
+  border: var(--border-chip);
   border-radius: var(--radius-pill);
   color: var(--green-dark);
   font-size: 11px;
@@ -685,6 +687,9 @@ h1 {
 .closing-orb {
   width: 68px;
   height: 68px;
+  --orb-surface-highlight: var(--color-alpha-white-44);
+  --orb-surface-light: var(--orb-resting-light-quiet);
+  --orb-shadow: var(--shadow-orb-small);
   margin-bottom: 34px;
 }
 
@@ -788,7 +793,7 @@ h1 {
   right: 20px;
   width: 38px;
   height: 38px;
-  border: var(--border-quiet);
+  border: var(--border-control);
   border-radius: var(--radius-orb);
   background: var(--color-surface-dialog-control);
   color: var(--ink);
@@ -799,6 +804,8 @@ h1 {
 .dialog-orb {
   width: 58px;
   height: 58px;
+  --orb-surface-highlight: var(--color-alpha-white-46);
+  --orb-surface-light: var(--orb-resting-light-quiet);
   margin-bottom: 32px;
   border-radius: var(--radius-orb);
   display: flex;

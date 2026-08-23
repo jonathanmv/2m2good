@@ -206,14 +206,14 @@ test("orb state classes resolve to three distinct proximity treatments", async (
   }
 
   for (const [state, shadow] of Object.entries(shadows)) {
-    assert.match(shadow, /^inset -5px -7px 14px \S+$/, `${state} should stay a compact inset cue`);
+    assert.match(shadow, /^inset -5px -7px 14px \S.*$/, `${state} should stay a compact inset cue`);
   }
 
   const heroShadow = resolveValue(
     declarationsFor(css, ".hero-orb")["--orb-shadow"],
     rootVariables,
   ).replace(/\s+/g, " ").trim();
-  assert.match(heroShadow, /^inset -10px -14px 25px \S+, 0 24px 45px \S+$/);
+  assert.match(heroShadow, /^inset -10px -14px 25px .+, 0 24px 45px .+$/);
 });
 
 test("every rendered orb consumes the shared surface and an owned state", async () => {
@@ -237,4 +237,40 @@ test("every rendered orb consumes the shared surface and an owned state", async 
     [...html.matchAll(/orb-state-[a-z]+/g)].map(([one]) => one),
   );
   assert.deepEqual([...stateClasses].sort(), ["orb-state-approaching", "orb-state-resting"]);
+});
+
+test("each resting orb keeps its own established depth", async () => {
+  const css = await builtStylesheet();
+  const scope = (selector) => ({
+    ...declarationsFor(css, ":root"),
+    ...declarationsFor(css, ".orb-state-resting"),
+    ...declarationsFor(css, selector),
+  });
+  const effective = (selector, property) => {
+    const variables = scope(selector);
+    return resolveValue(variables[property], variables).replace(/\s+/g, " ").trim();
+  };
+
+  const orbs = [".hero-orb", ".privacy-orb", ".closing-orb", ".dialog-orb"];
+  const surfaces = orbs.map((selector) => effective(selector, "--orb-surface"));
+  for (const [index, surface] of surfaces.entries()) {
+    assert.doesNotMatch(surface, /var\(|^$/, `${orbs[index]} should fully resolve its surface`);
+  }
+  assert.equal(new Set(surfaces).size, orbs.length, "each resting orb keeps a distinct surface");
+
+  const stops = (surface) => (surface.match(/#[0-9a-f]{3,8}|rgba?\(/gi) ?? []).length;
+  assert.ok(
+    stops(surfaces[0]) > stops(surfaces[1]),
+    "the hero orb keeps the deeper multi-stop gradient",
+  );
+
+  const shadows = Object.fromEntries(
+    orbs.map((selector) => [selector, effective(selector, "--orb-shadow")]),
+  );
+  assert.match(shadows[".hero-orb"], /^inset -10px -14px 25px .+, 0 24px 45px .+$/);
+  assert.equal(shadows[".privacy-orb"], shadows[".closing-orb"]);
+  assert.notEqual(shadows[".dialog-orb"], shadows[".privacy-orb"]);
+  for (const selector of [".privacy-orb", ".closing-orb", ".dialog-orb"]) {
+    assert.match(shadows[selector], /^inset -5px -7px 14px \S.*$/);
+  }
 });

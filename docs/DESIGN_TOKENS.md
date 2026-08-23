@@ -18,6 +18,7 @@ The old short color aliases in the token file are compatibility aliases for the 
 | `--color-border-subtle`, `--border-quiet`, `--border-on-dark` | quiet structure, never dashboard-like card chrome |
 | `--font-body`, `--font-display`, `--type-*` | sans-serif interface copy and editorial display copy |
 | `--space-*` and `--layout-*` | page gutters, section rhythm, reading widths, card widths, and orb-stage bounds |
+| `--border-faint`, `--border-card`, `--border-control`, `--border-orbit-path`, `--border-chip` | the exact hairline alphas the existing sections established, so tokenizing a border never shifts its weight |
 | `--radius-*` | pill actions, compact controls, soft cards, and the organic orb stage |
 | `--shadow-*` | restrained separation for the orb, check-in, actions, and dialog |
 | `--motion-*` | short interaction transitions and slow, purposeful orb movement |
@@ -40,7 +41,7 @@ Apply a state class plus `orb-surface` to an orb, or put the state class on a wr
 </div>
 ```
 
-`--orb-shadow-*` is a compact inset shading cue per state, sized for the small orbs. A hero-scale orb overrides `--orb-shadow` with `--shadow-orb-hero` for its extra drop shadow, as `.hero-orb` does.
+`--orb-shadow-*` is a compact inset shading cue per state, sized for the small orbs. A section can keep its own established depth without leaving the token system: override `--orb-surface-highlight` and `--orb-surface-light` to tune the resting sheen and light stop, and `--orb-shadow` to pick a different shading token. The hero orb does this with `--orb-surface-hero` and `--shadow-orb-hero` for its deeper multi-stop gradient and drop shadow.
 
 Color and motion are supporting cues only. The state must also be communicated by visible text, a label, or an explicit control. The reduced-motion rule in `globals.css` stops orb, halo, and blink animation while retaining the same state colors, labels, focus styles, and controls.
 
