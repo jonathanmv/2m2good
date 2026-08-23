@@ -40,9 +40,10 @@ button:disabled {
   cursor: not-allowed;
 }
 
-:focus-visible {
+:focus-visible:focus-visible {
   outline: var(--border-focus);
   outline-offset: var(--space-1);
+  box-shadow: var(--shadow-focus);
 }
 
 .shell {
@@ -79,7 +80,7 @@ button:disabled {
   height: var(--layout-wordmark-dot-size);
   margin-right: var(--space-wordmark-gap);
   border-radius: var(--radius-orb);
-  background: var(--color-pigment-moss);
+  background: var(--color-content-accent);
   box-shadow: var(--shadow-wordmark-dot);
 }
 
@@ -1096,8 +1097,8 @@ h3 {
 }
 
 .closing {
-  background: var(--color-content-signal);
-  color: var(--color-content-primary);
+  background: var(--color-surface-signal);
+  color: var(--color-content-on-signal);
 }
 
 .closing-inner {
