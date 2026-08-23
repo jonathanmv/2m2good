@@ -6,7 +6,7 @@ private final class CompanionPanel: NSPanel {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private let store = CompanionStore()
     private var panel: NSPanel?
     private var statusItem: NSStatusItem?
@@ -37,7 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildPanel() {
         let panel = CompanionPanel(
-            contentRect: NSRect(origin: .zero, size: size(for: .idle)),
+            contentRect: NSRect(origin: .zero, size: size(for: store.mode)),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -51,18 +51,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         panel.contentView = NSHostingView(rootView: CompanionView(store: store))
         panel.setFrameOrigin(origin(for: panel.frame.size))
-        panel.orderFrontRegardless()
         self.panel = panel
+        resizePanel(for: store.mode)
     }
 
     private func buildMenuBarItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "leaf.fill", accessibilityDescription: "2m2good")
+        item.button?.image = NSImage(systemSymbolName: "leaf.fill", accessibilityDescription: ProductIdentity.name)
 
         let menu = NSMenu()
         menu.addItem(withTitle: "Offer a break now", action: #selector(offerBreak), keyEquivalent: "")
+        menu.addItem(withTitle: ProductIdentity.configureAreasMenuTitle, action: #selector(configureAreas), keyEquivalent: "")
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(withTitle: "Quit 2m2good", action: #selector(quit), keyEquivalent: "q")
+        menu.addItem(withTitle: "Quit \(ProductIdentity.name)", action: #selector(quit), keyEquivalent: "q")
         menu.items.forEach { $0.target = self }
         item.menu = menu
         statusItem = item
@@ -71,6 +72,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func offerBreak() {
         panel?.orderFrontRegardless()
         store.offerBreakNow()
+    }
+
+    @objc private func configureAreas() {
+        panel?.orderFrontRegardless()
+        store.openAreaConfiguration()
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        guard menuItem.action == #selector(configureAreas) else { return true }
+        return store.canOpenAreaConfiguration
     }
 
     @objc private func quit() {
@@ -88,14 +99,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         frame.origin.x = min(max(frame.origin.x, visible.minX + 12), visible.maxX - newSize.width - 12)
         frame.origin.y = min(max(frame.origin.y, visible.minY + 12), visible.maxY - newSize.height - 12)
         panel.setFrame(frame, display: true, animate: true)
-        if mode == .complete {
+        switch mode {
+        case .complete, .setup, .configuration:
             let frontmost = NSWorkspace.shared.frontmostApplication
             if frontmost?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
                 previouslyActiveApplication = frontmost
             }
             NSApp.activate(ignoringOtherApps: true)
             panel.makeKeyAndOrderFront(nil)
-        } else {
+        default:
             panel.orderFrontRegardless()
             if mode == .idle, let previouslyActiveApplication {
                 previouslyActiveApplication.activate(options: [])
@@ -107,10 +119,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func size(for mode: CompanionStore.Mode) -> NSSize {
         switch mode {
         case .idle: return NSSize(width: 92, height: 92)
-        case .checkIn: return NSSize(width: 370, height: 300)
-        case .routine: return NSSize(width: 370, height: 390)
-        case .complete: return NSSize(width: 300, height: 270)
+        case .setup, .configuration: return fittedSize(width: 370, minimumHeight: 480)
+        case .checkIn: return fittedSize(width: 370, minimumHeight: 300)
+        case .routine: return fittedSize(width: 370, minimumHeight: 390)
+        case .complete: return fittedSize(width: 300, minimumHeight: 270)
         }
+    }
+
+    private func fittedSize(width: CGFloat, minimumHeight: CGFloat) -> NSSize {
+        let measuring = NSHostingController(
+            rootView: CompanionView(store: store).fixedSize(horizontal: false, vertical: true)
+        )
+        let needed = measuring.sizeThatFits(in: NSSize(width: width, height: 10_000)).height
+        let available = (NSScreen.main?.visibleFrame.height ?? 600) - 44
+        return NSSize(width: width, height: min(max(minimumHeight, needed.rounded(.up)), available))
     }
 
     private func origin(for size: NSSize) -> NSPoint {

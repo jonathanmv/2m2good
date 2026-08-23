@@ -4,6 +4,7 @@ struct CompanionView: View {
     @ObservedObject var store: CompanionStore
     @ObservedObject private var voice: VoiceService
     @State private var hovered = false
+    @State private var draftAreas: Set<BodyArea> = []
 
     init(store: CompanionStore) {
         self.store = store
@@ -22,6 +23,8 @@ struct CompanionView: View {
             switch store.mode {
             case .idle:
                 idleView
+            case .setup, .configuration:
+                areaConfigurationView
             case .checkIn:
                 checkInView
             case .routine:
@@ -48,12 +51,100 @@ struct CompanionView: View {
                 OrbPointerInteraction(onTap: store.offerBreakNow)
             }
         .onHover { hovered = $0 }
-        .help("2m2good — click for a pause")
+        .help("2M2Better — click for a pause")
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("2m2good. Offer a wellbeing break now.")
+        .accessibilityLabel("2M2Better. Offer a wellbeing break now.")
         .accessibilityValue(store.checkInAccessibilityValue)
+        .accessibilityHint("Click to offer a two-minute standing reset")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { store.offerBreakNow() }
+    }
+
+    private var areaConfigurationView: some View {
+        ScrollView {
+            areaConfigurationContent
+                .padding(23)
+        }
+        .onAppear { draftAreas = store.selectedAreas }
+    }
+
+    private var areaConfigurationContent: some View {
+        VStack(spacing: 14) {
+            HStack(spacing: 12) {
+                CompanionOrb(motion: .breathe, warmth: 0.72, active: true)
+                    .frame(width: 48, height: 48)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(store.mode == .setup ? "A small setup first" : "Body areas")
+                        .font(.system(size: 19, weight: .semibold, design: .rounded))
+                    Text("Choose one or more areas for your standing reset. You can change this from the menu bar.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+
+            VStack(spacing: 7) {
+                ForEach(Array(BodyArea.allCases.enumerated()), id: \.element) { index, area in
+                    Button {
+                        toggle(area)
+                    } label: {
+                        HStack(spacing: 10) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(area.label)
+                                    .font(.system(size: 14, weight: .medium))
+                                Text(area.setupDescription)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: draftAreas.contains(area) ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(draftAreas.contains(area) ? Color(red: 0.27, green: 0.55, blue: 0.49) : .secondary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(AreaOptionButtonStyle(selected: draftAreas.contains(area)))
+                    .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: [])
+                    .accessibilityValue(draftAreas.contains(area) ? "Selected" : "Not selected")
+                    .accessibilityHint("Press \(index + 1) to turn this area on or off")
+                }
+            }
+
+            Text("Move gently, stay in a comfortable range, and stop if anything hurts or you feel unwell. This is a standing reset.")
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button("Save areas") {
+                store.saveSelectedAreas(draftAreas)
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .keyboardShortcut(.defaultAction)
+            .disabled(draftAreas.isEmpty)
+            .opacity(draftAreas.isEmpty ? 0.5 : 1)
+
+            if store.offersBalancedChoice {
+                Button(store.mode == .setup ? "Use balanced for now" : "Use balanced instead", action: store.continueWithBalancedDefaults)
+                    .buttonStyle(QuietButtonStyle())
+                    .keyboardShortcut("b", modifiers: .command)
+                    .accessibilityHint("Press Command B to use the existing balanced movement selection without choosing an area")
+            }
+
+            if store.mode == .configuration {
+                Button("Cancel", action: store.cancelAreaConfiguration)
+                    .buttonStyle(QuietButtonStyle())
+                    .keyboardShortcut(.cancelAction)
+            }
+        }
+    }
+
+    private func toggle(_ area: BodyArea) {
+        if draftAreas.contains(area) {
+            draftAreas.remove(area)
+        } else {
+            draftAreas.insert(area)
+        }
     }
 
     private var checkInView: some View {
@@ -277,6 +368,24 @@ private struct PrimaryButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(Color(red: 0.27, green: 0.55, blue: 0.49).opacity(configuration.isPressed ? 0.75 : 1))
             )
+    }
+}
+
+private struct AreaOptionButtonStyle: ButtonStyle {
+    let selected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.primary.opacity(configuration.isPressed ? 0.10 : selected ? 0.08 : 0.045))
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(selected ? 0.16 : 0.06), lineWidth: 0.7)
+            }
     }
 }
 

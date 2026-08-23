@@ -35,9 +35,9 @@ export default function Home() {
     <>
       <main>
       <nav className="nav shell" aria-label="Primary navigation">
-        <a className="wordmark" href="#top" aria-label="2m2good home">
+        <a className="wordmark" href="#top" aria-label="2M2Better home">
           <span className="wordmark-dot" aria-hidden="true" />
-          2m<span>2</span>good
+          2M<span>2</span>Better
         </a>
         <div className="nav-links">
           <a href="#how-it-feels">How it feels</a>
@@ -71,7 +71,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="orb-stage" aria-label="2m2good preview">
+        <div className="orb-stage" aria-label="2M2Better preview">
           <div className="stage-note note-one">
             <span>small enough to stay</span>
             <strong>out of your way</strong>
@@ -233,7 +233,7 @@ export default function Home() {
           <p>Two minutes for your body.</p>
           <h2>Then back to what matters.</h2>
           <button className="button button-light" type="button" onClick={openComingSoon}>
-            Download 2m2good <span aria-hidden="true">↗</span>
+            Download 2M2Better <span aria-hidden="true">↗</span>
           </button>
         </div>
       </section>
@@ -241,9 +241,9 @@ export default function Home() {
       <footer className="shell footer">
         <a className="wordmark footer-mark" href="#top">
           <span className="wordmark-dot" aria-hidden="true" />
-          2m<span>2</span>good
+          2M<span>2</span>Better
         </a>
-        <p>2m2good for macOS · gentle by design</p>
+        <p>2M2Better for macOS · gentle by design</p>
         <p>Local. Private. Yours.</p>
       </footer>
       </main>
@@ -277,7 +277,7 @@ export default function Home() {
           <p className="eyebrow">Coming soon</p>
           <h2 id="coming-soon-title">Not public yet.</h2>
           <p id="coming-soon-description">
-            2m2good is still in early access. If you&apos;d like to hear when it
+            2M2Better is still in early access. If you&apos;d like to hear when it
             is ready, leave your email through the short Google Form.
           </p>
           <a

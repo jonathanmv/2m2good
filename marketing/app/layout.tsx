@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("http://localhost:3000"),
-  title: "2m2good · A two-minute reset for your body",
+  title: "2M2Better · A two-minute reset for your body",
   description:
     "A gentle, private macOS desktop companion for short standing breaks that protect your flow.",
   icons: {
@@ -11,10 +11,10 @@ export const metadata: Metadata = {
     shortcut: "/favicon.svg",
   },
   openGraph: {
-    title: "2m2good · A two-minute reset for your body",
+    title: "2M2Better · A two-minute reset for your body",
     description:
       "A gentle, private macOS desktop companion for short standing breaks that protect your flow.",
-    images: [{ url: "/og.png", width: 1698, height: 909 }],
+    images: [{ url: "/og.png", width: 1730, height: 909 }],
     type: "website",
   },
   twitter: {
