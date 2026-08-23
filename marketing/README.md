@@ -35,9 +35,12 @@ npm test
 `npm test` creates a production build and asserts against the rendered HTML and
 the built CSS: the rotating area promise and its static fallback, the
 click-only bounded preview and its controls, the auditable download-then-run
-developer-preview command, the privacy language, and the lowercase wordmark.
+developer-preview command, the privacy language, and the lowercase wordmark. It
+also parses the emitted CSS to prove the hero, area list, demo, orb states,
+installer, and reduced-motion rules resolve through declared design tokens.
 The page is local-only; it does not use accounts, analytics, or network
 services.
 
-The design-token source of truth is `app/design-tokens.css`; new sections should
-consume its semantic roles rather than copying raw values into component styles.
+The design-token source of truth is `app/design-tokens.css`;
+[`../docs/DESIGN_TOKENS.md`](../docs/DESIGN_TOKENS.md) owns the usage map and
+the rules for adding a role.
