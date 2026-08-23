@@ -7,81 +7,83 @@
  */
 
 :root {
-  /* A focused, earthy palette: paper, ink, moss, and one warm signal. */
-  --color-pigment-paper: #f3eee3;
-  --color-pigment-paper-deep: #e8dfcf;
-  --color-pigment-ink: #1f302b;
-  --color-pigment-ink-soft: #5d6a63;
-  --color-pigment-moss: #5b8167;
-  --color-pigment-moss-deep: #2d5144;
-  --color-pigment-sun: #e38352;
-  --color-pigment-sun-soft: #f2b37b;
-  --color-pigment-warm-red: #c85f4f;
-  --color-pigment-cream: #fffaf0;
+  /* A tide-and-clay palette: cool mineral space, chalk, and human warmth. */
+  --color-pigment-mist: #eef4f1;
+  --color-pigment-mineral: #dce9e7;
+  --color-pigment-deep-tide: #163e48;
+  --color-pigment-sea-slate: #4d646a;
+  --color-pigment-tide: #146b6d;
+  --color-pigment-tide-deep: #0f515b;
+  --color-pigment-clay: #945437;
+  --color-pigment-clay-soft: #e6b77f;
+  --color-pigment-plum: #80546e;
+  --color-pigment-chalk: #fffcf4;
 
-  --color-alpha-ink-04: rgba(31, 48, 43, 0.04);
-  --color-alpha-ink-07: rgba(31, 48, 43, 0.07);
-  --color-alpha-ink-09: rgba(31, 48, 43, 0.09);
-  --color-alpha-ink-10: rgba(31, 48, 43, 0.1);
-  --color-alpha-ink-12: rgba(31, 48, 43, 0.12);
-  --color-alpha-ink-13: rgba(31, 48, 43, 0.13);
-  --color-alpha-ink-14: rgba(31, 48, 43, 0.14);
-  --color-alpha-ink-15: rgba(31, 48, 43, 0.15);
-  --color-alpha-ink-16: rgba(31, 48, 43, 0.16);
-  --color-alpha-ink-18: rgba(31, 48, 43, 0.18);
-  --color-alpha-paper-64: rgba(255, 250, 240, 0.64);
-  --color-alpha-paper-65: rgba(255, 250, 240, 0.65);
-  --color-alpha-paper-68: rgba(255, 250, 240, 0.68);
-  --color-alpha-paper-82: rgba(255, 250, 240, 0.82);
-  --color-alpha-paper-88: rgba(255, 250, 240, 0.88);
-  --color-alpha-paper-96: rgba(255, 250, 240, 0.96);
+  --color-alpha-ink-04: rgba(22, 62, 72, 0.04);
+  --color-alpha-ink-07: rgba(22, 62, 72, 0.07);
+  --color-alpha-ink-09: rgba(22, 62, 72, 0.09);
+  --color-alpha-ink-10: rgba(22, 62, 72, 0.1);
+  --color-alpha-ink-12: rgba(22, 62, 72, 0.12);
+  --color-alpha-ink-13: rgba(22, 62, 72, 0.13);
+  --color-alpha-ink-14: rgba(22, 62, 72, 0.14);
+  --color-alpha-ink-15: rgba(22, 62, 72, 0.15);
+  --color-alpha-ink-16: rgba(22, 62, 72, 0.16);
+  --color-alpha-ink-18: rgba(22, 62, 72, 0.18);
+  --color-alpha-paper-64: rgba(255, 252, 244, 0.64);
+  --color-alpha-paper-65: rgba(255, 252, 244, 0.65);
+  --color-alpha-paper-68: rgba(255, 252, 244, 0.68);
+  --color-alpha-paper-82: rgba(255, 252, 244, 0.82);
+  --color-alpha-paper-88: rgba(255, 252, 244, 0.88);
+  --color-alpha-paper-96: rgba(255, 252, 244, 0.96);
   --color-alpha-white-44: rgba(255, 255, 255, 0.44);
   --color-alpha-white-46: rgba(255, 255, 255, 0.46);
   --color-alpha-white-48: rgba(255, 255, 255, 0.48);
-  --color-alpha-moss-12: rgba(91, 129, 103, 0.12);
-  --color-alpha-orange-14: rgba(227, 131, 82, 0.14);
-  --color-alpha-warm-red-14: rgba(200, 95, 79, 0.14);
-  --color-alpha-orb-shadow: rgba(45, 81, 68, 0.22);
-  --color-alpha-orb-shadow-dark: rgba(35, 69, 55, 0.22);
-  --color-alpha-orb-shadow-near: rgba(130, 68, 39, 0.16);
-  --color-alpha-orb-shadow-resting: rgba(35, 69, 55, 0.18);
-  --color-surface-card: rgba(243, 238, 227, 0.74);
+  --color-alpha-tide-14: rgba(20, 107, 109, 0.14);
+  --color-alpha-clay-16: rgba(148, 84, 55, 0.16);
+  --color-alpha-plum-16: rgba(128, 84, 110, 0.16);
+  --color-alpha-orb-shadow: rgba(15, 81, 91, 0.22);
+  --color-alpha-orb-shadow-dark: rgba(22, 62, 72, 0.22);
+  --color-alpha-orb-shadow-near: rgba(148, 84, 55, 0.18);
+  --color-alpha-orb-shadow-resting: rgba(15, 81, 91, 0.18);
+  --color-surface-card: rgba(255, 252, 244, 0.82);
   --color-surface-control-muted: var(--color-alpha-ink-07);
   --color-surface-caption: var(--color-alpha-paper-82);
   --color-surface-dialog-control: var(--color-alpha-paper-64);
-  --color-content-on-dark-muted: rgba(255, 250, 240, 0.65);
-  --color-content-on-dark-soft: var(--color-alpha-paper-68);
-  --color-content-on-dark-strong: var(--color-alpha-paper-88);
+  --color-content-on-dark-muted: rgba(255, 252, 244, 0.74);
+  --color-content-on-dark-soft: var(--color-alpha-paper-82);
+  --color-content-on-dark-strong: var(--color-alpha-paper-96);
   --color-stage-center: var(--color-alpha-paper-96);
   --color-stage-line: var(--color-alpha-ink-07);
-  --color-caption-surface: var(--color-alpha-paper-82);
-  --color-content-on-action-soft: var(--color-alpha-paper-68);
-  --color-time-mark-shadow: var(--color-alpha-moss-12);
-  --color-dialog-orbit: rgba(45, 81, 68, 0.13);
-  --color-dialog-orbit-soft: rgba(45, 81, 68, 0.045);
-  --color-dialog-orbit-faint: rgba(45, 81, 68, 0.025);
+  --color-caption-surface: var(--color-alpha-paper-88);
+  --color-content-on-action-soft: var(--color-alpha-paper-82);
+  --color-time-mark-shadow: var(--color-alpha-tide-14);
+  --color-dialog-orbit: rgba(15, 81, 91, 0.16);
+  --color-dialog-orbit-soft: rgba(15, 81, 91, 0.055);
+  --color-dialog-orbit-faint: rgba(15, 81, 91, 0.03);
 
   /* Semantic color roles */
-  --color-surface-canvas: var(--color-pigment-paper);
-  --color-surface-recessed: var(--color-pigment-paper-deep);
-  --color-surface-raised: var(--color-pigment-cream);
-  --color-surface-action: var(--color-pigment-ink);
-  --color-surface-action-strong: var(--color-pigment-moss-deep);
-  --color-surface-signal: var(--color-pigment-sun);
-  --color-content-primary: var(--color-pigment-ink);
-  --color-content-secondary: var(--color-pigment-ink-soft);
-  --color-content-on-action: var(--color-pigment-cream);
-  --color-content-accent: var(--color-pigment-moss-deep);
-  --color-content-signal: var(--color-pigment-sun);
-  --color-content-signal-soft: var(--color-pigment-sun-soft);
+  --color-surface-canvas: var(--color-pigment-mist);
+  --color-surface-recessed: var(--color-pigment-mineral);
+  --color-surface-raised: var(--color-pigment-chalk);
+  --color-surface-action: var(--color-pigment-deep-tide);
+  --color-surface-action-strong: var(--color-pigment-tide-deep);
+  --color-surface-signal: var(--color-pigment-clay);
+  --color-content-primary: var(--color-pigment-deep-tide);
+  --color-content-secondary: var(--color-pigment-sea-slate);
+  --color-content-on-action: var(--color-pigment-chalk);
+  --color-content-on-signal: var(--color-pigment-chalk);
+  --color-content-accent: var(--color-pigment-tide-deep);
+  --color-content-signal: var(--color-pigment-clay);
+  --color-content-signal-soft: var(--color-pigment-clay-soft);
   --color-border-subtle: var(--color-alpha-ink-16);
   --color-border-quiet: var(--color-alpha-ink-12);
-  --color-border-on-dark: rgba(255, 250, 240, 0.22);
-  --color-focus-ring: var(--color-pigment-sun);
-  --color-scrim: rgba(23, 38, 33, 0.48);
+  --color-border-on-dark: rgba(255, 252, 244, 0.28);
+  --color-focus-ring: var(--color-pigment-tide);
+  --color-focus-ring-contrast: var(--color-pigment-chalk);
+  --color-scrim: rgba(12, 36, 42, 0.52);
   --color-orb-highlight: var(--color-alpha-white-48);
-  --color-content-on-orb: var(--color-alpha-paper-88);
-  --color-orb-shadow-near-deep: #824427;
+  --color-content-on-orb: var(--color-alpha-paper-96);
+  --color-orb-shadow-near-deep: #7a442f;
 
   /* Typography roles */
   --font-body: "Avenir Next", Avenir, "Segoe UI", Helvetica, Arial, sans-serif;
@@ -400,20 +402,21 @@
   --border-width-hairline: 1px;
 
   /* Shadow roles */
-  --shadow-float: 0 32px 80px rgba(45, 61, 52, 0.16);
-  --shadow-card: 0 10px 28px rgba(31, 48, 43, 0.09);
-  --shadow-action: 0 12px 24px rgba(31, 48, 43, 0.18);
-  --shadow-action-quiet: 0 12px 24px rgba(31, 48, 43, 0.16);
-  --shadow-light-action: 0 12px 25px rgba(93, 55, 35, 0.15);
-  --shadow-dialog: 0 40px 100px rgba(20, 34, 29, 0.28);
+  --shadow-float: 0 32px 80px rgba(22, 62, 72, 0.16);
+  --shadow-card: 0 10px 28px rgba(22, 62, 72, 0.1);
+  --shadow-action: 0 12px 24px rgba(22, 62, 72, 0.2);
+  --shadow-action-quiet: 0 12px 24px rgba(22, 62, 72, 0.16);
+  --shadow-light-action: 0 12px 25px rgba(73, 52, 39, 0.18);
+  --shadow-dialog: 0 40px 100px rgba(12, 36, 42, 0.3);
+  --shadow-focus: 0 0 0 6px var(--color-focus-ring-contrast);
   --shadow-time-mark: 12px 12px 0 var(--color-time-mark-shadow);
-  --shadow-demo-ring: 0 0 0 48px var(--color-alpha-moss-12);
-  --shadow-orb-hero: inset -10px -14px 25px rgba(35, 69, 55, 0.22), 0 24px 45px rgba(45, 81, 68, 0.22);
+  --shadow-demo-ring: 0 0 0 48px var(--color-alpha-tide-14);
+  --shadow-orb-hero: inset -10px -14px 25px rgba(15, 81, 91, 0.24), 0 24px 45px rgba(22, 62, 72, 0.24);
   --shadow-orb-small: inset -5px -7px 14px var(--color-alpha-orb-shadow-near);
   --shadow-orb-small-resting-warm: inset -5px -7px 14px var(--color-alpha-orb-shadow-near);
-  --shadow-orb-small-resting: inset -5px -7px 14px rgba(35, 69, 55, 0.18);
-  --shadow-orb-small-imminent: inset -5px -7px 14px rgba(143, 62, 54, 0.16);
-  --shadow-wordmark-dot: inset -3px -3px 0 var(--color-pigment-moss-deep);
+  --shadow-orb-small-resting: inset -5px -7px 14px rgba(15, 81, 91, 0.18);
+  --shadow-orb-small-imminent: inset -5px -7px 14px rgba(112, 70, 95, 0.2);
+  --shadow-wordmark-dot: inset -3px -3px 0 var(--color-pigment-tide-deep);
 
   /* Motion and effect detail roles. These preserve the landing page's existing
    * movement rather than normalizing distinct cues onto one scale step. */
@@ -456,46 +459,46 @@
   --motion-reduced-duration: 0.001ms;
 
   /*
-   * Orb proximity contract: distant (green) -> near (orange) -> imminent
-   * (warm red). Color is a supporting cue only; copy and controls carry the
+   * Orb proximity contract: distant (teal) -> near (clay) -> imminent
+   * (plum). Color is a supporting cue only; copy and controls carry the
    * state for people who do not perceive color or motion.
    */
-  --orb-proximity-distant: var(--color-pigment-moss);
-  --orb-proximity-near: var(--color-pigment-sun);
-  --orb-proximity-imminent: var(--color-pigment-warm-red);
-  --orb-distant-light: #79a67e;
-  --orb-distant-mid: #4f7963;
-  --orb-distant-deep: #365a4b;
-  --orb-resting-light: #7ca483;
-  --orb-resting-light-quiet: #6f9978;
-  --orb-near-light: var(--color-pigment-sun-soft);
-  --orb-near-deep: #824427;
-  --orb-imminent-light: #df8a70;
-  --orb-imminent-deep: #8f3e36;
+  --orb-proximity-distant: var(--color-pigment-tide);
+  --orb-proximity-near: var(--color-pigment-clay);
+  --orb-proximity-imminent: var(--color-pigment-plum);
+  --orb-distant-light: #78b4ab;
+  --orb-distant-mid: #3e9292;
+  --orb-distant-deep: #1e626c;
+  --orb-resting-light: #73aa9f;
+  --orb-resting-light-quiet: #629a95;
+  --orb-near-light: #e4b47a;
+  --orb-near-deep: #a35b3a;
+  --orb-imminent-light: #c892ae;
+  --orb-imminent-deep: #70465f;
   --orb-surface-hero: radial-gradient(circle at 34% 25%, var(--color-alpha-white-48), transparent 32%), linear-gradient(145deg, var(--orb-distant-light) 0%, var(--orb-distant-mid) 60%, var(--orb-distant-deep) 100%);
-  --orb-surface-distant: radial-gradient(circle at 30% 22%, var(--color-alpha-white-48), transparent 34%), linear-gradient(145deg, var(--orb-resting-light), var(--color-pigment-moss-deep));
-  --orb-surface-resting-on-signal: radial-gradient(circle at 30% 22%, var(--color-alpha-white-44), transparent 34%), linear-gradient(145deg, var(--orb-resting-light-quiet), var(--color-pigment-moss-deep));
-  --orb-surface-resting-in-dialog: radial-gradient(circle at 30% 22%, var(--color-alpha-white-46), transparent 34%), linear-gradient(145deg, var(--orb-resting-light-quiet), var(--color-pigment-moss-deep));
-  --orb-surface-near: radial-gradient(circle at 30% 22%, var(--color-alpha-white-48), transparent 34%), linear-gradient(145deg, var(--orb-near-light), var(--orb-proximity-near));
-  --orb-surface-imminent: radial-gradient(circle at 30% 22%, var(--color-alpha-white-46), transparent 34%), linear-gradient(145deg, var(--orb-imminent-light), var(--orb-proximity-imminent));
+  --orb-surface-distant: radial-gradient(circle at 30% 22%, var(--color-alpha-white-48), transparent 34%), linear-gradient(145deg, var(--orb-resting-light), var(--color-pigment-tide-deep));
+  --orb-surface-resting-on-signal: radial-gradient(circle at 30% 22%, var(--color-alpha-white-44), transparent 34%), linear-gradient(145deg, var(--orb-resting-light-quiet), var(--color-pigment-tide-deep));
+  --orb-surface-resting-in-dialog: radial-gradient(circle at 30% 22%, var(--color-alpha-white-46), transparent 34%), linear-gradient(145deg, var(--orb-resting-light-quiet), var(--color-pigment-tide-deep));
+  --orb-surface-near: radial-gradient(circle at 30% 22%, var(--color-alpha-white-48), transparent 34%), linear-gradient(145deg, var(--orb-near-light), var(--orb-near-deep));
+  --orb-surface-imminent: radial-gradient(circle at 30% 22%, var(--color-alpha-white-46), transparent 34%), linear-gradient(145deg, var(--orb-imminent-light), var(--orb-imminent-deep));
   --orb-shadow-distant: var(--shadow-orb-small-resting);
   --orb-shadow-near: var(--shadow-orb-small);
   --orb-shadow-imminent: var(--shadow-orb-small-imminent);
-  --orb-halo-distant: var(--color-alpha-moss-12);
-  --orb-halo-near: rgba(227, 131, 82, 0.14);
-  --orb-halo-imminent: rgba(200, 95, 79, 0.14);
+  --orb-halo-distant: var(--color-alpha-tide-14);
+  --orb-halo-near: var(--color-alpha-clay-16);
+  --orb-halo-imminent: var(--color-alpha-plum-16);
 
   /* Compatibility aliases keep the existing page selectors stable while the
-   * semantic tokens become the public contract for the next landing pass. */
+   * semantic tokens remain the public contract for landing consumers. */
   --paper: var(--color-surface-canvas);
   --paper-deep: var(--color-surface-recessed);
   --ink: var(--color-content-primary);
   --ink-soft: var(--color-content-secondary);
-  --green: var(--color-pigment-moss);
-  --green-dark: var(--color-pigment-moss-deep);
+  --green: var(--color-pigment-tide);
+  --green-dark: var(--color-pigment-tide-deep);
   --orange: var(--color-content-signal);
   --orange-soft: var(--color-content-signal-soft);
-  --red-soft: var(--color-pigment-warm-red);
+  --red-soft: var(--color-pigment-plum);
   --cream: var(--color-surface-raised);
   --line: var(--color-border-subtle);
   --shadow: var(--shadow-float);

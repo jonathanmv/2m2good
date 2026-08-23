@@ -147,6 +147,74 @@ function tokensFrom(value) {
   return [...value.matchAll(/var\((--[\w-]+)/g)].map(([, token]) => token);
 }
 
+function tokenRoot(styles) {
+  const root = cssRules(styles).find(({ selectors, declarations, conditions }) =>
+    conditions.length === 0 &&
+    selectors.includes(":root") &&
+    declarations.has("--type-display-size"),
+  )?.declarations;
+  assert.ok(root, "expected marketing design tokens in the built CSS");
+  return root;
+}
+
+function resolveToken(root, token) {
+  let value = root.get(token);
+  assert.ok(value, `expected ${token} in the rendered token contract`);
+  for (let depth = 0; depth < 20; depth += 1) {
+    const reference = value.match(/var\((--[\w-]+)\)/);
+    if (!reference) return value;
+    const replacement = root.get(reference[1]);
+    assert.ok(replacement, `expected ${reference[1]} in the rendered token contract`);
+    value = value.replace(reference[0], replacement);
+  }
+  throw new Error(`token reference cycle while resolving ${token}`);
+}
+
+function parseColor(value) {
+  const hex = value.match(/^#([\da-f]{6})([\da-f]{2})?$/i);
+  if (hex) {
+    return [
+      Number.parseInt(hex[1].slice(0, 2), 16) / 255,
+      Number.parseInt(hex[1].slice(2, 4), 16) / 255,
+      Number.parseInt(hex[1].slice(4, 6), 16) / 255,
+      hex[2] === undefined ? 1 : Number.parseInt(hex[2], 16) / 255,
+    ];
+  }
+  const rgba = value.match(/^rgba?\(\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\s*\)$/i);
+  assert.ok(rgba, `expected a resolved CSS color, received ${value}`);
+  return [
+    Number(rgba[1]) / 255,
+    Number(rgba[2]) / 255,
+    Number(rgba[3]) / 255,
+    rgba[4] === undefined ? 1 : Number(rgba[4]),
+  ];
+}
+
+function blend(foreground, background) {
+  const alpha = foreground[3];
+  return [
+    foreground[0] * alpha + background[0] * (1 - alpha),
+    foreground[1] * alpha + background[1] * (1 - alpha),
+    foreground[2] * alpha + background[2] * (1 - alpha),
+    1,
+  ];
+}
+
+function relativeLuminance(color) {
+  return color
+    .slice(0, 3)
+    .map((channel) => (channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4))
+    .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+}
+
+function contrastRatio(foreground, background) {
+  const composited = blend(foreground, background);
+  const foregroundLuminance = relativeLuminance(composited);
+  const backgroundLuminance = relativeLuminance(background);
+  return (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+    (Math.min(foregroundLuminance, backgroundLuminance) + 0.05);
+}
+
 test("server-rendered page exposes the area promise, sequence, and safe product boundary", async () => {
   const response = await render();
   assert.equal(response.status, 200);
@@ -357,6 +425,91 @@ test("built landing regions resolve their rendered styles through design tokens"
       assert.ok(root.has(token), `compact ${selector} ${property} must resolve declared tokens`);
     }
   }
+});
+
+test("rendered palette roles keep surfaces readable and orb proximity distinct", async () => {
+  const html = await (await render()).text();
+  const styles = await builtStyles();
+  const rules = cssRules(styles);
+  const root = tokenRoot(styles);
+
+  for (const role of [
+    "--color-surface-canvas",
+    "--color-surface-raised",
+    "--color-surface-recessed",
+    "--color-content-primary",
+    "--color-content-secondary",
+    "--color-content-accent",
+    "--color-content-signal",
+    "--color-content-on-action",
+    "--color-content-on-signal",
+    "--color-border-subtle",
+    "--color-focus-ring",
+    "--shadow-focus",
+  ]) {
+    assert.ok(root.has(role), `expected ${role} in the rendered palette contract`);
+  }
+
+  const readablePairs = [
+    ["--color-content-primary", "--color-surface-canvas"],
+    ["--color-content-secondary", "--color-surface-canvas"],
+    ["--color-content-accent", "--color-surface-canvas"],
+    ["--color-content-signal", "--color-surface-raised"],
+    ["--color-content-on-action", "--color-surface-action"],
+    ["--color-content-on-signal", "--color-surface-signal"],
+    ["--color-content-on-dark-muted", "--color-content-primary"],
+  ];
+  for (const [foreground, background] of readablePairs) {
+    const ratio = contrastRatio(
+      parseColor(resolveToken(root, foreground)),
+      parseColor(resolveToken(root, background)),
+    );
+    assert.ok(ratio >= 4.5, `${foreground} on ${background} must be readable (got ${ratio.toFixed(2)}:1)`);
+  }
+
+  assert.ok(
+    contrastRatio(
+      parseColor(resolveToken(root, "--color-focus-ring")),
+      parseColor(resolveToken(root, "--color-surface-canvas")),
+    ) >= 3,
+    "the focus ring must remain visible on the canvas",
+  );
+  assert.ok(
+    contrastRatio(
+      parseColor(resolveToken(root, "--color-focus-ring-contrast")),
+      parseColor(resolveToken(root, "--color-surface-action")),
+    ) >= 3,
+    "the focus contrast halo must remain visible around dark actions",
+  );
+  assert.equal(declarationFor(rules, ":focus-visible", "outline"), "var(--border-focus)");
+  assert.equal(declarationFor(rules, ":focus-visible", "box-shadow"), "var(--shadow-focus)");
+
+  const states = [
+    ["resting", "distant"],
+    ["approaching", "near"],
+    ["due", "imminent"],
+  ];
+  const proximityColors = states.map(([, proximity]) =>
+    resolveToken(root, `--orb-proximity-${proximity}`),
+  );
+  assert.equal(new Set(proximityColors).size, states.length, "orb proximity colors must progress distinctly");
+  for (const [state, proximity] of states) {
+    assert.equal(
+      declarationFor(rules, `.orb-state-${state}`, "--orb-surface"),
+      `var(--orb-surface-${proximity})`,
+    );
+    assert.equal(
+      declarationFor(rules, `.orb-state-${state}`, "--orb-halo"),
+      `var(--orb-halo-${proximity})`,
+    );
+    assert.match(resolveToken(root, `--orb-surface-${proximity}`), /radial-gradient/);
+    assert.match(resolveToken(root, `--orb-surface-${proximity}`), /linear-gradient/);
+    assert.ok(
+      parseColor(resolveToken(root, `--orb-halo-${proximity}`))[3] < 1,
+      `expected the ${proximity} orb halo to stay soft rather than become a solid fill`,
+    );
+  }
+  assert.match(html, /teal → clay → quiet plum/);
 });
 
 test("every custom property the built CSS consumes without a fallback is declared", async () => {

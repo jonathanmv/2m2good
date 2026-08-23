@@ -322,7 +322,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="stage-note note-two">
-                <strong>green → orange → warm red</strong>
+                <strong>teal → clay → quiet plum</strong>
                 <span>as the preview gets closer</span>
               </div>
             </div>
@@ -390,8 +390,8 @@ export default function Home() {
               <p className="eyebrow">Scroll-led preview</p>
               <h2 id="demo-title">See the pause before you install it.</h2>
               <p>
-                As you approach this section, the orb shifts from distant green
-                toward its warmer break-proximity signal. Start the preview with
+                As you approach this section, the orb shifts from distant teal
+                toward its warmer clay signal. Start the preview with
                 a click and keep every control in reach.
               </p>
               <div className="demo-steps" aria-label="Preview flow">
