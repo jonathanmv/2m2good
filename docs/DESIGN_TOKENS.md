@@ -21,6 +21,8 @@ The new palette is a **tide-and-clay** system: cool mineral blue-green gives the
 | Focus | Teal with a chalk contrast halo | Makes keyboard agency visible on both light and dark surfaces without changing layout or motion. |
 | Orb progression | Distant teal → near clay → imminent plum | Communicates proximity as a gentle emotional shift, not a green/orange/urgency-red warning system. Copy and controls remain the source of truth for state. |
 
+This is a marketing presentation palette, deliberately not a pixel-identical theme for the shipped macOS app. The website and the app share one idea - proximity reads as a gentle emotional shift, never an alert - but they do not share RGB values, and neither one is the source of truth for the other's colors. The native orb keeps the values in `Sources/BreakCompanion/BreakProgress.swift` documented in [`../README.md`](../README.md); changing the site palette must not be read as a change to the app, and aligning the two is a separate product decision.
+
 Orb shading and halos are local to the orb: small highlights, tinted inset shadows, and soft state halos give the companion its expressive depth without putting a page-wide gradient behind the marketing message. The same distant/near/imminent roles are applied to the hero, floating orb, check-in, preview, privacy, and closing orb surfaces. All text roles on canvas, raised, recessed, action, signal, and dark command surfaces are selected for contrast; color and motion remain supporting cues, with labels and visible controls unchanged.
 
 ## Source of truth
@@ -71,6 +73,8 @@ Apply a state class plus `orb-surface` to an orb, or put the state class on a wr
 ```
 
 `--orb-shadow-*` is a compact inset shading cue per state, sized for the small orbs. A section that needs its own depth assigns a different complete token on the orb element itself, for example `--orb-surface: var(--orb-surface-near)` plus `--orb-shadow: var(--orb-shadow-near)`. Assign a whole surface or shadow token; do not expect a `:root` token to read a variable set later on the element, because custom properties are substituted where they are declared.
+
+The global focus rule in `globals.css` is written as `:focus-visible:focus-visible` on purpose. The doubled pseudo-class raises its specificity above single-class component rules such as `.button-primary` and `.button-light`, so a component's own resting `box-shadow` can never suppress the chalk contrast halo and leave a focused control with only a low-contrast ring on a dark or clay surface. Keep it doubled, and let the rendered-output test resolve the real cascade for every focusable action rather than only checking that the declaration exists.
 
 Color and motion are supporting cues only. The state must also be communicated by visible text, a label, or an explicit control. The reduced-motion rule in `globals.css` stops orb, halo, and blink animation and freezes the rotating area word behind its static `.area-fallback` list, while retaining the same state colors, labels, focus styles, and controls.
 

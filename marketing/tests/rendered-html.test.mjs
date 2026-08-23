@@ -208,11 +208,71 @@ function relativeLuminance(color) {
 }
 
 function contrastRatio(foreground, background) {
+  assert.equal(
+    background[3],
+    1,
+    "contrast must be measured against an opaque backdrop; composite the background first",
+  );
   const composited = blend(foreground, background);
   const foregroundLuminance = relativeLuminance(composited);
   const backgroundLuminance = relativeLuminance(background);
   return (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
     (Math.min(foregroundLuminance, backgroundLuminance) + 0.05);
+}
+
+function backdrop(root, background, base) {
+  const color = parseColor(resolveToken(root, background));
+  if (!base) return color;
+  return blend(color, parseColor(resolveToken(root, base)));
+}
+
+function specificity(selector) {
+  const cleaned = selector.replace(/::[\w-]+(?:\([^)]*\))?/g, " ");
+  return [
+    (cleaned.match(/#[\w-]+/g) ?? []).length,
+    (cleaned.match(/\.[\w-]+|\[[^\]]*\]|:[\w-]+(?:\([^)]*\))?/g) ?? []).length,
+    (cleaned.match(/(?:^|[\s>+~,])[a-z][\w-]*/gi) ?? []).length,
+  ];
+}
+
+function matchesElement(selector, element) {
+  const compound = selector.trim();
+  const parts = compound.match(/^[a-z][\w-]*|\*|\.[\w-]+|:[\w-]+/gi) ?? [];
+  if (parts.join("") !== compound) return false;
+  return parts.every((part) => {
+    if (part === "*") return true;
+    if (part.startsWith(".")) return element.classes.includes(part.slice(1));
+    if (part.startsWith(":")) return element.states.includes(part);
+    return part === element.tag;
+  });
+}
+
+function cascadeWinner(rules, element, property) {
+  const applicable = rules
+    .map((rule, order) => ({ rule, order }))
+    .filter(({ rule }) => rule.conditions.length === 0 && rule.declarations.has(property))
+    .map(({ rule, order }) => ({
+      rule,
+      order,
+      weight: rule.selectors
+        .filter((selector) => matchesElement(selector, element))
+        .map(specificity)
+        .sort((left, right) => right[0] - left[0] || right[1] - left[1] || right[2] - left[2])
+        .at(0),
+    }))
+    .filter(({ weight }) => weight !== undefined)
+    .sort(
+      (left, right) =>
+        left.weight[0] - right.weight[0] ||
+        left.weight[1] - right.weight[1] ||
+        left.weight[2] - right.weight[2] ||
+        left.order - right.order,
+    );
+  assert.ok(
+    applicable.length > 0,
+    `expected a rule declaring ${property} for ${element.tag}.${element.classes.join(".")}`,
+  );
+  return applicable.at(-1).rule.declarations.get(property);
 }
 
 test("server-rendered page exposes the area promise, sequence, and safe product boundary", async () => {
@@ -458,11 +518,14 @@ test("rendered palette roles keep surfaces readable and orb proximity distinct",
     ["--color-content-on-action", "--color-surface-action"],
     ["--color-content-on-signal", "--color-surface-signal"],
     ["--color-content-on-dark-muted", "--color-content-primary"],
+    ["--color-content-on-dark-muted", "--color-content-accent"],
+    ["--color-content-signal-soft", "--color-content-accent"],
+    ["--color-content-on-dark-strong", "--color-alpha-ink-18", "--color-content-primary"],
   ];
-  for (const [foreground, background] of readablePairs) {
+  for (const [foreground, background, base] of readablePairs) {
     const ratio = contrastRatio(
       parseColor(resolveToken(root, foreground)),
-      parseColor(resolveToken(root, background)),
+      backdrop(root, background, base),
     );
     assert.ok(ratio >= 4.5, `${foreground} on ${background} must be readable (got ${ratio.toFixed(2)}:1)`);
   }
@@ -481,8 +544,6 @@ test("rendered palette roles keep surfaces readable and orb proximity distinct",
     ) >= 3,
     "the focus contrast halo must remain visible around dark actions",
   );
-  assert.equal(declarationFor(rules, ":focus-visible", "outline"), "var(--border-focus)");
-  assert.equal(declarationFor(rules, ":focus-visible", "box-shadow"), "var(--shadow-focus)");
 
   const states = [
     ["resting", "distant"],
@@ -510,6 +571,36 @@ test("rendered palette roles keep surfaces readable and orb proximity distinct",
     );
   }
   assert.match(html, /teal → clay → quiet plum/);
+});
+
+test("keyboard focus resolves to the ring and contrast halo on every rendered action", async () => {
+  const html = await (await render()).text();
+  const rules = cssRules(await builtStyles());
+
+  const focusable = [...html.matchAll(/<(a|button)\b([^>]*)>/g)]
+    .filter(([, tag, attributes]) => tag === "button" || /\shref=/.test(attributes))
+    .map(([, tag, attributes]) => ({
+      tag,
+      classes: (attributes.match(/class="([^"]*)"/)?.[1] ?? "").split(/\s+/).filter(Boolean),
+      states: [":focus-visible", ":focus"],
+    }));
+  assert.ok(focusable.length >= 5, "expected the rendered page to offer focusable actions");
+
+  const distinct = new Map(
+    focusable.map((element) => [`${element.tag}${element.classes.map((name) => `.${name}`).join("")}`, element]),
+  );
+  for (const [label, element] of distinct) {
+    assert.equal(
+      cascadeWinner(rules, element, "outline"),
+      "var(--border-focus)",
+      `focused ${label} must keep the focus ring`,
+    );
+    assert.equal(
+      cascadeWinner(rules, element, "box-shadow"),
+      "var(--shadow-focus)",
+      `focused ${label} must keep the contrast halo instead of its own resting shadow`,
+    );
+  }
 });
 
 test("every custom property the built CSS consumes without a fallback is declared", async () => {
