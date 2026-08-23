@@ -1,12 +1,15 @@
 #!/bin/sh
 # Safe shell-level tests for scripts/install-preview.sh.
-# All destinations are private mktemp children; the fake git refuses every
-# operation except --version, so these tests cannot clone, build, or launch.
+# All destinations are private mktemp children. The fake git never reaches the
+# network: it either refuses a clone or copies a local stub checkout whose stub
+# build script only creates a directory, and the fake open records instead of
+# launching, so these tests cannot fetch, compile, or start an app.
 set -eu
 
 script_dir=$(CDPATH= cd "$(dirname "$0")" && pwd)
 installer="$script_dir/install-preview.sh"
 test_root=$(mktemp -d "${TMPDIR:-/tmp}/2m2good-installer-test.XXXXXX")
+test_root=$(CDPATH= cd "$test_root" && pwd)
 fake_bin="$test_root/fake-bin"
 fake_sdk="$test_root/fake-sdk"
 mkdir -p "$fake_bin" "$fake_sdk" "$test_root/home"
@@ -55,6 +58,15 @@ if [ "${1:-}" = "--version" ]; then
     printf 'git version %s\n' "${PREVIEW_TEST_GIT_VERSION:-2.48.1}"
     exit 0
 fi
+if [ "${1:-}" = "-C" ] && [ "${3:-}" = "rev-parse" ]; then
+    printf '%s\n' "${PREVIEW_TEST_GIT_REVISION:-d0ee7e5574877a042f83bf480c51db083d5eb32e}"
+    exit 0
+fi
+if [ "${1:-}" = "clone" ] && [ -n "${PREVIEW_TEST_GIT_STUB_REPO:-}" ]; then
+    for argument in "$@"; do clone_target=$argument; done
+    cp -R "$PREVIEW_TEST_GIT_STUB_REPO/." "$clone_target/"
+    exit 0
+fi
 if [ "${1:-}" = "clone" ] && [ -n "${PREVIEW_TEST_GIT_PARTIAL_CLONE:-}" ]; then
     for argument in "$@"; do clone_target=$argument; done
     printf 'partial checkout\n' > "$clone_target/partial-marker.txt"
@@ -80,13 +92,37 @@ case "${1:-}" in
     *) exit 1 ;;
 esac
 EOF
-for command_name in curl codesign open; do
+for command_name in curl codesign; do
     cat > "$fake_bin/$command_name" <<'EOF'
 #!/bin/sh
 exit 0
 EOF
 done
+cat > "$fake_bin/open" <<'EOF'
+#!/bin/sh
+[ -z "${PREVIEW_TEST_OPEN_LOG:-}" ] || printf '%s\n' "${1:-}" >> "$PREVIEW_TEST_OPEN_LOG"
+exit 0
+EOF
 chmod +x "$fake_bin"/*
+
+# A stub checkout whose build script reports its bundle on stdout exactly the
+# way scripts/build-app.sh does, so the installer's post-build path runs
+# without a real clone, toolchain, or app launch.
+stub_repo="$test_root/stub-repo/scripts"
+mkdir -p "$stub_repo"
+cat > "$stub_repo/build-app.sh" <<'EOF'
+#!/bin/sh
+set -eu
+project_dir=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
+app_dir="$project_dir/.build/app/${PREVIEW_TEST_APP_BUNDLE_NAME:-2M2Better.app}"
+if [ -z "${PREVIEW_TEST_BUILD_PRODUCES_NOTHING:-}" ]; then
+    mkdir -p "$app_dir/Contents/MacOS"
+    printf '#!/bin/sh\nexit 0\n' > "$app_dir/Contents/MacOS/BreakCompanion"
+    chmod +x "$app_dir/Contents/MacOS/BreakCompanion"
+fi
+printf '%s\n' "$app_dir"
+EOF
+chmod +x "$stub_repo/build-app.sh"
 
 run_installer() {
     PREVIEW_TEST_FAKE_BIN="$fake_bin" PREVIEW_TEST_FAKE_SDK="$fake_sdk" \
@@ -194,4 +230,36 @@ fi
 assert_contains "$output" 'BREAK_SDK_PATH does not point to an SDK directory'
 [ ! -e "$test_root/missing-sdk-preview" ] || fail_test 'SDK prerequisite failure created a destination'
 
-printf '%s\n' 'installer tests: PASS (safe dry-run and failure harness)'
+# The stub checkout lets these exercise everything after the clone: the
+# installer must take the app bundle path from the build script's own output,
+# whatever that bundle is named.
+built="$test_root/built-preview"
+output=$(PREVIEW_TEST_GIT_STUB_REPO="$test_root/stub-repo" \
+    run_installer --confirm --no-launch --destination "$built" 2>&1) || \
+    fail_test "post-build run failed: $output"
+assert_contains "$output" "$built/.build/app/2M2Better.app"
+assert_contains "$output" 'Built without launching'
+[ -x "$built/.build/app/2M2Better.app/Contents/MacOS/BreakCompanion" ] || \
+    fail_test 'stub build did not leave its app bundle in place'
+
+renamed="$test_root/renamed-preview"
+open_log="$test_root/open-log.txt"
+output=$(PREVIEW_TEST_GIT_STUB_REPO="$test_root/stub-repo" \
+    PREVIEW_TEST_APP_BUNDLE_NAME=2m2better.app \
+    PREVIEW_TEST_OPEN_LOG="$open_log" \
+    run_installer --confirm --destination "$renamed" 2>&1) || \
+    fail_test "post-build run with a renamed bundle failed: $output"
+assert_contains "$output" "$renamed/.build/app/2m2better.app"
+[ "$(cat "$open_log")" = "$renamed/.build/app/2m2better.app" ] || \
+    fail_test "installer launched the wrong path: $(cat "$open_log")"
+
+missing="$test_root/missing-bundle-preview"
+if output=$(PREVIEW_TEST_GIT_STUB_REPO="$test_root/stub-repo" \
+    PREVIEW_TEST_BUILD_PRODUCES_NOTHING=1 \
+    run_installer --confirm --no-launch --destination "$missing" 2>&1); then
+    fail_test 'a build that produced no app bundle unexpectedly succeeded'
+fi
+assert_contains "$output" 'build did not produce the expected app'
+[ -d "$missing" ] || fail_test 'a failed build removed its checkout'
+
+printf '%s\n' 'installer tests: PASS (safe dry-run, post-build, and failure harness)'

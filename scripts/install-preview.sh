@@ -137,6 +137,7 @@ case "$destination" in
     /*) ;;
     *) destination="$PWD/$destination" ;;
 esac
+destination=$(printf '%s\n' "$destination" | tr -s /)
 while [ "$destination" != "/" ] && [ "${destination%/}" != "$destination" ]; do
     destination=${destination%/}
 done
@@ -220,8 +221,6 @@ if [ -d "$destination_parent" ] && [ ! -w "$destination_parent" ]; then
     fail "destination parent is not writable: $destination_parent (sudo is not used)"
 fi
 
-app_path="$destination/.build/app/2m2good.app"
-
 printf '\n%s\n' '2m2good EARLY DEVELOPER PREVIEW'
 printf '%s\n' 'This is a source checkout and local build, not a consumer release installer.'
 printf '%s\n' 'Review these values before continuing:'
@@ -231,9 +230,9 @@ printf '  Destination:       %s\n' "$destination"
 printf '  Toolchain:         Swift %s at %s\n' "$swift_version" "$swiftc_path"
 printf '  macOS SDK:         %s (%s)\n' "$sdk_path" "$sdk_source"
 printf '  Build command:     (cd "%s" && ./scripts/build-app.sh)\n' "$destination"
-printf '  App output:        "%s"\n' "$app_path"
+printf '  App output:        the app bundle that scripts/build-app.sh reports, under "%s/.build/app"\n' "$destination"
 if [ "$launch" -eq 1 ]; then
-    printf '  Launch behavior:   open "%s" after a successful build\n' "$app_path"
+    printf '  Launch behavior:   open that reported app bundle after a successful build\n'
 else
     printf '  Launch behavior:   do not open the app after a successful build\n'
 fi
@@ -293,11 +292,20 @@ printf 'Checked out revision: %s\n' "$exact_revision"
 [ -x "$destination/scripts/build-app.sh" ] || \
     fail "source checkout has no executable scripts/build-app.sh; destination left intact: $destination"
 printf '%s\n' 'Building with the repository script...'
-if ! (cd "$destination" && ./scripts/build-app.sh); then
+# scripts/build-app.sh echoes the app bundle it produced as its last stdout
+# line, so the bundle name lives in one place and can be renamed there alone.
+if ! build_report=$(cd "$destination" && ./scripts/build-app.sh); then
+    printf '%s\n' "$build_report" >&2
     fail "the local build failed; source and build output were left intact for inspection: $destination"
 fi
+app_path=$(printf '%s\n' "$build_report" | tail -n 1)
+case "$app_path" in
+    /*) ;;
+    *) fail "scripts/build-app.sh did not report an absolute app bundle path (got '$app_path'); destination left intact: $destination" ;;
+esac
 [ -x "$app_path/Contents/MacOS/BreakCompanion" ] || \
     fail "build did not produce the expected app: $app_path"
+printf 'Built app bundle: %s\n' "$app_path"
 
 if [ "$launch" -eq 1 ]; then
     printf 'Launching: %s\n' "$app_path"

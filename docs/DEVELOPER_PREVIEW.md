@@ -13,28 +13,32 @@ public source repository and preview ref are:
 
 - Repository: `https://github.com/jonathanmv/2m2good.git`
 - Default ref: `main`
-- Output: `<destination>/.build/app/2m2good.app`
+- Output: the app bundle that `scripts/build-app.sh` reports, under
+  `<destination>/.build/app`
 
-Inspect the script without executing it:
+Download the script to a file first, then read it. Do not pipe it straight into
+a shell: `curl -f` prints nothing when the download fails, so a piped shell
+would read an empty script and exit successfully as though the run had worked.
+Downloading first fails loudly and leaves the exact bytes you are about to run
+on disk:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install-preview.sh | less
+curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install-preview.sh -o install-preview.sh
+less install-preview.sh
 ```
 
 Then print and validate the plan without cloning, building, launching, or
 making an installer network request:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install-preview.sh \
-  | sh -s -- --dry-run --ref main --destination "$HOME/2m2good-developer-preview"
+sh install-preview.sh --dry-run --ref main --destination "$HOME/2m2good-developer-preview"
 ```
 
 After reviewing the plan, run the same command without `--dry-run`. It pauses
 for confirmation before creating the destination:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install-preview.sh \
-  | sh -s -- --ref main --destination "$HOME/2m2good-developer-preview"
+sh install-preview.sh --ref main --destination "$HOME/2m2good-developer-preview"
 ```
 
 For a deliberately non-interactive invocation, add `--confirm` only after
@@ -92,8 +96,10 @@ BREAK_SDK_PATH=/path/to/MacOSX.sdk \
    full 40-character commit SHA is fetched and detached separately; any other
    ref is cloned directly as a branch or tag.
 3. It runs `(cd <destination> && ./scripts/build-app.sh)`.
-4. It verifies `<destination>/.build/app/2m2good.app` and, unless `--no-launch`
-   was selected, runs `open` on that path.
+4. It takes the app bundle path from that script's own output, verifies the
+   bundle it names, and, unless `--no-launch` was selected, runs `open` on that
+   path. The bundle name is never duplicated in the installer, so renaming it in
+   `scripts/build-app.sh` is enough.
 
 The network is used by the installer only to obtain the preview source. The
 built app retains the pilot's local-only behavior: no account, runtime network

@@ -46,9 +46,13 @@ Inspect the installer and its limitations in
 without cloning or building:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install-preview.sh \
-  | sh -s -- --dry-run --ref main --destination "$HOME/2m2good-developer-preview"
+curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install-preview.sh -o install-preview.sh
+sh install-preview.sh --dry-run --ref main --destination "$HOME/2m2good-developer-preview"
 ```
+
+Download it to a file rather than piping it into a shell: a failed `curl -fsSL`
+prints nothing, and a piped shell would then run an empty script and exit
+successfully as if the preview had worked.
 
 After reviewing the displayed repository, ref, destination, build command,
 output, and launch behavior, rerun without `--dry-run` to confirm and build.
