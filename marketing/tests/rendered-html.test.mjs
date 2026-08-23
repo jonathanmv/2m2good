@@ -77,7 +77,7 @@ function cssRules(styles) {
       if (open === -1 || open >= end) return;
       const close = matchingBrace(open);
       if (close > end) throw new Error("CSS block crossed its parent");
-      const header = source.slice(cursor, open).trim();
+      const header = source.slice(cursor, open).split(";").at(-1).trim();
       const body = source.slice(open + 1, close);
       if (body.includes("{")) {
         scan(
@@ -132,10 +132,13 @@ function declarationFor(rules, selector, property, condition) {
   return declaring.at(-1).declarations.get(property);
 }
 
-function tokenFrom(value) {
-  const match = value.match(/^var\((--[\w-]+)/);
-  assert.ok(match, `expected a design-token declaration, received ${value}`);
-  return match[1];
+function tokensFrom(value) {
+  assert.match(
+    value,
+    /^var\(--[\w-]+/,
+    `expected a design-token declaration, received ${value}`,
+  );
+  return [...value.matchAll(/var\((--[\w-]+)/g)].map(([, token]) => token);
 }
 
 test("server-rendered page exposes the area promise, sequence, and safe product boundary", async () => {
@@ -242,9 +245,11 @@ test("built landing regions resolve their rendered styles through design tokens"
     [".demo-card", "box-shadow"],
     [".installer-inner", "padding-block"],
     [".command-card", "border-radius"],
+    [".command-card pre", "font-family"],
   ]) {
-    const token = tokenFrom(declarationFor(rules, selector, property));
-    assert.ok(root.has(token), `${selector} must resolve a declared token`);
+    for (const token of tokensFrom(declarationFor(rules, selector, property))) {
+      assert.ok(root.has(token), `${selector} ${property} must resolve declared tokens`);
+    }
   }
 
   assert.equal(
@@ -283,9 +288,31 @@ test("built landing regions resolve their rendered styles through design tokens"
     [".checkin-window", "padding"],
     [".command-card", "padding"],
   ]) {
-    const token = tokenFrom(declarationFor(rules, selector, property, compact));
-    assert.ok(root.has(token), `compact ${selector} must resolve a declared token`);
+    for (const token of tokensFrom(declarationFor(rules, selector, property, compact))) {
+      assert.ok(root.has(token), `compact ${selector} ${property} must resolve declared tokens`);
+    }
   }
+});
+
+test("every custom property the built CSS consumes without a fallback is declared", async () => {
+  const styles = await builtStyles();
+  const declared = new Set([
+    ...[...styles.matchAll(/(--[\w-]+)\s*:/g)].map(([, name]) => name),
+    ...[...styles.matchAll(/@property\s+(--[\w-]+)/g)].map(([, name]) => name),
+  ]);
+  const dangling = [
+    ...new Set(
+      [...styles.matchAll(/var\((--[\w-]+)\s*([,)])/g)]
+        .filter(([, , next]) => next === ")")
+        .map(([, name]) => name),
+    ),
+  ].filter((name) => !declared.has(name));
+
+  assert.deepEqual(
+    dangling,
+    [],
+    "an undefined custom property with no fallback invalidates its whole declaration",
+  );
 });
 
 test("orb and area fallback are present in the built visual output", async () => {

@@ -1057,7 +1057,7 @@ h3 {
   border-radius: var(--radius-control);
   background: var(--color-alpha-ink-18);
   color: var(--color-content-on-dark-strong);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-command);
   font-size: var(--type-command-size);
   line-height: var(--type-command-leading);
   white-space: pre-wrap;
