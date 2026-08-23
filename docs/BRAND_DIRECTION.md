@@ -88,7 +88,6 @@ The visual feeling is: a small current of energy inside a focused working day.
 Supporting alternatives:
 
 - "Feel better without leaving your flow."
-- "A short break that doesn't break your focus."
 - "Two minutes for your body. Then back to what matters."
 
 ## Guardrails for future products and marketing

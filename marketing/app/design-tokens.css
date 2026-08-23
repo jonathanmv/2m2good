@@ -164,6 +164,7 @@
   --shadow-light-action: 0 12px 25px rgba(93, 55, 35, 0.15);
   --shadow-dialog: 0 40px 100px rgba(20, 34, 29, 0.28);
   --shadow-time-mark: 12px 12px 0 var(--color-time-mark-shadow);
+  --shadow-demo-ring: 0 0 0 48px var(--color-alpha-moss-12);
   --shadow-orb-hero: inset -10px -14px 25px rgba(35, 69, 55, 0.22), 0 24px 45px rgba(45, 81, 68, 0.22);
   --shadow-orb-small: inset -5px -7px 14px var(--color-alpha-orb-shadow-near);
   --shadow-orb-small-resting-warm: inset -5px -7px 14px var(--color-alpha-orb-shadow-near);
@@ -184,6 +185,8 @@
   /* Motion roles */
   --motion-duration-fast: 180ms;
   --motion-duration-link: 180ms;
+  --motion-duration-gentle: 450ms;
+  --motion-duration-proximity: 900ms;
   --motion-duration-orb: 4s;
   --motion-duration-blink: 6s;
   --motion-ease-standard: ease;

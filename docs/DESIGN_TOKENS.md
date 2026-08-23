@@ -6,7 +6,7 @@ The marketing site uses a small, body-aware token system rather than a generic w
 
 All raw marketing values live in [`marketing/app/design-tokens.css`](../marketing/app/design-tokens.css). `marketing/app/globals.css` imports that file and consumes its roles. New landing-page sections should use semantic variables from the token file. No raw color value remains in `globals.css`, and border, radius, shadow, and motion values are tokenized apart from the local `.wordmark-dot` inset offsets: do not introduce a one-off hex, rgba, radius, shadow, or animation value in component styles. Spacing and type scales are tokenized at the shell and body-copy level only, so `globals.css` still carries section-local px rhythm; prefer a `--space-*` or `--type-*` token when one already matches, and add the missing scale step rather than growing that raw set.
 
-The old short color aliases in the token file are compatibility aliases for the current page selectors. New work should prefer the semantic names below.
+The old short color aliases in the token file are legacy compatibility aliases that the current page no longer consumes. New work should use the semantic names below.
 
 ## Usage map
 
@@ -20,7 +20,7 @@ The old short color aliases in the token file are compatibility aliases for the 
 | `--space-*` and `--layout-*` | page gutters, section rhythm, reading widths, card widths, and orb-stage bounds |
 | `--border-faint`, `--border-card`, `--border-control`, `--border-orbit-path`, `--border-chip` | the exact hairline alphas the existing sections established, so tokenizing a border never shifts its weight |
 | `--radius-*` | pill actions, compact controls, soft cards, and the organic orb stage |
-| `--shadow-*` | restrained separation for the orb, check-in, actions, and dialog |
+| `--shadow-*` | restrained separation for the orb, check-in, preview card, and actions |
 | `--motion-*` | short interaction transitions and slow, purposeful orb movement |
 
 The visual system deliberately has no score, streak, dashboard-card, medical, or urgency-specific token. A selected body area belongs in product copy/content, not in a body diagram or a diagnostic color system.
@@ -41,9 +41,9 @@ Apply a state class plus `orb-surface` to an orb, or put the state class on a wr
 </div>
 ```
 
-`--orb-shadow-*` is a compact inset shading cue per state, sized for the small orbs. A section that needs its own depth assigns a different complete token on the orb element itself - `--orb-surface: var(--orb-surface-hero)` plus `--orb-shadow: var(--shadow-orb-hero)` on `.hero-orb`, `--orb-surface-resting-on-signal` on `.closing-orb`, `--orb-surface-resting-in-dialog` on `.dialog-orb`. Assign a whole surface or shadow token; do not expect a `:root` token to read a variable set later on the element, because custom properties are substituted where they are declared.
+`--orb-shadow-*` is a compact inset shading cue per state, sized for the small orbs. A section that needs its own depth assigns a different complete token on the orb element itself, for example `--orb-surface: var(--orb-surface-near)` plus `--orb-shadow: var(--orb-shadow-near)`. Assign a whole surface or shadow token; do not expect a `:root` token to read a variable set later on the element, because custom properties are substituted where they are declared.
 
-Color and motion are supporting cues only. The state must also be communicated by visible text, a label, or an explicit control. The reduced-motion rule in `globals.css` stops orb, halo, and blink animation while retaining the same state colors, labels, focus styles, and controls.
+Color and motion are supporting cues only. The state must also be communicated by visible text, a label, or an explicit control. The reduced-motion rule in `globals.css` stops orb, halo, and blink animation and freezes the rotating area word behind its static `.area-fallback` list, while retaining the same state colors, labels, focus styles, and controls.
 
 ## Brand application
 
