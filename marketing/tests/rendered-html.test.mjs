@@ -41,6 +41,79 @@ function section(html, className) {
   return html.slice(start, end);
 }
 
+async function builtStyles() {
+  const assetDir = new URL("../dist/client/assets/", import.meta.url);
+  return (
+    await Promise.all(
+      (await readdir(assetDir))
+        .filter((name) => name.endsWith(".css"))
+        .map((name) => readFile(new URL(name, assetDir), "utf8")),
+    )
+  ).join("\n");
+}
+
+function cssRules(styles) {
+  const source = styles.replace(/\/\*[\\s\\S]*?\*\//g, "");
+  const rules = [];
+
+  function matchingBrace(open) {
+    let depth = 1;
+    for (let index = open + 1; index < source.length; index += 1) {
+      if (source[index] === "{") depth += 1;
+      if (source[index] === "}") {
+        depth -= 1;
+        if (depth === 0) return index;
+      }
+    }
+    throw new Error("unterminated CSS block");
+  }
+
+  function scan(start, end) {
+    let cursor = start;
+    while (cursor < end) {
+      const open = source.indexOf("{", cursor);
+      if (open === -1 || open >= end) return;
+      const close = matchingBrace(open);
+      if (close > end) throw new Error("CSS block crossed its parent");
+      const header = source.slice(cursor, open).trim();
+      const body = source.slice(open + 1, close);
+      if (body.includes("{")) {
+        scan(open + 1, close);
+      } else if (header && !header.startsWith("@")) {
+        const declarations = new Map();
+        for (const declaration of body.split(";")) {
+          const separator = declaration.indexOf(":");
+          if (separator === -1) continue;
+          declarations.set(
+            declaration.slice(0, separator).trim(),
+            declaration.slice(separator + 1).trim(),
+          );
+        }
+        rules.push({
+          selectors: header.split(",").map((selector) => selector.trim()),
+          declarations,
+        });
+      }
+      cursor = close + 1;
+    }
+  }
+
+  scan(0, source.length);
+  return rules;
+}
+
+function ruleFor(rules, selector) {
+  const rule = rules.find(({ selectors }) => selectors.includes(selector));
+  assert.ok(rule, `expected built CSS rule for ${selector}`);
+  return rule;
+}
+
+function tokenFrom(value) {
+  const match = value.match(/^var\((--[\w-]+)/);
+  assert.ok(match, `expected a design-token declaration, received ${value}`);
+  return match[1];
+}
+
 test("server-rendered page exposes the area promise, sequence, and safe product boundary", async () => {
   const response = await render();
   assert.equal(response.status, 200);
@@ -116,6 +189,48 @@ test("rendered developer-preview section gives an auditable download-then-run co
   for (const step of steps) {
     assert.doesNotMatch(step, /^(?:less|more|vi|vim|nano|emacs)\b/);
   }
+});
+
+test("built landing regions resolve their rendered styles through design tokens", async () => {
+  const response = await render();
+  const html = await response.text();
+  const styles = await builtStyles();
+  const rules = cssRules(styles);
+  const root = rules.find(({ selectors, declarations }) =>
+    selectors.includes(":root") && declarations.has("--type-display-size"),
+  )?.declarations;
+  assert.ok(root, "expected marketing design tokens in the built CSS");
+
+  for (const className of ["hero", "areas-grid", "area-row", "demo-card", "installer-inner", "command-card"]) {
+    assert.match(html, new RegExp(`class="[^\"]*\\b${className}\\b`));
+  }
+
+  for (const [selector, property] of [
+    [".hero h1", "font-size"],
+    [".areas-grid", "padding-block"],
+    [".area-row", "border-bottom"],
+    [".demo-card", "box-shadow"],
+    [".installer-inner", "padding-block"],
+    [".command-card", "border-radius"],
+  ]) {
+    const declaration = ruleFor(rules, selector).declarations.get(property);
+    const token = tokenFrom(declaration ?? "");
+    assert.ok(root.has(token), `${selector} must resolve a declared token`);
+  }
+
+  const approaching = ruleFor(rules, ".orb-state-approaching").declarations;
+  assert.equal(approaching.get("--orb-surface"), "var(--orb-surface-near)");
+  assert.equal(approaching.get("--orb-shadow"), "var(--orb-shadow-near)");
+  assert.ok(root.has("--orb-surface-near"));
+  assert.ok(root.has("--orb-shadow-near"));
+
+  const reducedMotion = rules.find(
+    ({ selectors, declarations }) =>
+      selectors.includes("*") && declarations.has("animation-duration"),
+  )?.declarations;
+  assert.ok(reducedMotion, "expected reduced-motion animation contract in built CSS");
+  assert.equal(reducedMotion.get("animation-duration"), "var(--motion-reduced-duration)!important");
+  assert.ok(root.has("--motion-reduced-duration"));
 });
 
 test("orb and area fallback are present in the built visual output", async () => {

@@ -4,7 +4,7 @@ The marketing site uses a small, body-aware token system rather than a generic w
 
 ## Source of truth
 
-All raw marketing values live in [`marketing/app/design-tokens.css`](../marketing/app/design-tokens.css). `marketing/app/globals.css` imports that file and consumes its roles. New landing-page sections should use semantic variables from the token file. No raw color value remains in `globals.css`, and border, radius, shadow, and motion values are tokenized apart from the local `.wordmark-dot` inset offsets: do not introduce a one-off hex, rgba, radius, shadow, or animation value in component styles. Spacing and type scales are tokenized at the shell and body-copy level only, so `globals.css` still carries section-local px rhythm; prefer a `--space-*` or `--type-*` token when one already matches, and add the missing scale step rather than growing that raw set.
+All raw marketing values live in [`marketing/app/design-tokens.css`](../marketing/app/design-tokens.css). `marketing/app/globals.css` imports that file and consumes its roles. New landing-page sections should use semantic variables from the token file. The landing page now routes its semantic layout spacing, dimensions, typography, radii, borders, shadows, colors, and motion through named tokens; preserve exact existing values when adding a narrowly scoped role instead of snapping a section to a nearby scale step. Do not introduce a one-off color, radius, shadow, or animation value in component styles.
 
 The old short color aliases in the token file are legacy compatibility aliases that the current page no longer consumes. New work should use the semantic names below.
 
@@ -17,13 +17,16 @@ The old short color aliases in the token file are legacy compatibility aliases t
 | `--color-content-signal`, `--color-content-signal-soft` | the single warm invitation/signal family |
 | `--color-border-subtle`, `--border-quiet`, `--border-on-dark` | quiet structure, never dashboard-like card chrome |
 | `--font-body`, `--font-display`, `--type-*` | sans-serif interface copy and editorial display copy |
-| `--space-*` and `--layout-*` | page gutters, section rhythm, reading widths, card widths, and orb-stage bounds |
+| `--space-*` and `--layout-*` | page gutters, section rhythm, exact region dimensions, reading/card widths, responsive geometry, and orb-stage bounds |
 | `--border-faint`, `--border-card`, `--border-control`, `--border-orbit-path`, `--border-chip` | the exact hairline alphas the existing sections established, so tokenizing a border never shifts its weight |
 | `--radius-*` | pill actions, compact controls, soft cards, and the organic orb stage |
 | `--shadow-*` | restrained separation for the orb, check-in, preview card, and actions |
-| `--motion-*` | short interaction transitions and slow, purposeful orb movement |
+| `--motion-*` | short interaction transitions, orb state changes, and slow, purposeful orb movement |
+| `--type-*` | display/copy scales plus the smaller navigation, demo, installer, and responsive roles that preserve the current output |
 
-The visual system deliberately has no score, streak, dashboard-card, medical, or urgency-specific token. A selected body area belongs in product copy/content, not in a body diagram or a diagnostic color system.
+The representative landing-page path is: `.hero` uses display and hero rhythm roles; `.areas-grid`/`.area-row` use section, row, and border roles; `.demo-card`/`.demo-orb` use card, control, and orb roles; `.orb-state-*` maps proximity state variables before `.orb-surface` consumes them; `.installer-inner`/`.command-card` use installer spacing, type, border, radius, and shadow roles. The built rendered-output test exercises this map against the emitted CSS rather than only checking source text.
+
+Intentional raw geometry exceptions in `globals.css` are limited to CSS composition values that are clearer in place: fractional grid tracks, percentage-based decorative anchors/stops, full-width/100% constraints, aspect ratios, viewport breakpoints, and keyframe percentages. The decorative stage ring's percentage stops and the organic note/orbit anchor percentages are geometry, not reusable design roles; exact pixel dimensions and motion offsets around them are tokenized. The zero/full-width resets remain CSS primitives. The visual system deliberately has no score, streak, dashboard-card, medical, or urgency-specific token. A selected body area belongs in product copy/content, not in a body diagram or a diagnostic color system.
 
 ## Orb proximity contract
 
