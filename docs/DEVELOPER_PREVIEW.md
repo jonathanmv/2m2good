@@ -16,6 +16,10 @@ public source repository and preview ref are:
 - Output: the app bundle that `scripts/build-app.sh` reports, under
   `<destination>/.build/app`
 
+The landing page offers this download-then-run path as one convenience command
+for a quick start, while these developer instructions keep the stronger
+guidance of reading the script and running `--dry-run` before the real run.
+
 Download the script to a file first, then read it. Do not pipe it straight into
 a shell: `curl -f` prints nothing when the download fails, so a piped shell
 would read an empty script and exit successfully as though the run had worked.
