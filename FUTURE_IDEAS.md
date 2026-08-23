@@ -1,6 +1,6 @@
 # Future ideas and deferred work
 
-## Early developer-preview terminal installation — limited preview implemented
+## Early developer-preview terminal installation - limited preview implemented
 
 The early developer-preview path described here is now implemented as a
 transparent curl-driven source bootstrap for technically comfortable macOS
@@ -10,10 +10,10 @@ public Git repository, shows the selected repository/ref, destination, build
 command, output, and launch behavior, then builds into a new user-selected
 checkout with `scripts/build-app.sh`.
 
-See [`README.md`](README.md) and
-[`docs/DEVELOPER_PREVIEW.md`](docs/DEVELOPER_PREVIEW.md) for the command,
-validated macOS/Apple toolchain/Git requirements, safe dry-run behavior, and
-shell-level tests. The preview remains intentionally limited:
+See [`README.md`](README.md) for the command and
+[`docs/DEVELOPER_PREVIEW.md`](docs/DEVELOPER_PREVIEW.md) for the validated
+macOS/Apple toolchain/Git requirements, safe dry-run behavior, and shell-level
+tests. The preview remains intentionally limited:
 
 - There are no hosted release artifacts, Developer ID signing, notarization,
   automatic updates, rollback, or pinned-download/integrity guarantees.

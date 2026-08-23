@@ -41,9 +41,9 @@ notarized consumer installer and is not a general release channel. It clones
 into a new user-selected directory, runs `scripts/build-app.sh`, and opens the
 local app; it never uses `sudo` or modifies an existing checkout.
 
-Inspect the installer and its limitations in
-[`docs/DEVELOPER_PREVIEW.md`](docs/DEVELOPER_PREVIEW.md), then print its plan
-without cloning or building:
+[`docs/DEVELOPER_PREVIEW.md`](docs/DEVELOPER_PREVIEW.md) owns the validated
+prerequisites, options, safety behavior, and limitations of this path. Read the
+installer, then print its plan without cloning or building:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install-preview.sh -o install-preview.sh
@@ -56,10 +56,9 @@ successfully as if the preview had worked.
 
 After reviewing the displayed repository, ref, destination, build command,
 output, and launch behavior, rerun without `--dry-run` to confirm and build.
-The installer requires macOS 14+, Apple Swift 5.9+ from Xcode/Command Line
-Tools, Git 2.20+, and the macOS `curl`, `codesign`, and `open` commands. It
-provides no hosted release artifact, signing/notarization, automatic updates,
-rollback, or integrity guarantee.
+The installer checks its prerequisites before it creates anything and reports
+the missing one. This path provides no hosted release artifact,
+signing/notarization, automatic updates, rollback, or integrity guarantee.
 
 ## Permissions
 
