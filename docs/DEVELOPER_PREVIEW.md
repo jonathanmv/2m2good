@@ -57,9 +57,11 @@ clones into an existing checkout. It may create missing parent directories,
 but it does not use `sudo`, ask for credentials, overwrite files, remove files,
 write to `/Applications`, install a login item, or add an update service. A
 failed checkout or build is left in place for inspection rather than being
-silently deleted; only a destination that this run created and left completely
-empty is removed, so the same path can be reused after a checkout that wrote
-nothing.
+silently deleted. The only exception is scaffolding this run created and nothing
+else: a destination left completely empty is removed, and on the full-SHA path a
+repository that was initialized but never fetched into is discarded when it is
+the destination's only entry, so the same path can be reused after a checkout
+that wrote nothing. A partial checkout is always preserved.
 
 ## Requirements
 

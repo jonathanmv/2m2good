@@ -63,6 +63,30 @@ if [ "${1:-}" = "-C" ] && [ "${3:-}" = "rev-parse" ]; then
     printf '%s\n' "${PREVIEW_TEST_GIT_REVISION:-d0ee7e5574877a042f83bf480c51db083d5eb32e}"
     exit 0
 fi
+if [ -n "${PREVIEW_TEST_GIT_REVISION_FAILURE:-}" ]; then
+    case "${1:-}" in
+        init)
+            mkdir -p .git
+            printf 'fake repository\n' > .git/config
+            exit 0
+            ;;
+        remote)
+            exit 0
+            ;;
+        fetch)
+            if [ "$PREVIEW_TEST_GIT_REVISION_FAILURE" = fetch ]; then
+                printf 'fake git: fetch refused\n' >&2
+                exit 1
+            fi
+            exit 0
+            ;;
+        checkout)
+            printf 'partial checkout\n' > partial-marker.txt
+            printf 'fake git: checkout interrupted after writing\n' >&2
+            exit 1
+            ;;
+    esac
+fi
 if [ -n "${PREVIEW_TEST_GIT_STUB_REPO:-}" ]; then
     case "${1:-}" in
         clone)
@@ -299,6 +323,29 @@ output=$(PREVIEW_TEST_GIT_STUB_REPO="$test_root/stub-repo" \
 assert_contains "$output" "$revision/.build/app/2M2Better.app"
 assert_contains "$(cat "$git_log")" "fetch --depth 1 origin $full_sha"
 assert_lacks "$(cat "$git_log")" 'clone'
+
+# A full-SHA fetch that fails has written nothing but the repository the
+# installer itself initialized, so the destination must stay reusable.
+fetch_failure="$test_root/revision-fetch-failure"
+if output=$(PREVIEW_TEST_GIT_REVISION_FAILURE=fetch \
+    run_installer --confirm --no-launch --ref "$full_sha" --destination "$fetch_failure" 2>&1); then
+    fail_test 'a failed full-SHA fetch unexpectedly succeeded'
+fi
+assert_contains "$output" "revision '$full_sha' could not be fetched"
+assert_contains "$output" 'the same path can be reused'
+[ ! -e "$fetch_failure" ] || fail_test 'a failed full-SHA fetch orphaned its destination'
+
+# A checkout that wrote something is a partial checkout and must be preserved.
+checkout_failure="$test_root/revision-checkout-failure"
+if output=$(PREVIEW_TEST_GIT_REVISION_FAILURE=checkout \
+    run_installer --confirm --no-launch --ref "$full_sha" --destination "$checkout_failure" 2>&1); then
+    fail_test 'a failed full-SHA checkout unexpectedly succeeded'
+fi
+assert_contains "$output" "revision '$full_sha' was fetched but could not be checked out"
+assert_contains "$output" 'left intact for inspection'
+[ "$(cat "$checkout_failure/partial-marker.txt")" = 'partial checkout' ] || \
+    fail_test 'a failed full-SHA checkout did not preserve its partial content'
+[ -d "$checkout_failure/.git" ] || fail_test 'a failed full-SHA checkout discarded a partial repository'
 
 missing="$test_root/missing-bundle-preview"
 if output=$(PREVIEW_TEST_GIT_STUB_REPO="$test_root/stub-repo" \

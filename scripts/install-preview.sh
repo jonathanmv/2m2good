@@ -25,6 +25,21 @@ fail_after_destination() {
     fail "$1 What was already written was left intact for inspection: $destination"
 }
 
+# Discards only the repository this run just initialized, and only while it is
+# the destination's single entry, so the documented empty-destination reuse also
+# applies before anything has been checked out.
+discard_initialized_repository() {
+    [ -d "$destination/.git" ] || return 0
+    for entry in "$destination"/* "$destination"/.*; do
+        case "${entry##*/}" in
+            '*'|'.*'|.|..|.git) continue ;;
+        esac
+        [ -e "$entry" ] || [ -L "$entry" ] || continue
+        return 0
+    done
+    rm -rf "$destination/.git"
+}
+
 usage() {
     cat <<'EOF'
 2m2good early developer-preview installer
@@ -270,8 +285,12 @@ fi
 printf '%s\n' 'Fetching source...'
 if [ "$ref_is_revision" -eq 1 ]; then
     if ! (cd "$destination" && git init --quiet . && git remote add origin "$repository" && \
-        GIT_TERMINAL_PROMPT=0 git fetch --depth 1 origin "$ref" && git checkout --detach FETCH_HEAD); then
-        fail_after_destination "revision '$ref' could not be fetched or checked out; Git reported the cause above."
+        GIT_TERMINAL_PROMPT=0 git fetch --depth 1 origin "$ref"); then
+        discard_initialized_repository
+        fail_after_destination "revision '$ref' could not be fetched; Git reported the cause above."
+    fi
+    if ! (cd "$destination" && git checkout --detach FETCH_HEAD); then
+        fail_after_destination "revision '$ref' was fetched but could not be checked out; Git reported the cause above."
     fi
 else
     if ! GIT_TERMINAL_PROMPT=0 git clone --depth 1 --branch "$ref" -- "$repository" "$destination"; then
