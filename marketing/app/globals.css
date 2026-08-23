@@ -328,7 +328,7 @@ h1 {
   width: 10px;
   height: 10px;
   border-radius: var(--radius-orb);
-  background: var(--color-pigment-moss);
+  background: var(--orb-proximity-distant);
 }
 
 .progress-caption div {
@@ -644,7 +644,7 @@ h1 {
 .privacy-orb {
   width: 105px;
   height: 105px;
-  --orb-shadow: var(--shadow-orb-small);
+  --orb-shadow: var(--shadow-orb-small-resting-warm);
   z-index: 2;
   animation: orb-breathe var(--motion-duration-orb) var(--motion-ease-gentle) infinite;
 }
@@ -688,7 +688,7 @@ h1 {
   width: 68px;
   height: 68px;
   --orb-surface: var(--orb-surface-resting-on-signal);
-  --orb-shadow: var(--shadow-orb-small);
+  --orb-shadow: var(--shadow-orb-small-resting-warm);
   margin-bottom: 34px;
 }
 

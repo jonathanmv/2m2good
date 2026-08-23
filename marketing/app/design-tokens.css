@@ -165,7 +165,8 @@
   --shadow-dialog: 0 40px 100px rgba(20, 34, 29, 0.28);
   --shadow-time-mark: 12px 12px 0 var(--color-time-mark-shadow);
   --shadow-orb-hero: inset -10px -14px 25px rgba(35, 69, 55, 0.22), 0 24px 45px rgba(45, 81, 68, 0.22);
-  --shadow-orb-small: inset -5px -7px 14px rgba(130, 68, 39, 0.16);
+  --shadow-orb-small: inset -5px -7px 14px var(--color-alpha-orb-shadow-near);
+  --shadow-orb-small-resting-warm: inset -5px -7px 14px var(--color-alpha-orb-shadow-near);
   --shadow-orb-small-resting: inset -5px -7px 14px rgba(35, 69, 55, 0.18);
   --shadow-orb-small-imminent: inset -5px -7px 14px rgba(143, 62, 54, 0.16);
 
@@ -187,7 +188,7 @@
   --motion-duration-blink: 6s;
   --motion-ease-standard: ease;
   --motion-ease-gentle: ease-in-out;
-  --motion-reduced-duration: 1ms;
+  --motion-reduced-duration: 0.001ms;
 
   /*
    * Orb proximity contract: distant (green) -> near (orange) -> imminent

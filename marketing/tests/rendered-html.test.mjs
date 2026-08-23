@@ -207,8 +207,8 @@ function substitute(value, declared, inherited, pending = new Set()) {
   );
 }
 
-function rootScope(css) {
-  const declared = declarationsFor(css, ":root");
+function rootScope(css, overrides = {}) {
+  const declared = { ...declarationsFor(css, ":root"), ...overrides };
   return Object.fromEntries(
     Object.entries(declared).map(([name, value]) => [
       name,
@@ -217,19 +217,65 @@ function rootScope(css) {
   );
 }
 
-function computedOn(css, selectors, property, inherited) {
-  const declared = Object.assign(
-    {},
-    ...selectors.map((selector) => declarationsFor(css, selector)),
-  );
-  assert.ok(
-    property in declared,
-    `${selectors.join(" ")} should declare ${property}`,
-  );
-  return substitute(declared[property], declared, inherited)
-    .replace(/\s+/g, " ")
-    .trim();
+function classOnlySelector(selector) {
+  const classes = selector.match(/\.[-\w]+/g);
+  if (!classes) return null;
+  if (selector.replace(/\.[-\w]+/g, "").trim() !== "") return null;
+  return classes.map((one) => one.slice(1));
 }
+
+function declarationsForElement(css, classes) {
+  const matches = [];
+  unconditionalRules(css).forEach(([selectors, body], order) => {
+    for (const selector of selectors.split(",")) {
+      const required = classOnlySelector(selector.trim());
+      if (!required || !required.every((one) => classes.includes(one))) continue;
+      matches.push({ specificity: required.length, order, body });
+      break;
+    }
+  });
+  matches.sort((a, b) => a.specificity - b.specificity || a.order - b.order);
+
+  const declarations = {};
+  for (const { body } of matches) {
+    for (const declaration of body.split(";")) {
+      const split = declaration.indexOf(":");
+      if (split > 0) {
+        declarations[declaration.slice(0, split).trim()] = declaration
+          .slice(split + 1)
+          .trim();
+      }
+    }
+  }
+  return declarations;
+}
+
+function customPropertiesDown(css, chain, inherited) {
+  let scope = inherited;
+  for (const classes of chain) {
+    const declared = declarationsForElement(css, classes);
+    const substituted = {};
+    for (const [name, value] of Object.entries(declared)) {
+      if (name.startsWith("--")) substituted[name] = substitute(value, declared, scope);
+    }
+    scope = { ...scope, ...substituted };
+  }
+  return scope;
+}
+
+function computedOn(css, chain, property, inherited) {
+  const scope = customPropertiesDown(css, chain, inherited);
+  assert.ok(property in scope, `${JSON.stringify(chain)} should resolve ${property}`);
+  return scope[property].replace(/\s+/g, " ").trim();
+}
+
+const ORB_ELEMENTS = {
+  hero: [["orb-stage", "orb-state-resting"], ["hero-orb", "orb-surface"]],
+  mini: [["mini-orb", "orb-surface", "orb-state-approaching"]],
+  privacy: [["privacy-orbit"], ["privacy-orb", "orb-surface", "orb-state-resting"]],
+  closing: [["closing-orb", "orb-surface", "orb-state-resting"]],
+  dialog: [["dialog-orb", "orb-surface", "orb-state-resting"]],
+};
 
 test("orb state classes resolve to three distinct proximity treatments", async () => {
   const css = await builtStylesheet();
@@ -239,7 +285,7 @@ test("orb state classes resolve to three distinct proximity treatments", async (
   assert.ok(declarationsFor(css, ".orb-surface").background);
 
   const forState = (state, property) =>
-    computedOn(css, [`.orb-state-${state}`], property, root);
+    computedOn(css, [[`orb-state-${state}`]], property, root);
   const shadows = {
     resting: forState("resting", "--orb-shadow"),
     approaching: forState("approaching", "--orb-shadow"),
@@ -262,7 +308,7 @@ test("orb state classes resolve to three distinct proximity treatments", async (
     assert.match(shadow, /^inset -5px -7px 14px \S.*$/, `${state} should stay a compact inset cue`);
   }
 
-  const heroShadow = computedOn(css, [".hero-orb"], "--orb-shadow", root);
+  const heroShadow = computedOn(css, ORB_ELEMENTS.hero, "--orb-shadow", root);
   assert.match(heroShadow, /^inset -10px -14px 25px .+, 0 24px 45px .+$/);
 });
 
@@ -287,20 +333,29 @@ test("every rendered orb consumes the shared surface and an owned state", async 
     [...html.matchAll(/orb-state-[a-z]+/g)].map(([one]) => one),
   );
   assert.deepEqual([...stateClasses].sort(), ["orb-state-approaching", "orb-state-resting"]);
+
+  for (const [name, chain] of Object.entries(ORB_ELEMENTS)) {
+    const rendered = orbs.find((classes) => classes.includes(`${name}-orb`));
+    assert.deepEqual(
+      chain.at(-1).slice().sort(),
+      rendered.slice().sort(),
+      `${name} orb chain should match the rendered class list`,
+    );
+  }
 });
 
 test("each resting orb keeps its own established depth", async () => {
   const css = await builtStylesheet();
   const root = rootScope(css);
-  const effective = (selector, property) =>
-    computedOn(css, [".orb-state-resting", selector], property, root);
+  const effective = (name, property) =>
+    computedOn(css, ORB_ELEMENTS[name], property, root);
 
-  const orbs = [".hero-orb", ".privacy-orb", ".closing-orb", ".dialog-orb"];
-  const surfaces = orbs.map((selector) => effective(selector, "--orb-surface"));
+  const resting = ["hero", "privacy", "closing", "dialog"];
+  const surfaces = resting.map((name) => effective(name, "--orb-surface"));
   for (const [index, surface] of surfaces.entries()) {
-    assert.doesNotMatch(surface, /var\(|^$/, `${orbs[index]} should fully resolve its surface`);
+    assert.doesNotMatch(surface, /var\(|^$/, `${resting[index]} should fully resolve its surface`);
   }
-  assert.equal(new Set(surfaces).size, orbs.length, "each resting orb keeps a distinct surface");
+  assert.equal(new Set(surfaces).size, resting.length, "each resting orb keeps a distinct surface");
 
   const stops = (surface) => (surface.match(/#[0-9a-f]{3,8}|rgba?\(/gi) ?? []).length;
   assert.ok(
@@ -309,12 +364,32 @@ test("each resting orb keeps its own established depth", async () => {
   );
 
   const shadows = Object.fromEntries(
-    orbs.map((selector) => [selector, effective(selector, "--orb-shadow")]),
+    resting.map((name) => [name, effective(name, "--orb-shadow")]),
   );
-  assert.match(shadows[".hero-orb"], /^inset -10px -14px 25px .+, 0 24px 45px .+$/);
-  assert.equal(shadows[".privacy-orb"], shadows[".closing-orb"]);
-  assert.notEqual(shadows[".dialog-orb"], shadows[".privacy-orb"]);
-  for (const selector of [".privacy-orb", ".closing-orb", ".dialog-orb"]) {
-    assert.match(shadows[selector], /^inset -5px -7px 14px \S.*$/);
+  assert.match(shadows.hero, /^inset -10px -14px 25px .+, 0 24px 45px .+$/);
+  assert.equal(shadows.privacy, shadows.closing);
+  assert.notEqual(shadows.dialog, shadows.privacy);
+  for (const name of ["privacy", "closing", "dialog"]) {
+    assert.match(shadows[name], /^inset -5px -7px 14px \S.*$/);
+  }
+});
+
+test("retuning the approaching state leaves the resting orbs alone", async () => {
+  const css = await builtStylesheet();
+  const before = rootScope(css);
+  const after = rootScope(css, { "--shadow-orb-small": "inset 0 0 0 #ff00ff" });
+  const shadowOf = (name, scope) => computedOn(css, ORB_ELEMENTS[name], "--orb-shadow", scope);
+
+  assert.notEqual(
+    shadowOf("mini", after),
+    shadowOf("mini", before),
+    "the approaching orb should follow --shadow-orb-small",
+  );
+  for (const name of ["hero", "privacy", "closing", "dialog"]) {
+    assert.equal(
+      shadowOf(name, after),
+      shadowOf(name, before),
+      `${name} orb should not inherit the approaching state's shadow token`,
+    );
   }
 });

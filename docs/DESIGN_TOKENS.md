@@ -29,7 +29,7 @@ The visual system deliberately has no score, streak, dashboard-card, medical, or
 
 The owned mapping is:
 
-- `distant` / `resting` → `--orb-proximity-distant` (moss green)
+- `distant` / `resting` → `--orb-proximity-distant` (moss green), the state's identity color: it renders the halo tint and the hero caption swatch, while the resting orb surfaces shade from `--orb-resting-light` into `--color-pigment-moss-deep`
 - `near` / `approaching` → `--orb-proximity-near` (warm orange)
 - `imminent` / `due` → `--orb-proximity-imminent` (warm red)
 
