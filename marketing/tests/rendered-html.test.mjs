@@ -41,6 +41,106 @@ function section(html, className) {
   return html.slice(start, end);
 }
 
+async function builtStyles() {
+  const assetDir = new URL("../dist/client/assets/", import.meta.url);
+  return (
+    await Promise.all(
+      (await readdir(assetDir))
+        .filter((name) => name.endsWith(".css"))
+        .map((name) => readFile(new URL(name, assetDir), "utf8")),
+    )
+  ).join("\n");
+}
+
+const CONDITIONAL_AT_RULE = /^@(?:media|supports|container)\b/;
+
+function cssRules(styles) {
+  const source = styles.replace(/\/\*[\s\S]*?\*\//g, "");
+  const rules = [];
+
+  function matchingBrace(open) {
+    let depth = 1;
+    for (let index = open + 1; index < source.length; index += 1) {
+      if (source[index] === "{") depth += 1;
+      if (source[index] === "}") {
+        depth -= 1;
+        if (depth === 0) return index;
+      }
+    }
+    throw new Error("unterminated CSS block");
+  }
+
+  function scan(start, end, conditions) {
+    let cursor = start;
+    while (cursor < end) {
+      const open = source.indexOf("{", cursor);
+      if (open === -1 || open >= end) return;
+      const close = matchingBrace(open);
+      if (close > end) throw new Error("CSS block crossed its parent");
+      const header = source.slice(cursor, open).split(";").at(-1).trim();
+      const body = source.slice(open + 1, close);
+      if (body.includes("{")) {
+        scan(
+          open + 1,
+          close,
+          CONDITIONAL_AT_RULE.test(header) ? [...conditions, header] : conditions,
+        );
+      } else if (header && !header.startsWith("@")) {
+        const declarations = new Map();
+        for (const declaration of body.split(";")) {
+          const separator = declaration.indexOf(":");
+          if (separator === -1) continue;
+          declarations.set(
+            declaration.slice(0, separator).trim(),
+            declaration.slice(separator + 1).trim(),
+          );
+        }
+        rules.push({
+          selectors: header.split(",").map((selector) => selector.trim()),
+          declarations,
+          conditions,
+        });
+      }
+      cursor = close + 1;
+    }
+  }
+
+  scan(0, source.length, []);
+  return rules;
+}
+
+const REDUCED_MOTION = /prefers-reduced-motion\s*:\s*reduce/;
+
+function rulesFor(rules, selector, condition) {
+  return rules.filter(({ selectors, conditions }) =>
+    selectors.includes(selector) &&
+    (condition
+      ? conditions.some((entry) => condition.test(entry))
+      : conditions.length === 0),
+  );
+}
+
+function declarationFor(rules, selector, property, condition) {
+  const declaring = rulesFor(rules, selector, condition).filter(({ declarations }) =>
+    declarations.has(property),
+  );
+  const context = condition ? ` under ${condition}` : " outside any media query";
+  assert.ok(
+    declaring.length > 0,
+    `expected built CSS to declare ${property} on ${selector}${context}`,
+  );
+  return declaring.at(-1).declarations.get(property);
+}
+
+function tokensFrom(value) {
+  assert.match(
+    value,
+    /^var\(--[\w-]+/,
+    `expected a design-token declaration, received ${value}`,
+  );
+  return [...value.matchAll(/var\((--[\w-]+)/g)].map(([, token]) => token);
+}
+
 test("server-rendered page exposes the area promise, sequence, and safe product boundary", async () => {
   const response = await render();
   assert.equal(response.status, 200);
@@ -118,6 +218,103 @@ test("rendered developer-preview section gives an auditable download-then-run co
   }
 });
 
+test("built landing regions resolve their rendered styles through design tokens", async () => {
+  const response = await render();
+  const html = await response.text();
+  const styles = await builtStyles();
+  const rules = cssRules(styles);
+  const root = rules.find(({ selectors, declarations, conditions }) =>
+    conditions.length === 0 &&
+    selectors.includes(":root") &&
+    declarations.has("--type-display-size"),
+  )?.declarations;
+  assert.ok(root, "expected marketing design tokens in the built CSS");
+
+  for (const className of ["hero", "areas-grid", "area-row", "demo-card", "installer-inner", "command-card"]) {
+    assert.match(
+      html,
+      new RegExp(`class="(?:[^"]*\\s)?${className}(?=\\s|")`),
+      `expected the ${className} region in the rendered page`,
+    );
+  }
+
+  for (const [selector, property] of [
+    [".hero h1", "font-size"],
+    [".areas-grid", "padding-block"],
+    [".area-row", "border-bottom"],
+    [".demo-card", "box-shadow"],
+    [".installer-inner", "padding-block"],
+    [".command-card", "border-radius"],
+    [".command-card pre", "font-family"],
+  ]) {
+    for (const token of tokensFrom(declarationFor(rules, selector, property))) {
+      assert.ok(root.has(token), `${selector} ${property} must resolve declared tokens`);
+    }
+  }
+
+  assert.equal(
+    declarationFor(rules, ".orb-state-approaching", "--orb-surface"),
+    "var(--orb-surface-near)",
+  );
+  assert.equal(
+    declarationFor(rules, ".orb-state-approaching", "--orb-shadow"),
+    "var(--orb-shadow-near)",
+  );
+  assert.ok(root.has("--orb-surface-near"));
+  assert.ok(root.has("--orb-shadow-near"));
+
+  assert.equal(
+    declarationFor(rules, "*", "animation-duration", REDUCED_MOTION),
+    "var(--motion-reduced-duration)!important",
+  );
+  assert.ok(root.has("--motion-reduced-duration"));
+  assert.deepEqual(
+    rules
+      .filter(
+        ({ selectors, declarations, conditions }) =>
+          selectors.includes("*") &&
+          declarations.has("animation-duration") &&
+          !conditions.some((entry) => REDUCED_MOTION.test(entry)),
+      )
+      .map(({ conditions }) => conditions.join(" ") || "top level"),
+    [],
+    "every global animation-duration override must stay inside the reduced-motion query",
+  );
+
+  const compact = /max-width\s*:\s*560px|width\s*<=\s*560px/;
+  for (const [selector, property] of [
+    [".nav-action", "font-size"],
+    [".area-row", "grid-template-columns"],
+    [".checkin-window", "padding"],
+    [".command-card", "padding"],
+  ]) {
+    for (const token of tokensFrom(declarationFor(rules, selector, property, compact))) {
+      assert.ok(root.has(token), `compact ${selector} ${property} must resolve declared tokens`);
+    }
+  }
+});
+
+test("every custom property the built CSS consumes without a fallback is declared", async () => {
+  const styles = await builtStyles();
+  const declared = new Set([
+    ...[...styles.matchAll(/(--[\w-]+)\s*:/g)].map(([, name]) => name),
+    ...[...styles.matchAll(/@property\s+(--[\w-]+)/g)].map(([, name]) => name),
+  ]);
+  const dangling = [
+    ...new Set(
+      [...styles.matchAll(/var\((--[\w-]+)\s*([,)])/g)]
+        .filter(([, , next]) => next === ")")
+        .map(([, name]) => name),
+    ),
+  ].filter((name) => !declared.has(name));
+
+  assert.deepEqual(
+    dangling,
+    [],
+    "an undefined custom property with no fallback invalidates its whole declaration",
+  );
+});
+
 test("orb and area fallback are present in the built visual output", async () => {
   const html = await (await render()).text();
   assert.match(html, /orb-state-resting/);
@@ -125,17 +322,22 @@ test("orb and area fallback are present in the built visual output", async () =>
   assert.match(html, /aria-live="polite"/);
   assert.match(html, /area-fallback/);
 
-  const assetDir = new URL("../dist/client/assets/", import.meta.url);
-  const styles = (
-    await Promise.all(
-      (await readdir(assetDir))
-        .filter((name) => name.endsWith(".css"))
-        .map((name) => readFile(new URL(name, assetDir), "utf8")),
-    )
-  ).join("\n");
-  assert.match(styles, /prefers-reduced-motion/);
-  assert.match(styles, /area-fallback/);
-  assert.match(styles, /orb-state-approaching/);
+  const rules = cssRules(await builtStyles());
+
+  assert.equal(declarationFor(rules, ".area-fallback", "display"), "none");
+  assert.equal(
+    declarationFor(rules, ".area-fallback", "display", REDUCED_MOTION),
+    "block",
+  );
+  assert.equal(declarationFor(rules, ".area-word", "animation", REDUCED_MOTION), "none");
+  assert.equal(
+    declarationFor(rules, ".orb-state-approaching", "--orb-halo"),
+    "var(--orb-halo-near)",
+  );
+  assert.equal(
+    declarationFor(rules, ".orb-halo", "animation", REDUCED_MOTION),
+    "none!important",
+  );
 });
 
 test("declared og:image dimensions match the shipped image bytes", async () => {

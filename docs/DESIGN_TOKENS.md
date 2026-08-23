@@ -4,7 +4,7 @@ The marketing site uses a small, body-aware token system rather than a generic w
 
 ## Source of truth
 
-All raw marketing values live in [`marketing/app/design-tokens.css`](../marketing/app/design-tokens.css). `marketing/app/globals.css` imports that file and consumes its roles. New landing-page sections should use semantic variables from the token file. No raw color value remains in `globals.css`, and border, radius, shadow, and motion values are tokenized apart from the local `.wordmark-dot` inset offsets: do not introduce a one-off hex, rgba, radius, shadow, or animation value in component styles. Spacing and type scales are tokenized at the shell and body-copy level only, so `globals.css` still carries section-local px rhythm; prefer a `--space-*` or `--type-*` token when one already matches, and add the missing scale step rather than growing that raw set.
+All raw marketing values live in [`marketing/app/design-tokens.css`](../marketing/app/design-tokens.css). `marketing/app/globals.css` imports that file and consumes its roles. New landing-page sections should use semantic variables from the token file. The landing page now routes its semantic layout spacing, dimensions, typography, radii, borders, shadows, colors, and motion through named tokens; preserve exact existing values when adding a narrowly scoped role instead of snapping a section to a nearby scale step. Do not introduce a one-off color, radius, shadow, or animation value in component styles.
 
 The old short color aliases in the token file are legacy compatibility aliases that the current page no longer consumes. New work should use the semantic names below.
 
@@ -16,14 +16,20 @@ The old short color aliases in the token file are legacy compatibility aliases t
 | `--color-content-primary`, `--color-content-secondary`, `--color-content-accent` | reading hierarchy and moss emphasis |
 | `--color-content-signal`, `--color-content-signal-soft` | the single warm invitation/signal family |
 | `--color-border-subtle`, `--border-quiet`, `--border-on-dark` | quiet structure, never dashboard-like card chrome |
-| `--font-body`, `--font-display`, `--type-*` | sans-serif interface copy and editorial display copy |
-| `--space-*` and `--layout-*` | page gutters, section rhythm, reading widths, card widths, and orb-stage bounds |
+| `--font-body`, `--font-display`, `--font-command`, `--type-*` | sans-serif interface copy, editorial display copy, and the monospace stack of the auditable installer command |
+| `--space-*` | page gutters, section rhythm, and every padding, margin, and gap role, including their compact-breakpoint variants |
+| `--layout-*` | exact region dimensions, reading/card widths, responsive geometry, and orb-stage bounds |
 | `--border-faint`, `--border-card`, `--border-control`, `--border-orbit-path`, `--border-chip` | the exact hairline alphas the existing sections established, so tokenizing a border never shifts its weight |
 | `--radius-*` | pill actions, compact controls, soft cards, and the organic orb stage |
 | `--shadow-*` | restrained separation for the orb, check-in, preview card, and actions |
-| `--motion-*` | short interaction transitions and slow, purposeful orb movement |
+| `--motion-*` | short interaction transitions, orb state changes, and slow, purposeful orb movement |
+| `--type-*` | display/copy scales plus the smaller navigation, demo, installer, and responsive roles that preserve the current output |
 
-The visual system deliberately has no score, streak, dashboard-card, medical, or urgency-specific token. A selected body area belongs in product copy/content, not in a body diagram or a diagnostic color system.
+Small detail roles stay one per call site even when they share a value today: `--type-stage-strong-size`, `--type-demo-status-size`, `--type-demo-time-size`, `--type-demo-control-size`, `--type-command-size`, `--type-copy-button-size`, `--type-navigation-compact-size`, and `--type-area-note-compact-size` are all 12px, and `--type-weight-wordmark`, `--type-weight-demo-control`, `--type-weight-privacy-note`, and `--type-weight-copy-invite` are all 700. Retuning the hero orb-stage caption must not resize the auditable installer command or the demo controls, so adjust the role you mean and leave the others alone rather than collapsing them back into one shared name.
+
+The representative landing-page path is: `.hero` uses display and hero rhythm roles; `.areas-grid`/`.area-row` use section, row, and border roles; `.demo-card`/`.demo-orb` use card, control, and orb roles; `.orb-state-*` maps proximity state variables before `.orb-surface` consumes them; `.installer-inner`/`.command-card` use installer spacing, type, border, radius, and shadow roles. The built rendered-output test exercises this map against the emitted CSS rather than only checking source text.
+
+Intentional raw geometry exceptions in `globals.css` are limited to CSS composition values that are clearer in place: fractional grid tracks, percentage-based decorative anchors/stops, full-width/100% constraints, aspect ratios, viewport breakpoints, keyframe percentages, the two organic rotation angles on the hand-placed stage note and check-in window, and `z-index` stacking values. The decorative stage ring's percentage stops and the organic note/orbit anchor percentages are geometry, not reusable design roles; exact pixel dimensions and motion offsets around them are tokenized. The zero/full-width resets remain CSS primitives. Rotation angles and stacking order are local composition, not reusable roles: the system deliberately defines no rotation or layer token, so read a raw `rotate()` or `z-index` in a component rule as intentional rather than as a missed token. The visual system deliberately has no score, streak, dashboard-card, medical, or urgency-specific token. A selected body area belongs in product copy/content, not in a body diagram or a diagnostic color system.
 
 ## Orb proximity contract
 
