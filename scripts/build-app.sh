@@ -10,6 +10,8 @@ module_cache="$project_dir/.build/manual-module-cache"
 sdk_path="${BREAK_SDK_PATH:-$(xcrun --show-sdk-path)}"
 architecture="$(uname -m)"
 
+# Rebuild the bundle from scratch: a renamed bundle resolves to this same path on a
+# case-insensitive volume, so leftover contents would otherwise survive the rename.
 rm -rf "$app_dir"
 mkdir -p "$macos_dir" "$module_cache"
 cp "$project_dir/Resources/Info.plist" "$contents_dir/Info.plist"

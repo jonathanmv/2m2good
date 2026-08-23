@@ -18,7 +18,7 @@ Do not frame the name through the "two-minute rule," Atomic Habits, habit-stacki
 
 ### Written form
 
-Every user-facing surface writes the name all lowercase as **2m2better**, including the macOS app bundle, `Info.plist` strings, in-app labels, and marketing surfaces. Repository paths and internal identifiers are unchanged.
+Every user-facing surface writes the name all lowercase as **2m2better**, including the macOS app bundle, `Info.plist` strings, in-app labels, and marketing surfaces. Repository paths and internal identifiers are unchanged. In-app labels read the name from `Sources/BreakCompanion/ProductIdentity.swift`, and `marketing/tests/rendered-html.test.mjs` fails if the rendered landing page contains any other casing.
 
 ## Product character
 
