@@ -293,7 +293,7 @@ h3 {
   background: var(--orb-halo, var(--orb-halo-distant));
   filter: blur(2px);
   animation: halo-breathe var(--motion-duration-orb) var(--motion-ease-gentle) infinite;
-  transition: background 900ms var(--motion-ease-gentle);
+  transition: background var(--motion-duration-proximity) var(--motion-ease-gentle);
 }
 
 .hero-orb {
@@ -308,8 +308,8 @@ h3 {
   gap: 19px;
   animation: orb-breathe var(--motion-duration-orb) var(--motion-ease-gentle) infinite;
   transition:
-    background 900ms var(--motion-ease-gentle),
-    box-shadow 900ms var(--motion-ease-gentle);
+    background var(--motion-duration-proximity) var(--motion-ease-gentle),
+    box-shadow var(--motion-duration-proximity) var(--motion-ease-gentle);
 }
 
 .orb-eye {
@@ -371,7 +371,7 @@ h3 {
   flex: 0 0 auto;
   border-radius: var(--radius-orb);
   background: var(--orb-proximity-distant);
-  transition: background 900ms var(--motion-ease-gentle);
+  transition: background var(--motion-duration-proximity) var(--motion-ease-gentle);
 }
 
 .orb-state-approaching .progress-swatch {
@@ -436,8 +436,8 @@ h3 {
   justify-content: center;
   gap: 6px;
   transition:
-    background 900ms var(--motion-ease-gentle),
-    box-shadow 900ms var(--motion-ease-gentle);
+    background var(--motion-duration-proximity) var(--motion-ease-gentle),
+    box-shadow var(--motion-duration-proximity) var(--motion-ease-gentle);
 }
 
 .floating-orb-face .orb-eye {
@@ -590,8 +590,8 @@ h3 {
   justify-content: center;
   gap: var(--space-2);
   transition:
-    background 900ms var(--motion-ease-gentle),
-    box-shadow 900ms var(--motion-ease-gentle);
+    background var(--motion-duration-proximity) var(--motion-ease-gentle),
+    box-shadow var(--motion-duration-proximity) var(--motion-ease-gentle);
 }
 
 .mini-orb {
@@ -689,7 +689,7 @@ h3 {
   right: -170px;
   border: var(--border-orbit-path);
   border-radius: var(--radius-orb);
-  box-shadow: 0 0 0 48px var(--color-alpha-moss-12);
+  box-shadow: var(--shadow-demo-ring);
   pointer-events: none;
 }
 

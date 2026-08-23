@@ -2,8 +2,10 @@
 
 The self-contained local landing page for 2m2better. Its visual and copy
 direction comes from [`../docs/BRAND_DIRECTION.md`](../docs/BRAND_DIRECTION.md),
-and its reusable visual contract is documented in
-[`../docs/DESIGN_TOKENS.md`](../docs/DESIGN_TOKENS.md).
+its reusable visual contract is documented in
+[`../docs/DESIGN_TOKENS.md`](../docs/DESIGN_TOKENS.md), and the dated
+competitor pass behind the current page structure is recorded in
+[`../docs/RESEARCH_2026-08-23-LANDING-POSITIONING.md`](../docs/RESEARCH_2026-08-23-LANDING-POSITIONING.md).
 
 ## Run the local preview
 
@@ -30,9 +32,12 @@ npm run build
 npm test
 ```
 
-`npm test` creates a production build and verifies that the rendered page keeps
-the approved product promise, privacy language, and token contract. The page
-is local-only; it does not use accounts, analytics, or network services.
+`npm test` creates a production build and asserts against the rendered HTML and
+the built CSS: the rotating area promise and its static fallback, the
+click-only bounded preview and its controls, the auditable download-then-run
+developer-preview command, the privacy language, and the lowercase wordmark.
+The page is local-only; it does not use accounts, analytics, or network
+services.
 
 The design-token source of truth is `app/design-tokens.css`; new sections should
 consume its semantic roles rather than copying raw values into component styles.
