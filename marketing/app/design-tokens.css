@@ -19,6 +19,8 @@
   --color-pigment-plum: #80546e;
   --color-pigment-chalk: #fffcf4;
 
+  /* `ink` and `paper` are legacy names kept so consuming selectors stay
+   * stable: ink now carries deep tide and paper now carries chalk. */
   --color-alpha-ink-04: rgba(22, 62, 72, 0.04);
   --color-alpha-ink-07: rgba(22, 62, 72, 0.07);
   --color-alpha-ink-09: rgba(22, 62, 72, 0.09);

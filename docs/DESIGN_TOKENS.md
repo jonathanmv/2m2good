@@ -29,7 +29,12 @@ Orb shading and halos are local to the orb: small highlights, tinted inset shado
 
 All raw marketing values live in [`marketing/app/design-tokens.css`](../marketing/app/design-tokens.css). `marketing/app/globals.css` imports that file and consumes its roles. New landing-page sections should use semantic variables from the token file. The landing page now routes its semantic layout spacing, dimensions, typography, radii, borders, shadows, colors, and motion through named tokens; preserve exact existing values when adding a narrowly scoped role instead of snapping a section to a nearby scale step. Do not introduce a one-off color, radius, shadow, or animation value in component styles.
 
-The old short color aliases in the token file are legacy compatibility aliases that the current page no longer consumes. New work should use the semantic names below.
+Two groups of names in the token file keep pre-palette wording on purpose, so read the value, not the word:
+
+- The old short color aliases (`--paper`, `--paper-deep`, `--ink`, `--ink-soft`, `--green`, `--green-dark`, `--orange`, `--orange-soft`, `--red-soft`, `--cream`, `--line`, `--shadow`) are legacy compatibility aliases that the current page no longer consumes. They now resolve to the tide-and-clay roles, so `--green`/`--green-dark` are tide, `--orange` is clay, and `--red-soft` is plum.
+- The `--color-alpha-ink-*` and `--color-alpha-paper-*` primitives keep their old names while carrying the new palette: `ink` is deep tide and `paper` is chalk.
+
+Both groups are retained deliberately so consuming selectors stay stable; renaming them is a separate mechanical change. The semantic roles below are the authoritative contract, and new work should use them.
 
 ## Usage map
 
