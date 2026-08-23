@@ -278,10 +278,11 @@ if [ "$ref_is_revision" -eq 1 ]; then
     fi
 else
     if ! GIT_TERMINAL_PROMPT=0 git clone --depth 1 --branch "$ref" -- "$repository" "$destination"; then
+        clone_failure="source checkout for ref '$ref' failed; Git reported the cause above."
         if [ "$ref_is_abbreviated_hex" -eq 1 ]; then
-            fail_after_destination "ref '$ref' is not a branch or tag on this remote; an abbreviated commit SHA cannot be fetched, so pass the full 40-character commit SHA instead."
+            clone_failure="$clone_failure If '$ref' was meant as a commit SHA, note that an abbreviated SHA cannot be fetched from a remote; pass the full 40-character SHA."
         fi
-        fail_after_destination "source checkout for ref '$ref' failed."
+        fail_after_destination "$clone_failure"
     fi
 fi
 

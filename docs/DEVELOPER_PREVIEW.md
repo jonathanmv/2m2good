@@ -43,10 +43,10 @@ reviewing the printed plan. `--no-launch` builds without opening the app.
 tag, or full 40-character commit SHA. Only a full 40-character SHA is treated as
 an exact commit revision, because a remote can only be asked for a complete
 object id; every other value, including a branch or tag whose name happens to
-look hexadecimal, is resolved as a branch or tag. An abbreviated SHA is
-therefore reported as an unknown branch or tag, with a request for the full
-40-character SHA. The selected ref is shown before the checkout; a moving branch
-is not an integrity guarantee.
+look hexadecimal, is resolved as a branch or tag. A failed checkout reports
+Git's own cause and, for a hexadecimal-looking ref, adds the reminder that an
+abbreviated SHA cannot be fetched from a remote. The selected ref is shown
+before the checkout; a moving branch is not an integrity guarantee.
 
 The installer refuses an existing destination, including a symlink, and never
 clones into an existing checkout. It may create missing parent directories,

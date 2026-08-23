@@ -28,6 +28,14 @@ assert_contains() {
         fail_test "expected output to contain: $needle"
 }
 
+assert_lacks() {
+    haystack=$1
+    needle=$2
+    if printf '%s\n' "$haystack" | grep -Fq "$needle"; then
+        fail_test "expected output not to contain: $needle"
+    fi
+}
+
 cat > "$fake_bin/uname" <<'EOF'
 #!/bin/sh
 case "${1:-}" in
@@ -137,14 +145,17 @@ assert_contains "$sha_output" 'Dry run complete'
 if output=$(run_installer --confirm --no-launch --ref beef1234 --destination "$test_root/abbrev-clone" 2>&1); then
     fail_test 'refused clone unexpectedly succeeded'
 fi
-assert_contains "$output" "ref 'beef1234' is not a branch or tag on this remote"
-assert_contains "$output" 'full 40-character commit SHA'
+assert_contains "$output" "source checkout for ref 'beef1234' failed"
+assert_contains "$output" 'Git reported the cause above'
+assert_contains "$output" "If 'beef1234' was meant as a commit SHA"
+assert_lacks "$output" 'is not a branch or tag on this remote'
 [ ! -e "$test_root/abbrev-clone" ] || fail_test 'empty destination survived a failed checkout'
 
 if output=$(run_installer --confirm --no-launch --ref main --destination "$test_root/branch-clone" 2>&1); then
     fail_test 'refused branch clone unexpectedly succeeded'
 fi
 assert_contains "$output" "source checkout for ref 'main' failed"
+assert_lacks "$output" 'was meant as a commit SHA'
 [ ! -e "$test_root/branch-clone" ] || fail_test 'empty destination survived a failed branch checkout'
 
 partial="$test_root/partial-clone"
