@@ -17,7 +17,8 @@ A deliberately small, local macOS break companion. After 60 minutes of active ke
 
 ## Build and run
 
-Requires macOS 14 or newer and Apple Command Line Tools (or Xcode).
+Requires macOS 14 or newer on an arm64 or x86_64 Mac, plus Xcode 15 or
+newer or the matching Apple Command Line Tools.
 
 ```sh
 ./scripts/build-app.sh
@@ -31,6 +32,33 @@ This development Mac currently has a newer command-line compiler paired with a s
 ```sh
 BREAK_SDK_PATH=/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk ./scripts/build-app.sh
 ```
+
+## Early developer-preview terminal installer
+
+Technically comfortable macOS preview users can inspect and run the source
+bootstrap from the public repository. It is explicitly **not** a signed or
+notarized consumer installer and is not a general release channel. It clones
+into a new user-selected directory, runs `scripts/build-app.sh`, and opens the
+local app; it never uses `sudo` or modifies an existing checkout.
+
+[`docs/DEVELOPER_PREVIEW.md`](docs/DEVELOPER_PREVIEW.md) owns the validated
+prerequisites, options, safety behavior, and limitations of this path. Read the
+installer, then print its plan without cloning or building:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install-preview.sh -o install-preview.sh
+sh install-preview.sh --dry-run --ref main --destination "$HOME/2m2good-developer-preview"
+```
+
+Download it to a file rather than piping it into a shell: a failed `curl -fsSL`
+prints nothing, and a piped shell would then run an empty script and exit
+successfully as if the preview had worked.
+
+After reviewing the displayed repository, ref, destination, build command,
+output, and launch behavior, rerun without `--dry-run` to confirm and build.
+The installer checks its prerequisites before it creates anything and reports
+the missing one. This path provides no hosted release artifact,
+signing/notarization, automatic updates, rollback, or integrity guarantee.
 
 ## Permissions
 

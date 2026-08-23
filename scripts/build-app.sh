@@ -27,4 +27,7 @@ xcrun swiftc \
     -framework Speech
 
 codesign --force --sign - "$app_dir" >/dev/null
+
+# Output contract: the last stdout line is the app bundle this build produced.
+# scripts/install-preview.sh consumes it, so keep other output off stdout.
 echo "$app_dir"
