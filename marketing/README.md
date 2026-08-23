@@ -34,8 +34,9 @@ npm test
 
 `npm test` creates a production build and asserts against the rendered HTML and
 the built CSS: the rotating area promise and its static fallback, the
-click-only bounded preview and its controls, the auditable download-then-run
-developer-preview command, the privacy language, and the lowercase wordmark. It
+click-only bounded preview and its controls, the single paste-safe
+download-then-run developer-preview command (which it also runs against stubbed
+`curl` and `sh`), the privacy language, and the lowercase wordmark. It
 also parses the emitted CSS to prove the hero, area list, demo, orb states,
 installer, and reduced-motion rules resolve through declared design tokens.
 The page is local-only; it does not use accounts, analytics, or network
