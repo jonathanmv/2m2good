@@ -1,0 +1,249 @@
+/*
+ * 2m2better design tokens
+ *
+ * Raw palette and scale values live here. Component styles consume the
+ * semantic roles below so a landing-page section can change without carrying
+ * its own visual constants.
+ */
+
+:root {
+  /* A focused, earthy palette: paper, ink, moss, and one warm signal. */
+  --color-pigment-paper: #f3eee3;
+  --color-pigment-paper-deep: #e8dfcf;
+  --color-pigment-ink: #1f302b;
+  --color-pigment-ink-soft: #5d6a63;
+  --color-pigment-moss: #5b8167;
+  --color-pigment-moss-deep: #2d5144;
+  --color-pigment-sun: #e38352;
+  --color-pigment-sun-soft: #f2b37b;
+  --color-pigment-warm-red: #c85f4f;
+  --color-pigment-cream: #fffaf0;
+
+  --color-alpha-ink-04: rgba(31, 48, 43, 0.04);
+  --color-alpha-ink-07: rgba(31, 48, 43, 0.07);
+  --color-alpha-ink-09: rgba(31, 48, 43, 0.09);
+  --color-alpha-ink-10: rgba(31, 48, 43, 0.1);
+  --color-alpha-ink-12: rgba(31, 48, 43, 0.12);
+  --color-alpha-ink-13: rgba(31, 48, 43, 0.13);
+  --color-alpha-ink-14: rgba(31, 48, 43, 0.14);
+  --color-alpha-ink-15: rgba(31, 48, 43, 0.15);
+  --color-alpha-ink-16: rgba(31, 48, 43, 0.16);
+  --color-alpha-ink-18: rgba(31, 48, 43, 0.18);
+  --color-alpha-paper-64: rgba(255, 250, 240, 0.64);
+  --color-alpha-paper-65: rgba(255, 250, 240, 0.65);
+  --color-alpha-paper-68: rgba(255, 250, 240, 0.68);
+  --color-alpha-paper-82: rgba(255, 250, 240, 0.82);
+  --color-alpha-paper-88: rgba(255, 250, 240, 0.88);
+  --color-alpha-paper-96: rgba(255, 250, 240, 0.96);
+  --color-alpha-white-44: rgba(255, 255, 255, 0.44);
+  --color-alpha-white-46: rgba(255, 255, 255, 0.46);
+  --color-alpha-white-48: rgba(255, 255, 255, 0.48);
+  --color-alpha-moss-12: rgba(91, 129, 103, 0.12);
+  --color-alpha-orange-14: rgba(227, 131, 82, 0.14);
+  --color-alpha-warm-red-14: rgba(200, 95, 79, 0.14);
+  --color-alpha-orb-shadow: rgba(45, 81, 68, 0.22);
+  --color-alpha-orb-shadow-dark: rgba(35, 69, 55, 0.22);
+  --color-alpha-orb-shadow-near: rgba(130, 68, 39, 0.16);
+  --color-alpha-orb-shadow-resting: rgba(35, 69, 55, 0.18);
+  --color-surface-card: rgba(243, 238, 227, 0.74);
+  --color-surface-control-muted: var(--color-alpha-ink-07);
+  --color-surface-caption: var(--color-alpha-paper-82);
+  --color-surface-dialog-control: var(--color-alpha-paper-64);
+  --color-content-on-dark-muted: rgba(255, 250, 240, 0.65);
+  --color-content-on-dark-soft: var(--color-alpha-paper-68);
+  --color-content-on-dark-strong: var(--color-alpha-paper-88);
+  --color-stage-center: var(--color-alpha-paper-96);
+  --color-stage-line: var(--color-alpha-ink-07);
+  --color-caption-surface: var(--color-alpha-paper-82);
+  --color-content-on-action-soft: var(--color-alpha-paper-68);
+  --color-time-mark-shadow: var(--color-alpha-moss-12);
+  --color-dialog-orbit: rgba(45, 81, 68, 0.13);
+  --color-dialog-orbit-soft: rgba(45, 81, 68, 0.045);
+  --color-dialog-orbit-faint: rgba(45, 81, 68, 0.025);
+
+  /* Semantic color roles */
+  --color-surface-canvas: var(--color-pigment-paper);
+  --color-surface-recessed: var(--color-pigment-paper-deep);
+  --color-surface-raised: var(--color-pigment-cream);
+  --color-surface-action: var(--color-pigment-ink);
+  --color-surface-action-strong: var(--color-pigment-moss-deep);
+  --color-surface-signal: var(--color-pigment-sun);
+  --color-content-primary: var(--color-pigment-ink);
+  --color-content-secondary: var(--color-pigment-ink-soft);
+  --color-content-on-action: var(--color-pigment-cream);
+  --color-content-accent: var(--color-pigment-moss-deep);
+  --color-content-signal: var(--color-pigment-sun);
+  --color-content-signal-soft: var(--color-pigment-sun-soft);
+  --color-border-subtle: var(--color-alpha-ink-16);
+  --color-border-quiet: var(--color-alpha-ink-12);
+  --color-border-on-dark: rgba(255, 250, 240, 0.22);
+  --color-focus-ring: var(--color-pigment-sun);
+  --color-scrim: rgba(23, 38, 33, 0.48);
+  --color-orb-highlight: var(--color-alpha-white-48);
+  --color-content-on-orb: var(--color-alpha-paper-88);
+  --color-orb-shadow-near-deep: #824427;
+
+  /* Typography roles */
+  --font-body: "Avenir Next", Avenir, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-display: Georgia, "Times New Roman", serif;
+  --type-label-size: 11px;
+  --type-label-leading: 1.3;
+  --type-label-tracking: 0.16em;
+  --type-body-size: 17px;
+  --type-body-leading: 1.7;
+  --type-body-large-size: 18px;
+  --type-body-large-leading: 1.65;
+  --type-body-small-size: 14px;
+  --type-body-small-leading: 1.5;
+  --type-caption-size: 11px;
+  --type-caption-leading: 1.3;
+  --type-display-size: clamp(54px, 6.1vw, 86px);
+  --type-display-leading: 0.96;
+  --type-display-tracking: -0.055em;
+  --type-section-size: clamp(44px, 5.5vw, 76px);
+  --type-section-leading: 1;
+  --type-section-tracking: -0.045em;
+  --type-kicker-size: clamp(38px, 4.6vw, 64px);
+  --type-kicker-leading: 1.06;
+  --type-kicker-tracking: -0.04em;
+
+  /* Spacing roles. The scale is intentionally quiet and editorial, not a dashboard grid. */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-9: 40px;
+  --space-10: 48px;
+  --space-11: 64px;
+  --space-12: 80px;
+  --space-13: 96px;
+  --space-14: 112px;
+  --space-15: 128px;
+  --space-shell-wide: 32px;
+  --space-shell-tablet: 20px;
+  --space-shell-phone: 16px;
+  --space-section-wide: 108px;
+  --space-section-compact: 82px;
+
+  /* Shape roles */
+  --radius-pill: 999px;
+  --radius-orb: 50%;
+  --radius-control: 16px;
+  --radius-control-quiet: 14px;
+  --radius-card: 34px;
+  --radius-card-compact: 25px;
+  --radius-dialog: 34px;
+  --radius-dialog-compact: 26px;
+  --radius-organic: 48% 48% 42% 42%;
+  --radius-organic-line: 46% 54% 48% 52%;
+
+  /* Border roles */
+  --border-subtle: 1px solid var(--color-border-subtle);
+  --border-quiet: 1px solid var(--color-border-quiet);
+  --border-on-dark: 1px solid var(--color-border-on-dark);
+  --border-orbit: 1px solid var(--color-dialog-orbit);
+  --border-focus: 3px solid var(--color-focus-ring);
+
+  /* Shadow roles */
+  --shadow-float: 0 32px 80px rgba(45, 61, 52, 0.16);
+  --shadow-card: 0 10px 28px rgba(31, 48, 43, 0.09);
+  --shadow-action: 0 12px 24px rgba(31, 48, 43, 0.18);
+  --shadow-action-quiet: 0 12px 24px rgba(31, 48, 43, 0.16);
+  --shadow-light-action: 0 12px 25px rgba(93, 55, 35, 0.15);
+  --shadow-dialog: 0 40px 100px rgba(20, 34, 29, 0.28);
+  --shadow-time-mark: 12px 12px 0 var(--color-time-mark-shadow);
+  --shadow-orb-resting: inset -10px -14px 25px rgba(35, 69, 55, 0.22), 0 24px 45px rgba(45, 81, 68, 0.22);
+  --shadow-orb-small: inset -5px -7px 14px rgba(130, 68, 39, 0.16);
+  --shadow-orb-small-resting: inset -5px -7px 14px rgba(35, 69, 55, 0.18);
+
+  /* Layout roles */
+  --layout-content-max: 1180px;
+  --layout-reading-max: 580px;
+  --layout-card-max: 570px;
+  --layout-dialog-max: 500px;
+  --layout-orb-stage-max: 500px;
+  --layout-orb-stage-tablet: 540px;
+  --layout-nav-min-height: 86px;
+  --layout-section-min-height: 650px;
+  --layout-dialog-gutter: 16px;
+
+  /* Motion roles */
+  --motion-duration-fast: 180ms;
+  --motion-duration-link: 180ms;
+  --motion-duration-orb: 4s;
+  --motion-duration-blink: 6s;
+  --motion-ease-standard: ease;
+  --motion-ease-gentle: ease-in-out;
+  --motion-reduced-duration: 1ms;
+
+  /*
+   * Orb proximity contract: distant (green) -> near (orange) -> imminent
+   * (warm red). Color is a supporting cue only; copy and controls carry the
+   * state for people who do not perceive color or motion.
+   */
+  --orb-proximity-distant: var(--color-pigment-moss);
+  --orb-proximity-near: var(--color-pigment-sun);
+  --orb-proximity-imminent: var(--color-pigment-warm-red);
+  --orb-distant-light: #79a67e;
+  --orb-distant-deep: #365a4b;
+  --orb-near-light: var(--color-pigment-sun-soft);
+  --orb-near-deep: #824427;
+  --orb-imminent-light: #df8a70;
+  --orb-imminent-deep: #8f3e36;
+  --orb-surface-distant: radial-gradient(circle at 34% 25%, var(--color-alpha-white-48), transparent 32%), linear-gradient(145deg, var(--orb-distant-light) 0%, var(--orb-proximity-distant) 60%, var(--orb-distant-deep) 100%);
+  --orb-surface-near: radial-gradient(circle at 30% 22%, var(--color-alpha-white-48), transparent 34%), linear-gradient(145deg, var(--orb-near-light), var(--orb-proximity-near));
+  --orb-surface-imminent: radial-gradient(circle at 30% 22%, var(--color-alpha-white-46), transparent 34%), linear-gradient(145deg, var(--orb-imminent-light), var(--orb-proximity-imminent));
+  --orb-shadow-distant: var(--shadow-orb-resting);
+  --orb-shadow-near: var(--shadow-orb-small);
+  --orb-shadow-imminent: var(--shadow-orb-small);
+  --orb-halo-distant: var(--color-alpha-moss-12);
+  --orb-halo-near: rgba(227, 131, 82, 0.14);
+  --orb-halo-imminent: rgba(200, 95, 79, 0.14);
+
+  /* Compatibility aliases keep the existing page selectors stable while the
+   * semantic tokens become the public contract for the next landing pass. */
+  --paper: var(--color-surface-canvas);
+  --paper-deep: var(--color-surface-recessed);
+  --ink: var(--color-content-primary);
+  --ink-soft: var(--color-content-secondary);
+  --green: var(--color-pigment-moss);
+  --green-dark: var(--color-pigment-moss-deep);
+  --orange: var(--color-content-signal);
+  --orange-soft: var(--color-content-signal-soft);
+  --red-soft: var(--color-pigment-warm-red);
+  --cream: var(--color-surface-raised);
+  --line: var(--color-border-subtle);
+  --shadow: var(--shadow-float);
+}
+
+/* Owned state mapping for any future orb consumer. */
+.orb-state-resting,
+.orb-state-distant {
+  --orb-surface: var(--orb-surface-distant);
+  --orb-shadow: var(--orb-shadow-distant);
+  --orb-halo: var(--orb-halo-distant);
+}
+
+.orb-state-approaching,
+.orb-state-near {
+  --orb-surface: var(--orb-surface-near);
+  --orb-shadow: var(--orb-shadow-near);
+  --orb-halo: var(--orb-halo-near);
+}
+
+.orb-state-due,
+.orb-state-imminent {
+  --orb-surface: var(--orb-surface-imminent);
+  --orb-shadow: var(--orb-shadow-imminent);
+  --orb-halo: var(--orb-halo-imminent);
+}
+
+.orb-surface {
+  background: var(--orb-surface, var(--orb-surface-distant));
+  box-shadow: var(--orb-shadow, var(--orb-shadow-distant));
+}

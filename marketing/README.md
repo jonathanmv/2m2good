@@ -1,7 +1,9 @@
-# 2M2Better marketing page
+# 2m2better marketing page
 
-The self-contained local landing page for 2M2Better. Its visual and copy
-direction comes from [`../docs/BRAND_DIRECTION.md`](../docs/BRAND_DIRECTION.md).
+The self-contained local landing page for 2m2better. Its visual and copy
+direction comes from [`../docs/BRAND_DIRECTION.md`](../docs/BRAND_DIRECTION.md),
+and its reusable visual contract is documented in
+[`../docs/DESIGN_TOKENS.md`](../docs/DESIGN_TOKENS.md).
 
 ## Run the local preview
 
@@ -23,9 +25,14 @@ For live editing with automatic refresh, use `npm run dev` instead.
 
 ```bash
 npm run lint
+npm run typecheck
+npm run build
 npm test
 ```
 
 `npm test` creates a production build and verifies that the rendered page keeps
-the approved product promise and privacy language. The page is local-only; it
-does not use accounts, analytics, or network services.
+the approved product promise, privacy language, and token contract. The page
+is local-only; it does not use accounts, analytics, or network services.
+
+The design-token source of truth is `app/design-tokens.css`; new sections should
+consume its semantic roles rather than copying raw values into component styles.

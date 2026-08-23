@@ -35,9 +35,9 @@ export default function Home() {
     <>
       <main>
       <nav className="nav shell" aria-label="Primary navigation">
-        <a className="wordmark" href="#top" aria-label="2M2Better home">
+        <a className="wordmark" href="#top" aria-label="2m2better home">
           <span className="wordmark-dot" aria-hidden="true" />
-          2M<span>2</span>Better
+          2m<span>2</span>better
         </a>
         <div className="nav-links">
           <a href="#how-it-feels">How it feels</a>
@@ -71,14 +71,14 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="orb-stage" aria-label="2M2Better preview">
+        <div className="orb-stage orb-state-resting" aria-label="2m2better preview">
           <div className="stage-note note-one">
             <span>small enough to stay</span>
             <strong>out of your way</strong>
           </div>
           <div className="orb-halo" aria-hidden="true" />
           <div
-            className="hero-orb"
+            className="hero-orb orb-surface"
             role="img"
             aria-label="A calm green orb gently breathing. The next break is still a while away."
           >
@@ -112,7 +112,7 @@ export default function Home() {
 
           <div className="checkin-window" aria-label="Example break check-in">
             <div className="window-top">
-              <div className="mini-orb" aria-hidden="true">
+              <div className="mini-orb orb-state-approaching" aria-hidden="true">
                 <i />
                 <i />
               </div>
@@ -204,7 +204,7 @@ export default function Home() {
 
       <section className="privacy shell" id="privacy">
         <div className="privacy-orbit" aria-hidden="true">
-          <div className="privacy-orb">
+          <div className="privacy-orb orb-state-resting">
             <i />
             <i />
           </div>
@@ -226,14 +226,14 @@ export default function Home() {
 
       <section className="closing">
         <div className="shell closing-inner">
-          <div className="closing-orb" aria-hidden="true">
+          <div className="closing-orb orb-state-resting" aria-hidden="true">
             <i />
             <i />
           </div>
           <p>Two minutes for your body.</p>
           <h2>Then back to what matters.</h2>
           <button className="button button-light" type="button" onClick={openComingSoon}>
-            Download 2M2Better <span aria-hidden="true">↗</span>
+            Download 2m2better <span aria-hidden="true">↗</span>
           </button>
         </div>
       </section>
@@ -241,9 +241,9 @@ export default function Home() {
       <footer className="shell footer">
         <a className="wordmark footer-mark" href="#top">
           <span className="wordmark-dot" aria-hidden="true" />
-          2M<span>2</span>Better
+          2m<span>2</span>better
         </a>
-        <p>2M2Better for macOS · gentle by design</p>
+        <p>2m2better for macOS · gentle by design</p>
         <p>Local. Private. Yours.</p>
       </footer>
       </main>
@@ -270,14 +270,14 @@ export default function Home() {
           >
             <span aria-hidden="true">×</span>
           </button>
-          <div className="dialog-orb" aria-hidden="true">
+          <div className="dialog-orb orb-state-resting" aria-hidden="true">
             <i />
             <i />
           </div>
           <p className="eyebrow">Coming soon</p>
           <h2 id="coming-soon-title">Not public yet.</h2>
           <p id="coming-soon-description">
-            2M2Better is still in early access. If you&apos;d like to hear when it
+            2m2better is still in early access. If you&apos;d like to hear when it
             is ready, leave your email through the short Google Form.
           </p>
           <a

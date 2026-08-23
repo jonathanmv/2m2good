@@ -33,7 +33,8 @@ test("server-renders the 2M2Better landing page and early-access dialog", async 
     .replace(/<!--.*?-->/g, "")
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ");
-  assert.match(html, /<title>2M2Better · A two-minute reset for your body<\/title>/i);
+  assert.match(html, /<title>2m2better · A two-minute reset for your body<\/title>/i);
+  assert.match(renderedText, /2m2better/);
   assert.match(renderedText, /A two-minute reset that helps your body keep up with your mind\./);
   assert.match(renderedText, /A nudge, not a negotiation\./);
   assert.match(renderedText, /Your breaks stay on your Mac\./);
@@ -90,11 +91,48 @@ test("source preserves the minimal private product story", async () => {
   assert.match(normalizedPage, /https:\/\/forms\.gle\/ALeWYDcoYHvXYNBo6/);
   assert.match(layout, /openGraph/);
   assert.match(layout, /\/og\.png/);
+  assert.match(css, /@import "\.\/design-tokens\.css"/);
   assert.match(css, /@keyframes orb-breathe/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
+  assert.match(css, /var\(--motion-reduced-duration\)/);
+  assert.match(css, /\.orb-halo,[\s\S]*\.dialog-orb/);
+  assert.doesNotMatch(css, /#[0-9a-f]{3,8}|rgba?\(/i);
   assert.match(css, /\.coming-soon::backdrop/);
   assert.deepEqual(
     page.match(/https?:\/\/[^"]+/g),
     ["https://forms.gle/ALeWYDcoYHvXYNBo6"],
   );
+});
+
+test("marketing token contract owns the landing-page visual vocabulary", async () => {
+  const [tokens, page] = await Promise.all([
+    readFile(new URL("../app/design-tokens.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  ]);
+
+  for (const token of [
+    "--color-surface-canvas",
+    "--color-content-primary",
+    "--font-body",
+    "--type-display-size",
+    "--space-8",
+    "--radius-card",
+    "--border-subtle",
+    "--shadow-float",
+    "--layout-content-max",
+    "--motion-duration-orb",
+    "--orb-proximity-distant",
+    "--orb-proximity-near",
+    "--orb-proximity-imminent",
+  ]) {
+    assert.match(tokens, new RegExp(`${token}\\s*:`));
+  }
+
+  assert.match(tokens, /\.orb-state-resting[\s\S]*--orb-surface/);
+  assert.match(tokens, /\.orb-state-approaching[\s\S]*--orb-surface/);
+  assert.match(tokens, /\.orb-state-due[\s\S]*--orb-surface/);
+  assert.match(page, /orb-state-resting/);
+  assert.match(page, /orb-state-approaching/);
+  assert.match(page, /2m2better/);
+  assert.doesNotMatch(page, /2M2Better/);
 });
