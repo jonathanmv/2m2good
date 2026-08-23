@@ -1,299 +1,473 @@
 "use client";
 
-import { type KeyboardEvent, type MouseEvent, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
-const earlyAccessForm = "https://forms.gle/ALeWYDcoYHvXYNBo6";
+const AREAS = [
+  { label: "neck", title: "Neck", cue: "turn a little, stay comfortable" },
+  { label: "shoulders", title: "Shoulders", cue: "let them move a little" },
+  { label: "hands + wrists", title: "Hands + wrists", cue: "open and soften your hands" },
+  { label: "lower back", title: "Lower back", cue: "shift gently and change position" },
+] as const;
+
+const BREAK_PROMPT = "Ready for a gentle reset?";
+const PREVIEW_SECONDS = 12;
+const INSTALL_COMMAND = `curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install-preview.sh -o install-preview.sh
+less install-preview.sh
+sh install-preview.sh --ref main --destination "$HOME/2m2good-developer-preview"`;
+
+type OrbState = "resting" | "approaching" | "due";
+type DemoState = "ready" | "active" | "paused" | "done";
+
 const Arrow = () => <span aria-hidden="true">↘</span>;
 
+function OrbFace() {
+  return (
+    <>
+      <span className="orb-eye" />
+      <span className="orb-eye" />
+    </>
+  );
+}
+
+function DemoPreview() {
+  const [demoState, setDemoState] = useState<DemoState>("ready");
+  const [remaining, setRemaining] = useState(PREVIEW_SECONDS);
+
+  useEffect(() => {
+    if (demoState !== "active") return;
+
+    const timer = window.setInterval(() => {
+      setRemaining((current) => {
+        if (current <= 1) {
+          setDemoState("done");
+          return 0;
+        }
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [demoState]);
+
+  const resetPreview = () => {
+    setRemaining(PREVIEW_SECONDS);
+    setDemoState("ready");
+  };
+
+  const cue =
+    remaining > 8
+      ? AREAS[0].cue
+      : remaining > 4
+        ? AREAS[1].cue
+        : AREAS[2].cue;
+  const isRunning = demoState === "active" || demoState === "paused";
+  const status =
+    demoState === "ready"
+      ? "A short preview of the reset"
+      : demoState === "active"
+        ? "Moving gently"
+        : demoState === "paused"
+          ? "Paused when you are ready"
+          : "That’s it. Welcome back.";
+
+  return (
+    <div className="demo-card" aria-label="Playable 2m2better preview" data-demo-duration={PREVIEW_SECONDS}>
+      <div className="demo-card-top">
+        <div className="demo-orb orb-surface orb-state-approaching" aria-hidden="true">
+          <OrbFace />
+        </div>
+        <div className="demo-prompt">
+          <span>A small pause?</span>
+          <strong>{BREAK_PROMPT}</strong>
+        </div>
+        <span className="demo-preview-label">Preview</span>
+      </div>
+
+      <div className="demo-status" aria-live="polite">
+        <span className="status-dot" aria-hidden="true" />
+        <span>{status}</span>
+      </div>
+
+      <div className="demo-cue" aria-live="polite">
+        {demoState === "done" ? "Take what you need, then carry on." : cue}
+      </div>
+
+      <div className="demo-progress-row">
+        <div
+          className="demo-progress"
+          role="progressbar"
+          aria-label="Preview progress"
+          aria-valuemin={0}
+          aria-valuemax={PREVIEW_SECONDS}
+          aria-valuenow={PREVIEW_SECONDS - remaining}
+        >
+          <span style={{ width: `${((PREVIEW_SECONDS - remaining) / PREVIEW_SECONDS) * 100}%` }} />
+        </div>
+        <span className="demo-time" aria-label={`${remaining} seconds remaining`}>
+          {remaining.toString().padStart(2, "0")}s
+        </span>
+      </div>
+
+      <div className="demo-controls" aria-label="Preview controls">
+        <button
+          className="button button-demo-start"
+          type="button"
+          onClick={() => {
+            setRemaining(PREVIEW_SECONDS);
+            setDemoState("active");
+          }}
+          disabled={demoState !== "ready"}
+        >
+          Start <Arrow />
+        </button>
+        <button
+          className="button button-demo-control"
+          type="button"
+          onClick={() => setDemoState((current) => (current === "active" ? "paused" : "active"))}
+          disabled={!isRunning}
+        >
+          {demoState === "paused" ? "Resume" : "Pause"}
+        </button>
+        <button
+          className="button button-demo-control"
+          type="button"
+          onClick={() => setRemaining((current) => Math.max(0, current - 3))}
+          disabled={!isRunning}
+        >
+          Next cue
+        </button>
+        <button
+          className="button button-demo-control"
+          type="button"
+          onClick={() => setDemoState("done")}
+          disabled={!isRunning}
+        >
+          End
+        </button>
+        <button className="demo-reset" type="button" onClick={resetPreview} disabled={demoState !== "done"}>
+          Try again
+        </button>
+      </div>
+
+      <p className="demo-footnote" id="demo-note">
+        Click-only preview. The app keeps these controls visible for a quiet path through the reset.
+      </p>
+    </div>
+  );
+}
+
 export default function Home() {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const openerRef = useRef<HTMLButtonElement | null>(null);
+  const demoRef = useRef<HTMLElement>(null);
+  const [areaIndex, setAreaIndex] = useState(0);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const [orbState, setOrbState] = useState<OrbState>("resting");
+  const [copyStatus, setCopyStatus] = useState("Copy command");
+  const area = AREAS[areaIndex];
 
-  function openComingSoon(event: MouseEvent<HTMLButtonElement>) {
-    openerRef.current = event.currentTarget;
-    dialogRef.current?.showModal();
-  }
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updateMotionPreference = () => setReducedMotion(media.matches);
+    updateMotionPreference();
+    media.addEventListener?.("change", updateMotionPreference);
+    return () => media.removeEventListener?.("change", updateMotionPreference);
+  }, []);
 
-  function closeComingSoon() {
-    dialogRef.current?.close();
-  }
+  useEffect(() => {
+    if (reducedMotion) return;
 
-  function closeFromBackdrop(event: MouseEvent<HTMLDialogElement>) {
-    if (event.target === event.currentTarget) {
-      closeComingSoon();
+    const rotation = window.setInterval(() => {
+      setAreaIndex((current) => (current + 1) % AREAS.length);
+    }, 3200);
+    return () => window.clearInterval(rotation);
+  }, [reducedMotion]);
+
+  useEffect(() => {
+    const updateOrbState = () => {
+      const section = demoRef.current;
+      if (!section) return;
+      const distance = section.getBoundingClientRect().top;
+      const viewport = window.innerHeight;
+      setOrbState(distance < viewport * 0.38 ? "due" : distance < viewport * 0.92 ? "approaching" : "resting");
+    };
+
+    updateOrbState();
+    window.addEventListener("scroll", updateOrbState, { passive: true });
+    window.addEventListener("resize", updateOrbState);
+    return () => {
+      window.removeEventListener("scroll", updateOrbState);
+      window.removeEventListener("resize", updateOrbState);
+    };
+  }, []);
+
+  async function copyInstaller() {
+    try {
+      await navigator.clipboard.writeText(INSTALL_COMMAND);
+      setCopyStatus("Copied");
+    } catch {
+      setCopyStatus("Select the command to copy it");
     }
   }
 
-  function closeFromKeyboard(event: KeyboardEvent<HTMLDialogElement>) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      closeComingSoon();
-    }
-  }
+  const orbMessage =
+    orbState === "resting"
+      ? "The next pause is a little way off."
+      : orbState === "approaching"
+        ? "A pause is getting closer."
+        : "The reset is close.";
 
   return (
     <>
       <main>
-      <nav className="nav shell" aria-label="Primary navigation">
-        <a className="wordmark" href="#top" aria-label="2m2better home">
-          <span className="wordmark-dot" aria-hidden="true" />
-          2m<span>2</span>better
-        </a>
-        <div className="nav-links">
-          <a href="#how-it-feels">How it feels</a>
-          <a href="#principles">Principles</a>
-          <a href="#privacy">Privacy</a>
-        </div>
-        <button className="nav-action nav-button" type="button" onClick={openComingSoon}>
-          Download <Arrow />
-        </button>
-      </nav>
-
-      <section className="hero shell" id="top">
-        <div className="hero-copy">
-          <p className="eyebrow">A gentle desktop companion for macOS</p>
-          <h1>
-            A two-minute reset that helps your body{" "}
-            <span className="soft-underline">keep up with your mind.</span>
-          </h1>
-          <p className="hero-lede">
-            When you&apos;ve been at the screen for a while, a small orb checks
-            in. Stand, move gently, and come right back. No coaching. No
-            keeping score.
-          </p>
-          <div className="hero-actions">
-            <a className="button button-primary" href="#how-it-feels">
-              See how it feels <Arrow />
-            </a>
-            <a className="text-link" href="#two-minutes">
-              Two minutes, exactly
-            </a>
-          </div>
-        </div>
-
-        <div className="orb-stage orb-state-resting" aria-label="2m2better preview">
-          <div className="stage-note note-one">
-            <span>small enough to stay</span>
-            <strong>out of your way</strong>
-          </div>
-          <div className="orb-halo" aria-hidden="true" />
-          <div
-            className="hero-orb orb-surface"
-            role="img"
-            aria-label="A calm green orb gently breathing. The next break is still a while away."
-          >
-            <span className="orb-eye" />
-            <span className="orb-eye" />
-          </div>
-          <div className="progress-caption">
-            <span className="progress-swatch" aria-hidden="true" />
-            <div>
-              <span>next check-in</span>
-              <strong>still a while away</strong>
-            </div>
-          </div>
-          <div className="stage-note note-two">
-            <strong>green → orange → warm red</strong>
-            <span>as a break gets closer</span>
-          </div>
-        </div>
-      </section>
-
-      <section className="flow-section" id="how-it-feels">
-        <div className="shell flow-grid">
-          <div className="section-intro">
-            <p className="eyebrow">It asks. You decide.</p>
-            <h2>A nudge, not a negotiation.</h2>
-            <p>
-              One suggestion. Three easy answers. Saying “later” is normal, not
-              a broken streak.
-            </p>
-          </div>
-
-          <div className="checkin-window" aria-label="Example break check-in">
-            <div className="window-top">
-              <div className="mini-orb orb-surface orb-state-approaching" aria-hidden="true">
-                <i />
-                <i />
-              </div>
-              <div>
-                <span>A small pause?</span>
-                <strong>Ready to stand for a gentle reset?</strong>
-              </div>
-            </div>
-            <div className="choice-stack" aria-label="Available responses">
-              <button type="button" className="start-choice">
-                Start <span>2 min</span>
-              </button>
-              <div className="quiet-choices">
-                <button type="button">In an hour</button>
-                <button type="button">Tomorrow</button>
-              </div>
-            </div>
-            <p className="voice-line">
-              <span className="voice-bars" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-                <i />
-              </span>
-              Or just say “yeah”, “later”, or “tomorrow”
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="two-minutes shell" id="two-minutes">
-        <div className="time-mark" aria-hidden="true">
-          2:00
-        </div>
-        <div className="time-story">
-          <p className="eyebrow">Short on purpose</p>
-          <h2>Your train of thought can wait two minutes. It won&apos;t leave.</h2>
-          <p>
-            Six gentle standing movements, guided one at a time by voice. A
-            shoulder roll, a soft reach, a little weight shift. Nothing
-            athletic. Nothing to learn.
-          </p>
-          <div className="movement-line" aria-label="Example two-minute session">
-            <span>stand</span>
-            <i />
-            <span>roll</span>
-            <i />
-            <span>reach</span>
-            <i />
-            <span>breathe</span>
-            <i />
-            <span>return</span>
-          </div>
-        </div>
-      </section>
-
-      <section className="principles" id="principles">
-        <div className="shell principles-inner">
-          <p className="principles-kicker">
-            A break companion
-            <br />
-            that knows its place.
-          </p>
-          <div className="principle-list">
-            <article>
-              <span>01</span>
-              <div>
-                <h3>Protect the flow</h3>
-                <p>Easy to accept, easy to postpone, easy to finish.</p>
-              </div>
-            </article>
-            <article>
-              <span>02</span>
-              <div>
-                <h3>Ask, never command</h3>
-                <p>You choose now, later, tomorrow, or not at all.</p>
-              </div>
-            </article>
-            <article>
-              <span>03</span>
-              <div>
-                <h3>Voice-first, never voice-only</h3>
-                <p>Speak naturally, or use the quiet buttons beside you.</p>
-              </div>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section className="privacy shell" id="privacy">
-        <div className="privacy-orbit" aria-hidden="true">
-          <div className="privacy-orb orb-surface orb-state-resting">
-            <i />
-            <i />
-          </div>
-        </div>
-        <div className="privacy-copy">
-          <p className="eyebrow">Personal means personal</p>
-          <h2>Your breaks stay on your Mac.</h2>
-          <p>
-            No account to create. No network connection. No analytics watching
-            whether you stood up. Just a small companion, working locally.
-          </p>
-          <div className="privacy-notes" aria-label="Privacy commitments">
-            <span>no account</span>
-            <span>no network</span>
-            <span>no analytics</span>
-          </div>
-        </div>
-      </section>
-
-      <section className="closing">
-        <div className="shell closing-inner">
-          <div className="closing-orb orb-surface orb-state-resting" aria-hidden="true">
-            <i />
-            <i />
-          </div>
-          <p>Two minutes for your body.</p>
-          <h2>Then back to what matters.</h2>
-          <button className="button button-light" type="button" onClick={openComingSoon}>
-            Download 2m2better <span aria-hidden="true">↗</span>
-          </button>
-        </div>
-      </section>
-
-      <footer className="shell footer">
-        <a className="wordmark footer-mark" href="#top">
-          <span className="wordmark-dot" aria-hidden="true" />
-          2m<span>2</span>better
-        </a>
-        <p>2m2better for macOS · gentle by design</p>
-        <p>Local. Private. Yours.</p>
-      </footer>
-      </main>
-
-      <dialog
-        className="coming-soon"
-        ref={dialogRef}
-        aria-labelledby="coming-soon-title"
-        aria-describedby="coming-soon-description"
-        onClick={closeFromBackdrop}
-        onKeyDown={closeFromKeyboard}
-        onCancel={(event) => {
-          event.preventDefault();
-          closeComingSoon();
-        }}
-        onClose={() => openerRef.current?.focus()}
-      >
-        <div className="dialog-card">
-          <button
-            className="dialog-close"
-            type="button"
-            aria-label="Close coming soon dialog"
-            onClick={closeComingSoon}
-          >
-            <span aria-hidden="true">×</span>
-          </button>
-          <div className="dialog-orb orb-surface orb-state-resting" aria-hidden="true">
-            <i />
-            <i />
-          </div>
-          <p className="eyebrow">Coming soon</p>
-          <h2 id="coming-soon-title">Not public yet.</h2>
-          <p id="coming-soon-description">
-            2m2better is still in early access. If you&apos;d like to hear when it
-            is ready, leave your email through the short Google Form.
-          </p>
-          <a
-            className="button dialog-primary"
-            href={earlyAccessForm}
-            target="_blank"
-            rel="noopener noreferrer"
-            autoFocus
-          >
-            Join early access <span aria-hidden="true">↗</span>
+        <nav className="nav shell" aria-label="Primary navigation">
+          <a className="wordmark" href="#top" aria-label="2m2better home">
+            <span className="wordmark-dot" aria-hidden="true" />
+            2m<span>2</span>better
           </a>
-          <p className="dialog-note">
-            This opens Google Forms. No email is collected on this site.
-          </p>
-        </div>
-      </dialog>
+          <div className="nav-links">
+            <a href="#areas">Your areas</a>
+            <a href="#demo">Try the preview</a>
+            <a href="#privacy">Privacy</a>
+          </div>
+          <a className="nav-action" href="#developer-preview">
+            Developer preview <Arrow />
+          </a>
+        </nav>
+
+        <section className="hero shell" id="top">
+          <div className="hero-copy">
+            <p className="eyebrow">A small companion for screen-heavy days</p>
+            <h1>
+              Give your body a little room to move, then come back to your day.
+            </h1>
+            <p className="area-promise" aria-live="polite" aria-atomic="true">
+              2 mins to better your <span className="area-word">{area.label}</span>.
+            </p>
+            <p className="area-fallback">
+              neck · shoulders · hands + wrists · lower back
+            </p>
+            <p className="hero-lede">
+              2m2better offers one gentle, local reset for the part of you that
+              needs a change of position. Choose Start, come back later, or stay
+              with what you&apos;re doing.
+            </p>
+            <div className="hero-actions">
+              <a className="button button-primary" href="#demo">
+                Try the reset <Arrow />
+              </a>
+              <a className="text-link" href="#areas">
+                See the areas
+              </a>
+            </div>
+          </div>
+
+          <div className="hero-visual">
+            <div className={`orb-stage orb-state-${orbState}`} aria-label="Break proximity preview">
+              <div className="stage-note note-one">
+                <span>quietly nearby</span>
+                <strong>one small invitation</strong>
+              </div>
+              <div className="orb-halo" aria-hidden="true" />
+              <div className="hero-orb orb-surface" role="img" aria-label={`2m2better orb. ${orbMessage}`}>
+                <OrbFace />
+              </div>
+              <div className="progress-caption" aria-live="polite">
+                <span className="progress-swatch" aria-hidden="true" />
+                <div>
+                  <span>break proximity</span>
+                  <strong>{orbMessage}</strong>
+                </div>
+              </div>
+              <div className="stage-note note-two">
+                <strong>green → orange → warm red</strong>
+                <span>as the preview gets closer</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="areas-section" id="areas">
+          <div className="shell areas-grid">
+            <div className="areas-copy">
+              <p className="eyebrow">A little more specific</p>
+              <h2>Meet your body where it is.</h2>
+              <p>
+                The invitation stays small, while the focus can feel personal.
+                2m2better rotates through four plain-language areas and keeps the
+                choice easy to change.
+              </p>
+            </div>
+            <div className="area-list" aria-label="Available movement areas">
+              {AREAS.map((item, index) => (
+                <div className={`area-row ${index === areaIndex ? "area-row-active" : ""}`} key={item.label}>
+                  <span className="area-row-index">0{index + 1}</span>
+                  <strong>{item.title}</strong>
+                  <span>{item.cue}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="checkin-section" aria-labelledby="checkin-title">
+          <div className="shell checkin-grid">
+            <div className="checkin-copy">
+              <p className="eyebrow">The first moment</p>
+              <h2 id="checkin-title">One suggestion. Your call.</h2>
+              <p>
+                A quiet orb offers the next reset without asking you to plan a
+                routine. Start now, choose later, or leave it for another day.
+              </p>
+            </div>
+            <div className="checkin-window" aria-label="Example break check-in">
+              <div className="window-top">
+                <div className="mini-orb orb-surface orb-state-approaching" aria-hidden="true">
+                  <OrbFace />
+                </div>
+                <div>
+                  <span>A small pause?</span>
+                  <strong>{BREAK_PROMPT}</strong>
+                </div>
+              </div>
+              <div className="choice-stack" aria-label="Available responses">
+                <button type="button" className="start-choice">Start</button>
+                <div className="quiet-choices">
+                  <button type="button">Later</button>
+                  <button type="button">Tomorrow</button>
+                </div>
+              </div>
+              <p className="button-note">Buttons always work. No microphone needed for the decision.</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="demo-section" id="demo" ref={demoRef} aria-labelledby="demo-title">
+          <div className="shell demo-grid">
+            <div className="demo-copy">
+              <p className="eyebrow">Scroll-led preview</p>
+              <h2 id="demo-title">See the pause before you install it.</h2>
+              <p>
+                As you approach this section, the orb shifts from distant green
+                toward its warmer break-proximity signal. Start the preview with
+                a click and keep every control in reach.
+              </p>
+              <div className="demo-steps" aria-label="Preview flow">
+                <span><b>01</b> Start</span>
+                <span><b>02</b> Move gently</span>
+                <span><b>03</b> Come back</span>
+              </div>
+            </div>
+            <DemoPreview />
+          </div>
+        </section>
+
+        <section className="principles" aria-labelledby="principles-title">
+          <div className="shell principles-inner">
+            <div>
+              <p className="eyebrow eyebrow-light">The shape of it</p>
+              <h2 id="principles-title">Small enough to keep.</h2>
+            </div>
+            <div className="principle-list">
+              <article>
+                <span>01</span>
+                <div>
+                  <h3>Ask, never command</h3>
+                  <p>Start, later, tomorrow, or not this time. There is no wrong answer.</p>
+                </div>
+              </article>
+              <article>
+                <span>02</span>
+                <div>
+                  <h3>Support, don&apos;t score</h3>
+                  <p>No streaks, scores, dashboards, or performance story to keep up with.</p>
+                </div>
+              </article>
+              <article>
+                <span>03</span>
+                <div>
+                  <h3>Leave room for you</h3>
+                  <p>Move in a comfortable range. Pause, skip, or end whenever you need.</p>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section className="privacy shell" id="privacy" aria-labelledby="privacy-title">
+          <div className="privacy-orbit" aria-hidden="true">
+            <div className="privacy-orb orb-surface orb-state-resting"><OrbFace /></div>
+          </div>
+          <div className="privacy-copy">
+            <p className="eyebrow">Personal means personal</p>
+            <h2 id="privacy-title">Your breaks stay close to home.</h2>
+            <p>
+              The companion runs locally on your Mac once installed. No account,
+              analytics, or in-app network connection. Optional voice support does
+              not replace the quiet buttons.
+            </p>
+            <div className="privacy-notes" aria-label="Privacy commitments">
+              <span>no account</span>
+              <span>no analytics</span>
+              <span>buttons always available</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="installer" id="developer-preview" aria-labelledby="installer-title">
+          <div className="shell installer-inner">
+            <div className="installer-copy">
+              <p className="eyebrow">Early developer preview</p>
+              <h2 id="installer-title">See the source. Build the companion.</h2>
+              <p>
+                This is not a signed consumer download. The public installer
+                checks out the source and builds a local app for macOS 14 or
+                newer.
+              </p>
+              <ul className="requirements">
+                <li>macOS 14+ on arm64 or x86_64</li>
+                <li>Xcode 15+ or matching Apple Command Line Tools</li>
+                <li>Git 2.20+, curl, codesign, and open</li>
+              </ul>
+            </div>
+            <div className="command-card">
+              <div className="command-heading">
+                <span>Public installer</span>
+                <span>auditable · download then run</span>
+              </div>
+              <pre><code>{INSTALL_COMMAND}</code></pre>
+              <button className="copy-button" type="button" onClick={copyInstaller}>
+                {copyStatus}
+              </button>
+              <p className="copy-invite" aria-live="polite">
+                Copy this into your terminal, or ask your agent to install it for you.
+              </p>
+              <p className="command-note">
+                Inspect the downloaded script first. It is a developer preview with
+                no signing, notarization, hosted artifact, or automatic updates.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="closing">
+          <div className="shell closing-inner">
+            <div className="closing-orb orb-surface orb-state-resting" aria-hidden="true"><OrbFace /></div>
+            <p>A little room to move.</p>
+            <h2>Then back to your day.</h2>
+            <a className="button button-light" href="#developer-preview">
+              View the developer preview <Arrow />
+            </a>
+          </div>
+        </section>
+
+        <footer className="shell footer">
+          <a className="wordmark footer-mark" href="#top">
+            <span className="wordmark-dot" aria-hidden="true" />
+            2m<span>2</span>better
+          </a>
+          <p>2m2better for macOS · gentle by design</p>
+          <p>Local. Private. Yours.</p>
+        </footer>
+      </main>
     </>
   );
 }

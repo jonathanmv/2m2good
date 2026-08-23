@@ -3,17 +3,17 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("http://localhost:3000"),
-  title: "2m2better · A two-minute reset for your body",
+  title: "2m2better · A little room to move",
   description:
-    "A gentle, private macOS desktop companion for short standing breaks that protect your flow.",
+    "A small, private macOS companion for a gentle movement reset around your day.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
   },
   openGraph: {
-    title: "2m2better · A two-minute reset for your body",
+    title: "2m2better · A little room to move",
     description:
-      "A gentle, private macOS desktop companion for short standing breaks that protect your flow.",
+      "A small, private macOS companion for a gentle movement reset around your day.",
     images: [{ url: "/og.png", width: 1730, height: 909 }],
     type: "website",
   },
