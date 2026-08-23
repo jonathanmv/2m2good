@@ -96,10 +96,16 @@ test("rendered developer-preview section gives an auditable download-then-run co
   assert.match(text, /macOS 14\+/);
   assert.match(text, /Xcode 15\+/);
   assert.match(text, /Copy this into your terminal, or ask your agent to install it for you\./);
-  assert.match(installer, /<pre><code>curl -fsSL https:\/\/raw\.githubusercontent\.com\/jonathanmv\/2m2good\/main\/scripts\/install-preview\.sh -o install-preview\.sh/);
-  assert.match(installer, /less install-preview\.sh/);
-  assert.match(installer, /sh install-preview\.sh --ref main --destination/);
-  assert.doesNotMatch(installer, /curl\s*\|\s*sh/i);
+  const command = installer.match(/<pre><code>([\s\S]*?)<\/code><\/pre>/)?.[1] ?? "";
+  const steps = command.split("\n").map((line) => line.trim()).filter(Boolean);
+  assert.equal(steps.length, 3);
+  assert.match(steps[0], /^curl -fsSL https:\/\/raw\.githubusercontent\.com\/jonathanmv\/2m2good\/main\/scripts\/install-preview\.sh -o install-preview\.sh$/);
+  assert.match(steps[1], /^cat install-preview\.sh$/);
+  assert.match(steps[2], /^sh install-preview\.sh --ref main --destination/);
+  assert.doesNotMatch(command, /curl\s*\|\s*sh/i);
+  for (const step of steps) {
+    assert.doesNotMatch(step, /^(?:less|more|vi|vim|nano|emacs)\b/);
+  }
 });
 
 test("orb and area fallback are present in the built visual output", async () => {

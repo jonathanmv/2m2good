@@ -11,8 +11,10 @@ const AREAS = [
 
 const BREAK_PROMPT = "Ready for a gentle reset?";
 const PREVIEW_SECONDS = 12;
+const CUE_SECONDS = PREVIEW_SECONDS / AREAS.length;
+const LAST_CUE_INDEX = AREAS.length - 1;
 const INSTALL_COMMAND = `curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install-preview.sh -o install-preview.sh
-less install-preview.sh
+cat install-preview.sh
 sh install-preview.sh --ref main --destination "$HOME/2m2good-developer-preview"`;
 
 type OrbState = "resting" | "approaching" | "due";
@@ -31,35 +33,49 @@ function OrbFace() {
 
 function DemoPreview() {
   const [demoState, setDemoState] = useState<DemoState>("ready");
-  const [remaining, setRemaining] = useState(PREVIEW_SECONDS);
+  const [cueIndex, setCueIndex] = useState(0);
+  const [cueElapsed, setCueElapsed] = useState(0);
+  const remaining = PREVIEW_SECONDS - (cueIndex * CUE_SECONDS + cueElapsed);
 
   useEffect(() => {
     if (demoState !== "active") return;
 
-    const timer = window.setInterval(() => {
-      setRemaining((current) => {
-        if (current <= 1) {
-          setDemoState("done");
-          return 0;
-        }
-        return current - 1;
-      });
+    const tick = window.setTimeout(() => {
+      if (cueElapsed + 1 < CUE_SECONDS) {
+        setCueElapsed(cueElapsed + 1);
+        return;
+      }
+      if (cueIndex === LAST_CUE_INDEX) {
+        setCueElapsed(CUE_SECONDS);
+        setDemoState("done");
+        return;
+      }
+      setCueIndex(cueIndex + 1);
+      setCueElapsed(0);
     }, 1000);
 
-    return () => window.clearInterval(timer);
-  }, [demoState]);
+    return () => window.clearTimeout(tick);
+  }, [demoState, cueIndex, cueElapsed]);
+
+  const startPreview = () => {
+    setCueIndex(0);
+    setCueElapsed(0);
+    setDemoState("active");
+  };
 
   const resetPreview = () => {
-    setRemaining(PREVIEW_SECONDS);
+    setCueIndex(0);
+    setCueElapsed(0);
     setDemoState("ready");
   };
 
-  const cue =
-    remaining > 8
-      ? AREAS[0].cue
-      : remaining > 4
-        ? AREAS[1].cue
-        : AREAS[2].cue;
+  const advanceCue = () => {
+    setCueIndex((current) => Math.min(LAST_CUE_INDEX, current + 1));
+    setCueElapsed(0);
+  };
+
+  const area = AREAS[cueIndex];
+  const cue = area.cue;
   const isRunning = demoState === "active" || demoState === "paused";
   const status =
     demoState === "ready"
@@ -89,6 +105,7 @@ function DemoPreview() {
       </div>
 
       <div className="demo-cue" aria-live="polite">
+        {demoState === "done" ? null : <span className="demo-cue-area">{area.title}</span>}
         {demoState === "done" ? "Take what you need, then carry on." : cue}
       </div>
 
@@ -112,10 +129,7 @@ function DemoPreview() {
         <button
           className="button button-demo-start"
           type="button"
-          onClick={() => {
-            setRemaining(PREVIEW_SECONDS);
-            setDemoState("active");
-          }}
+          onClick={startPreview}
           disabled={demoState !== "ready"}
         >
           Start <Arrow />
@@ -131,8 +145,8 @@ function DemoPreview() {
         <button
           className="button button-demo-control"
           type="button"
-          onClick={() => setRemaining((current) => Math.max(0, current - 3))}
-          disabled={!isRunning}
+          onClick={advanceCue}
+          disabled={!isRunning || cueIndex === LAST_CUE_INDEX}
         >
           Next cue
         </button>
@@ -158,9 +172,11 @@ function DemoPreview() {
 
 export default function Home() {
   const demoRef = useRef<HTMLElement>(null);
+  const heroVisualRef = useRef<HTMLDivElement>(null);
   const [areaIndex, setAreaIndex] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [orbState, setOrbState] = useState<OrbState>("resting");
+  const [orbFloating, setOrbFloating] = useState(false);
   const [copyStatus, setCopyStatus] = useState("Copy command");
   const area = AREAS[areaIndex];
 
@@ -182,20 +198,36 @@ export default function Home() {
   }, [reducedMotion]);
 
   useEffect(() => {
+    let frame = 0;
+
     const updateOrbState = () => {
       const section = demoRef.current;
       if (!section) return;
-      const distance = section.getBoundingClientRect().top;
+      const demo = section.getBoundingClientRect();
       const viewport = window.innerHeight;
-      setOrbState(distance < viewport * 0.38 ? "due" : distance < viewport * 0.92 ? "approaching" : "resting");
+      setOrbState(demo.top < viewport * 0.38 ? "due" : demo.top < viewport * 0.92 ? "approaching" : "resting");
+
+      const heroVisual = heroVisualRef.current;
+      setOrbFloating(
+        heroVisual !== null && heroVisual.getBoundingClientRect().bottom < 0 && demo.bottom > 0,
+      );
+    };
+
+    const scheduleUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        updateOrbState();
+      });
     };
 
     updateOrbState();
-    window.addEventListener("scroll", updateOrbState, { passive: true });
-    window.addEventListener("resize", updateOrbState);
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
     return () => {
-      window.removeEventListener("scroll", updateOrbState);
-      window.removeEventListener("resize", updateOrbState);
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
     };
   }, []);
 
@@ -217,6 +249,20 @@ export default function Home() {
 
   return (
     <>
+      <div
+        className={`floating-orb orb-state-${orbState}`}
+        data-visible={orbFloating}
+        aria-hidden="true"
+      >
+        <span className="floating-orb-face orb-surface">
+          <OrbFace />
+        </span>
+        <span className="floating-orb-text">
+          <span>break proximity</span>
+          <strong>{orbMessage}</strong>
+        </span>
+      </div>
+
       <main>
         <nav className="nav shell" aria-label="Primary navigation">
           <a className="wordmark" href="#top" aria-label="2m2better home">
@@ -260,7 +306,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="hero-visual">
+          <div className="hero-visual" ref={heroVisualRef}>
             <div className={`orb-stage orb-state-${orbState}`} aria-label="Break proximity preview">
               <div className="stage-note note-one">
                 <span>quietly nearby</span>

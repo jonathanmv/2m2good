@@ -184,6 +184,7 @@
   /* Motion roles */
   --motion-duration-fast: 180ms;
   --motion-duration-link: 180ms;
+  --motion-duration-gentle: 450ms;
   --motion-duration-orb: 4s;
   --motion-duration-blink: 6s;
   --motion-ease-standard: ease;
