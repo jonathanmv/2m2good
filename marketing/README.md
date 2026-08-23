@@ -38,9 +38,11 @@ click-only bounded preview and its controls, the single paste-safe
 download-then-run developer-preview command (which it also runs against stubbed
 `curl` and `sh`), the privacy language, and the lowercase wordmark. It
 also parses the emitted CSS to prove the hero, area list, demo, orb states,
-installer, and reduced-motion rules resolve through declared design tokens.
-The page is local-only; it does not use accounts, analytics, or network
-services.
+installer, and reduced-motion rules resolve through declared design tokens, to
+measure the palette's text, focus, and orb-proximity contrast from the resolved
+token values, and to replay the real cascade so every rendered action keeps the
+focus ring and its contrast halo. The page is local-only; it does not use
+accounts, analytics, or network services.
 
 The design-token source of truth is `app/design-tokens.css`;
 [`../docs/DESIGN_TOKENS.md`](../docs/DESIGN_TOKENS.md) owns the usage map and
