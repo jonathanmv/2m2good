@@ -4,7 +4,7 @@ The marketing site uses a small, body-aware token system rather than a generic w
 
 ## Source of truth
 
-All raw marketing values live in [`marketing/app/design-tokens.css`](../marketing/app/design-tokens.css). `marketing/app/globals.css` imports that file and consumes its roles. New landing-page sections should use semantic variables from the token file. Color, border, radius, shadow, and motion values are fully tokenized: do not introduce a one-off hex, rgba, radius, shadow, or animation value in component styles. Spacing and type scales are tokenized at the shell and body-copy level only, so `globals.css` still carries section-local px rhythm; prefer a `--space-*` or `--type-*` token when one already matches, and add the missing scale step rather than growing that raw set.
+All raw marketing values live in [`marketing/app/design-tokens.css`](../marketing/app/design-tokens.css). `marketing/app/globals.css` imports that file and consumes its roles. New landing-page sections should use semantic variables from the token file. No raw color value remains in `globals.css`, and border, radius, shadow, and motion values are tokenized apart from the local `.wordmark-dot` inset offsets: do not introduce a one-off hex, rgba, radius, shadow, or animation value in component styles. Spacing and type scales are tokenized at the shell and body-copy level only, so `globals.css` still carries section-local px rhythm; prefer a `--space-*` or `--type-*` token when one already matches, and add the missing scale step rather than growing that raw set.
 
 The old short color aliases in the token file are compatibility aliases for the current page selectors. New work should prefer the semantic names below.
 
@@ -29,7 +29,7 @@ The visual system deliberately has no score, streak, dashboard-card, medical, or
 
 The owned mapping is:
 
-- `distant` / `resting` → `--orb-proximity-distant` (moss green), the state's identity color: it renders the halo tint and the hero caption swatch, while the resting orb surfaces shade from `--orb-resting-light` into `--color-pigment-moss-deep`
+- `distant` / `resting` → `--orb-proximity-distant` (moss green), the state's identity color: it renders the hero caption swatch, `--orb-halo-distant` carries the same moss hue at low alpha for the halo, and the resting orb surfaces shade from `--orb-resting-light` into `--color-pigment-moss-deep`
 - `near` / `approaching` → `--orb-proximity-near` (warm orange)
 - `imminent` / `due` → `--orb-proximity-imminent` (warm red)
 
@@ -47,4 +47,4 @@ Color and motion are supporting cues only. The state must also be communicated b
 
 ## Brand application
 
-Use the required lowercase user-facing spelling **`2m2better`**. Keep invitations concise and permission-based: the selected area can name a gentle reset for the neck, shoulders, hands + wrists, or lower back, but tokens must not introduce posture correction, pain, treatment, productivity guilt, or medical language. Keep the orb compact and expressive; use the local orb shading only for depth, never as a page-wide competitor-like gradient.
+[`BRAND_DIRECTION.md`](BRAND_DIRECTION.md) owns the name and its written form. Keep invitations concise and permission-based: the selected area can name a gentle reset for the neck, shoulders, hands + wrists, or lower back, but tokens must not introduce posture correction, pain, treatment, productivity guilt, or medical language. Keep the orb compact and expressive; use the local orb shading only for depth, never as a page-wide competitor-like gradient.
