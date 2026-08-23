@@ -212,6 +212,9 @@ test("rendered developer-preview section gives one auditable download-then-run c
   assert.match(text, /macOS 14\+/);
   assert.match(text, /Xcode 15\+/);
   assert.match(text, /ask your coding agent to install it for you\./);
+  assert.match(text, /The one-liner downloads the script and then runs it\./);
+  assert.match(text, /stays on disk afterward, so you can audit it\./);
+  assert.doesNotMatch(text, /available\s+to inspect/);
   const rawCommand = installer.match(/<pre><code>([\s\S]*?)<\/code><\/pre>/)?.[1] ?? "";
   const command = rawCommand.replace(/&amp;/g, "&").replace(/&quot;/g, '"');
   assert.equal(command.split("\n").length, 1, "the CTA must be one pasteable shell command");

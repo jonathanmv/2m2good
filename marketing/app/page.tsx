@@ -485,9 +485,10 @@ export default function Home() {
                 Copy this into your terminal, or ask your coding agent to install it for you.
               </p>
               <p className="command-note">
-                The script downloads before it runs, so the exact file is available
-                to inspect. This unsigned developer preview has no notarization,
-                hosted artifact, or automatic updates.
+                The one-liner downloads the script and then runs it. The exact file
+                it ran stays on disk afterward, so you can audit it. This unsigned
+                developer preview has no notarization, hosted artifact, or automatic
+                updates.
               </p>
             </div>
           </div>
