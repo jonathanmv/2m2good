@@ -109,18 +109,27 @@ function cssRules(styles) {
   return rules;
 }
 
-function ruleFor(rules, selector, condition) {
-  const rule = rules.find(({ selectors, conditions }) =>
+const REDUCED_MOTION = /prefers-reduced-motion\s*:\s*reduce/;
+
+function rulesFor(rules, selector, condition) {
+  return rules.filter(({ selectors, conditions }) =>
     selectors.includes(selector) &&
     (condition
       ? conditions.some((entry) => condition.test(entry))
       : conditions.length === 0),
   );
-  assert.ok(
-    rule,
-    `expected built CSS rule for ${selector}${condition ? ` under ${condition}` : " outside any media query"}`,
+}
+
+function declarationFor(rules, selector, property, condition) {
+  const declaring = rulesFor(rules, selector, condition).filter(({ declarations }) =>
+    declarations.has(property),
   );
-  return rule;
+  const context = condition ? ` under ${condition}` : " outside any media query";
+  assert.ok(
+    declaring.length > 0,
+    `expected built CSS to declare ${property} on ${selector}${context}`,
+  );
+  return declaring.at(-1).declarations.get(property);
 }
 
 function tokenFrom(value) {
@@ -234,36 +243,47 @@ test("built landing regions resolve their rendered styles through design tokens"
     [".installer-inner", "padding-block"],
     [".command-card", "border-radius"],
   ]) {
-    const declaration = ruleFor(rules, selector).declarations.get(property);
-    const token = tokenFrom(declaration ?? "");
+    const token = tokenFrom(declarationFor(rules, selector, property));
     assert.ok(root.has(token), `${selector} must resolve a declared token`);
   }
 
-  const approaching = ruleFor(rules, ".orb-state-approaching").declarations;
-  assert.equal(approaching.get("--orb-surface"), "var(--orb-surface-near)");
-  assert.equal(approaching.get("--orb-shadow"), "var(--orb-shadow-near)");
+  assert.equal(
+    declarationFor(rules, ".orb-state-approaching", "--orb-surface"),
+    "var(--orb-surface-near)",
+  );
+  assert.equal(
+    declarationFor(rules, ".orb-state-approaching", "--orb-shadow"),
+    "var(--orb-shadow-near)",
+  );
   assert.ok(root.has("--orb-surface-near"));
   assert.ok(root.has("--orb-shadow-near"));
 
-  const reducedMotion = ruleFor(
-    rules,
-    "*",
-    /prefers-reduced-motion\s*:\s*reduce/,
-  ).declarations;
-  assert.equal(reducedMotion.get("animation-duration"), "var(--motion-reduced-duration)!important");
+  assert.equal(
+    declarationFor(rules, "*", "animation-duration", REDUCED_MOTION),
+    "var(--motion-reduced-duration)!important",
+  );
   assert.ok(root.has("--motion-reduced-duration"));
-  assert.ok(
-    !ruleFor(rules, "*").declarations.has("animation-duration"),
-    "the animation override must stay inside the reduced-motion query",
+  assert.deepEqual(
+    rules
+      .filter(
+        ({ selectors, declarations, conditions }) =>
+          selectors.includes("*") &&
+          declarations.has("animation-duration") &&
+          !conditions.some((entry) => REDUCED_MOTION.test(entry)),
+      )
+      .map(({ conditions }) => conditions.join(" ") || "top level"),
+    [],
+    "every global animation-duration override must stay inside the reduced-motion query",
   );
 
   const compact = /max-width\s*:\s*560px|width\s*<=\s*560px/;
   for (const [selector, property] of [
     [".nav-action", "font-size"],
     [".area-row", "grid-template-columns"],
+    [".checkin-window", "padding"],
+    [".command-card", "padding"],
   ]) {
-    const declaration = ruleFor(rules, selector, compact).declarations.get(property);
-    const token = tokenFrom(declaration ?? "");
+    const token = tokenFrom(declarationFor(rules, selector, property, compact));
     assert.ok(root.has(token), `compact ${selector} must resolve a declared token`);
   }
 });
@@ -275,17 +295,22 @@ test("orb and area fallback are present in the built visual output", async () =>
   assert.match(html, /aria-live="polite"/);
   assert.match(html, /area-fallback/);
 
-  const assetDir = new URL("../dist/client/assets/", import.meta.url);
-  const styles = (
-    await Promise.all(
-      (await readdir(assetDir))
-        .filter((name) => name.endsWith(".css"))
-        .map((name) => readFile(new URL(name, assetDir), "utf8")),
-    )
-  ).join("\n");
-  assert.match(styles, /prefers-reduced-motion/);
-  assert.match(styles, /area-fallback/);
-  assert.match(styles, /orb-state-approaching/);
+  const rules = cssRules(await builtStyles());
+
+  assert.equal(declarationFor(rules, ".area-fallback", "display"), "none");
+  assert.equal(
+    declarationFor(rules, ".area-fallback", "display", REDUCED_MOTION),
+    "block",
+  );
+  assert.equal(declarationFor(rules, ".area-word", "animation", REDUCED_MOTION), "none");
+  assert.equal(
+    declarationFor(rules, ".orb-state-approaching", "--orb-halo"),
+    "var(--orb-halo-near)",
+  );
+  assert.equal(
+    declarationFor(rules, ".orb-halo", "animation", REDUCED_MOTION),
+    "none!important",
+  );
 });
 
 test("declared og:image dimensions match the shipped image bytes", async () => {

@@ -17,7 +17,8 @@ The old short color aliases in the token file are legacy compatibility aliases t
 | `--color-content-signal`, `--color-content-signal-soft` | the single warm invitation/signal family |
 | `--color-border-subtle`, `--border-quiet`, `--border-on-dark` | quiet structure, never dashboard-like card chrome |
 | `--font-body`, `--font-display`, `--type-*` | sans-serif interface copy and editorial display copy |
-| `--space-*` and `--layout-*` | page gutters, section rhythm, exact region dimensions, reading/card widths, responsive geometry, and orb-stage bounds |
+| `--space-*` | page gutters, section rhythm, and every padding, margin, and gap role, including their compact-breakpoint variants |
+| `--layout-*` | exact region dimensions, reading/card widths, responsive geometry, and orb-stage bounds |
 | `--border-faint`, `--border-card`, `--border-control`, `--border-orbit-path`, `--border-chip` | the exact hairline alphas the existing sections established, so tokenizing a border never shifts its weight |
 | `--radius-*` | pill actions, compact controls, soft cards, and the organic orb stage |
 | `--shadow-*` | restrained separation for the orb, check-in, preview card, and actions |

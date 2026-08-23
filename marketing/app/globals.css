@@ -1398,19 +1398,16 @@ h3 {
   }
 
   .checkin-window {
-    padding: var(--layout-checkin-window-compact-padding-block) var(--layout-checkin-window-compact-padding-inline);
+    padding: var(--space-checkin-window-compact-padding-block) var(--space-checkin-window-compact-padding-inline);
+    transform: none;
   }
 
   .demo-card {
-    padding: var(--layout-demo-card-compact-padding-block) var(--layout-demo-card-compact-padding-inline);
+    padding: var(--space-demo-card-compact-padding-block) var(--space-demo-card-compact-padding-inline);
   }
 
   .command-card {
-    padding: var(--layout-command-card-compact-padding-block) var(--layout-command-card-compact-padding-inline);
-  }
-
-  .checkin-window {
-    transform: none;
+    padding: var(--space-command-card-compact-padding-block) var(--space-command-card-compact-padding-inline);
   }
 
   .window-top,

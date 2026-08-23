@@ -216,6 +216,8 @@
   --space-area-row-active: 12px;
   --space-checkin-grid-gap: 110px;
   --space-checkin-window-padding: 34px;
+  --space-checkin-window-compact-padding-block: 24px;
+  --space-checkin-window-compact-padding-inline: 20px;
   --space-window-top-gap: 18px;
   --space-window-copy-gap: 5px;
   --space-choice-stack-top: 30px;
@@ -229,6 +231,8 @@
   --space-demo-step-marker-gap: 12px;
   --space-demo-control-inline: 15px;
   --space-demo-card-padding: 31px;
+  --space-demo-card-compact-padding-block: 24px;
+  --space-demo-card-compact-padding-inline: 20px;
   --space-demo-card-top-padding-bottom: 26px;
   --space-demo-label-padding-block: 7px;
   --space-demo-label-padding-inline: 10px;
@@ -258,6 +262,8 @@
   --space-requirements-gap: 11px;
   --space-requirement-indent: 19px;
   --space-command-card-padding: 26px;
+  --space-command-card-compact-padding-block: 24px;
+  --space-command-card-compact-padding-inline: 20px;
   --space-command-heading-gap: 14px;
   --space-command-pre-top: 22px;
   --space-command-pre-padding: 21px;
@@ -368,12 +374,6 @@
   --layout-stage-ring-line-start: 69px;
   --layout-stage-ring-line-end: 70px;
   --layout-progress-caption-scale-mobile: 0.9;
-  --layout-checkin-window-compact-padding-block: 24px;
-  --layout-checkin-window-compact-padding-inline: 20px;
-  --layout-demo-card-compact-padding-block: 24px;
-  --layout-demo-card-compact-padding-inline: 20px;
-  --layout-command-card-compact-padding-block: 24px;
-  --layout-command-card-compact-padding-inline: 20px;
   --layout-demo-orb-compact-size: 56px;
   --layout-privacy-orbit-compact-min-height: 320px;
   --layout-privacy-orbit-compact-outer-size: 280px;
