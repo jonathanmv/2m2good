@@ -49,7 +49,7 @@ test("server-rendered page exposes the area promise, sequence, and safe product 
   const html = await response.text();
   const text = renderedText(html);
   assert.match(html, /<title>2m2better · A little room to move<\/title>/i);
-  const brandSpellings = text.match(/2m2better/gi) ?? [];
+  const brandSpellings = html.match(/2m2better/gi) ?? [];
   assert.ok(brandSpellings.length > 0, "expected the canonical product name in rendered output");
   assert.ok(
     brandSpellings.every((spelling) => spelling === "2m2better"),

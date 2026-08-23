@@ -296,12 +296,12 @@ assert_contains "$output" 'Built without launching'
 renamed="$test_root/renamed-preview"
 open_log="$test_root/open-log.txt"
 output=$(PREVIEW_TEST_GIT_STUB_REPO="$test_root/stub-repo" \
-    PREVIEW_TEST_APP_BUNDLE_NAME=2m2better.app \
+    PREVIEW_TEST_APP_BUNDLE_NAME=Renamed.app \
     PREVIEW_TEST_OPEN_LOG="$open_log" \
     run_installer --confirm --destination "$renamed" 2>&1) || \
     fail_test "post-build run with a renamed bundle failed: $output"
-assert_contains "$output" "$renamed/.build/app/2m2better.app"
-[ "$(cat "$open_log")" = "$renamed/.build/app/2m2better.app" ] || \
+assert_contains "$output" "$renamed/.build/app/Renamed.app"
+[ "$(cat "$open_log")" = "$renamed/.build/app/Renamed.app" ] || \
     fail_test "installer launched the wrong path: $(cat "$open_log")"
 
 renamed_executable="$test_root/renamed-executable-preview"
