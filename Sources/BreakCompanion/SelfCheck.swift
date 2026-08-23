@@ -14,7 +14,7 @@ enum SelfCheck {
         checkPointer(&failures)
 
         if failures.isEmpty {
-            print("Self-check passed: 2M2Better standing session composition, body-area selection, first-run and menu-bar configuration, legacy migration, supportive wording, recent-shown persistence, focus balance, voice variants, completion dismissal, progress color, and pointer movement.")
+            print("Self-check passed: 2m2better standing session composition, body-area selection, first-run and menu-bar configuration, legacy migration, supportive wording, recent-shown persistence, focus balance, voice variants, completion dismissal, progress color, and pointer movement.")
             return true
         }
 

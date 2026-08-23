@@ -7,7 +7,7 @@
 # intended to be auditable when run through curl.
 set -eu
 
-SCRIPT_NAME="2m2good preview installer"
+SCRIPT_NAME="2m2better preview installer"
 DEFAULT_REPOSITORY="https://github.com/jonathanmv/2m2good.git"
 DEFAULT_REF="main"
 
@@ -27,7 +27,7 @@ fail_after_destination() {
 
 usage() {
     cat <<'EOF'
-2m2good early developer-preview installer
+2m2better early developer-preview installer
 
 Usage:
   install-preview.sh [options]
@@ -221,7 +221,7 @@ if [ -d "$destination_parent" ] && [ ! -w "$destination_parent" ]; then
     fail "destination parent is not writable: $destination_parent (sudo is not used)"
 fi
 
-printf '\n%s\n' '2m2good EARLY DEVELOPER PREVIEW'
+printf '\n%s\n' '2m2better EARLY DEVELOPER PREVIEW'
 printf '%s\n' 'This is a source checkout and local build, not a consumer release installer.'
 printf '%s\n' 'Review these values before continuing:'
 printf '  Repository:       %s\n' "$repository"

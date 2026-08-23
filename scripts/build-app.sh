@@ -3,7 +3,7 @@ set -euo pipefail
 
 project_dir="${0:A:h:h}"
 build_dir="$project_dir/.build/app"
-app_dir="$build_dir/2M2Better.app"
+app_dir="$build_dir/2m2better.app"
 contents_dir="$app_dir/Contents"
 macos_dir="$contents_dir/MacOS"
 module_cache="$project_dir/.build/manual-module-cache"

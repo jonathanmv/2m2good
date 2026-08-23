@@ -1,8 +1,8 @@
-# 2M2Better — Brand Direction
+# 2m2better — Brand Direction
 
 ## The idea
 
-2M2Better is a desktop companion that helps people take a short, body-supporting break before long computer sessions turn into stiffness, fatigue, or disconnection.
+2m2better is a desktop companion that helps people take a short, body-supporting break before long computer sessions turn into stiffness, fatigue, or disconnection.
 
 Its promise is deliberately small: two minutes is enough to reset without losing the thread of the work.
 
@@ -10,7 +10,7 @@ This is not a productivity coach. Better work can be a welcome outcome, but the 
 
 ## What the name means
 
-**2M2Better** means two minutes toward feeling good again: a small return to the body, not a demand to improve oneself.
+**2m2better** means two minutes toward feeling good again: a small return to the body, not a demand to improve oneself.
 
 The two-minute limit exists to protect flow. A person should not have to negotiate with themselves about an elaborate routine, a context switch, or a lost train of thought. The break is short enough to say yes to.
 
@@ -18,7 +18,7 @@ Do not frame the name through the "two-minute rule," Atomic Habits, habit-stacki
 
 ### Written form
 
-Marketing surfaces write the name all lowercase as **2m2better**; `marketing/tests/rendered-html.test.mjs` fails if the rendered landing page contains any other casing. The macOS app keeps `2M2Better` in its bundle name, `Info.plist` strings, and in-app labels, and repository paths and internal identifiers are unchanged.
+Every user-facing surface writes the name all lowercase as **2m2better**, including the macOS app bundle, `Info.plist` strings, in-app labels, and marketing surfaces. Repository paths and internal identifiers are unchanged.
 
 ## Product character
 
@@ -100,4 +100,4 @@ Every new feature, screen, routine, campaign, and piece of copy should pass thes
 4. Does it serve wellbeing before productivity?
 5. Does it still make sense if the product remains only a two-minute desktop companion?
 
-If the answer is no, it is probably outside 2M2Better.
+If the answer is no, it is probably outside 2m2better.

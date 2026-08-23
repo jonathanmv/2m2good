@@ -49,6 +49,12 @@ test("server-rendered page exposes the area promise, sequence, and safe product 
   const html = await response.text();
   const text = renderedText(html);
   assert.match(html, /<title>2m2better · A little room to move<\/title>/i);
+  const brandSpellings = text.match(/2m2better/gi) ?? [];
+  assert.ok(brandSpellings.length > 0, "expected the canonical product name in rendered output");
+  assert.ok(
+    brandSpellings.every((spelling) => spelling === "2m2better"),
+    "the product name must be lowercase in rendered output",
+  );
   assert.match(text, /Give your body a little room to move, then come back to your day\./);
   assert.match(text, /2 mins to better your neck\s*\./);
   for (const area of ["Neck", "Shoulders", "Hands + wrists", "Lower back"]) {
@@ -64,7 +70,7 @@ test("server-rendered page exposes the area promise, sequence, and safe product 
     /standing-only|six (?:gentle )?movements|20-second|two minutes, exactly|posture correction|pain relief|prevent RSI|productivity guilt/i,
   );
   assert.doesNotMatch(text, /<input|<form|pricing|testimonial|subscribe|sign in/i);
-  assert.doesNotMatch(text, /2M2Better|2mintogood/);
+  assert.doesNotMatch(text, /2mintogood/);
 });
 
 test("rendered demo exposes a click-only, bounded, accessible flow", async () => {
