@@ -150,10 +150,14 @@ enum SelfCheck {
             selectedAreas: [.neck]
         ) {
             let neckIDs = Set(MoveLibrary.all.filter { $0.bodyAreas.contains(.neck) }.map(\.id))
-            if Set(neckFollowUp.moveIDs).isDisjoint(with: neckIDs),
-               neckFollowUp.title.lowercased().contains("neck")
-                   || neckFollowUp.invitation.lowercased().contains("neck") {
+            let carried = Set(neckFollowUp.moveIDs).intersection(neckIDs)
+            let announcesNeck = neckFollowUp.title.lowercased().contains("neck")
+                || neckFollowUp.invitation.lowercased().contains("neck")
+            if carried.isEmpty, announcesNeck {
                 failures.append("a session should not announce an area it carries no movements for")
+            }
+            if carried.count < 3 {
+                failures.append("a follow-up session should keep the selected-area quota")
             }
         }
         for move in MoveLibrary.all {

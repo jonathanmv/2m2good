@@ -324,6 +324,33 @@ enum MoveLibrary {
             supportsStanding: true
         ),
         .init(
+            id: "ear-to-shoulder-lean",
+            title: "Ear-to-shoulder lean",
+            instruction: "Let one ear travel a small amount toward that shoulder, return to center, then change sides. Keep it comfortable.",
+            focuses: [.neckShoulders],
+            bodyAreas: [.neck],
+            motion: .sideToSide,
+            supportsStanding: true
+        ),
+        .init(
+            id: "chin-nods",
+            title: "Small chin nods",
+            instruction: "Nod your chin down a little, then let your head come back level. Keep the range small and easy.",
+            focuses: [.neckShoulders],
+            bodyAreas: [.neck],
+            motion: .breathe,
+            supportsStanding: true
+        ),
+        .init(
+            id: "neck-lengthen",
+            title: "Gentle neck lengthening",
+            instruction: "Let the top of your head float a little taller while your shoulders settle and stay easy.",
+            focuses: [.neckShoulders, .upperBackPosture],
+            bodyAreas: [.neck, .shoulders],
+            motion: .rise,
+            supportsStanding: true
+        ),
+        .init(
             id: "reach-and-release",
             title: "Reach and release",
             instruction: "Reach both hands forward without rounding hard, then let your arms fall loose.",

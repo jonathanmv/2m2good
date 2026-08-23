@@ -239,16 +239,21 @@ final class BreakCompanionTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let taggedNeckMoves = MoveLibrary.all.filter { $0.bodyAreas.contains(.neck) }
-        XCTAssertLessThan(taggedNeckMoves.count, SessionComposer.sessionMoveCount)
+        let scarceLibrary = (1...2).map { makeMove("neck-\($0)", [.neckShoulders], bodyAreas: [.neck]) }
+            + (1...12).map { makeMove("other-\($0)", [.breathRelaxation]) }
+        XCTAssertLessThan(
+            scarceLibrary.filter { $0.bodyAreas.contains(.neck) }.count,
+            SessionComposer.sessionMoveCount
+        )
 
         let store = SessionSelectionStore(defaults: defaults)
-        let current = store.suggestion(from: MoveLibrary.all, selectedAreas: [.neck])!
-        let next = store.nextSession(after: current, from: MoveLibrary.all, selectedAreas: [.neck])!
+        let current = store.suggestion(from: scarceLibrary, selectedAreas: [.neck])!
+        let next = store.nextSession(after: current, from: scarceLibrary, selectedAreas: [.neck])!
 
         XCTAssertTrue(Set(current.moveIDs).isDisjoint(with: next.moveIDs))
         XCTAssertEqual(Set(next.moveIDs).count, SessionComposer.sessionMoveCount)
         XCTAssertEqual(next.duration, 120)
+        XCTAssertEqual(next.title, "Standing reset")
     }
 
     func testFollowUpSessionOnlyClaimsAnAreaItStillCarriesMovesFor() {
@@ -262,12 +267,21 @@ final class BreakCompanionTests: XCTestCase {
         let current = store.suggestion(from: MoveLibrary.all, selectedAreas: [.neck])!
         XCTAssertEqual(current.title, "Neck standing reset")
 
-        let next = store.nextSession(after: current, from: MoveLibrary.all, selectedAreas: [.neck])!
-        XCTAssertTrue(Set(next.moveIDs).isDisjoint(with: neckIDs))
-        XCTAssertEqual(next.title, "Standing reset")
-        XCTAssertFalse(next.invitation.lowercased().contains("neck"))
-        XCTAssertTrue(next.invitation.lowercased().contains("stand"))
-        XCTAssertEqual(next.duration, 120)
+        var session = current
+        for round in 1...4 {
+            session = store.nextSession(after: session, from: MoveLibrary.all, selectedAreas: [.neck])!
+            let carried = Set(session.moveIDs).intersection(neckIDs)
+            XCTAssertGreaterThanOrEqual(carried.count, 3, "round \(round)")
+            XCTAssertEqual(session.title.contains("Neck"), !carried.isEmpty, "round \(round)")
+            XCTAssertEqual(
+                session.invitation.lowercased().contains("neck"),
+                !carried.isEmpty,
+                "round \(round)"
+            )
+            XCTAssertTrue(session.invitation.lowercased().contains("stand"))
+            XCTAssertEqual(Set(session.moveIDs).count, SessionComposer.sessionMoveCount)
+            XCTAssertEqual(session.duration, 120)
+        }
     }
 
     func testRoutineDropsSelectedAreasThatTheComposedMovesDoNotCover() {
