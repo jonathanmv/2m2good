@@ -4,7 +4,7 @@ The marketing site uses a small, body-aware token system rather than a generic w
 
 ## Source of truth
 
-All raw marketing values live in [`marketing/app/design-tokens.css`](../marketing/app/design-tokens.css). `marketing/app/globals.css` imports that file and consumes its roles. New landing-page sections should use semantic variables from the token file; do not introduce one-off hex, rgba, spacing, radius, shadow, or animation values in component styles.
+All raw marketing values live in [`marketing/app/design-tokens.css`](../marketing/app/design-tokens.css). `marketing/app/globals.css` imports that file and consumes its roles. New landing-page sections should use semantic variables from the token file. Color, border, radius, shadow, and motion values are fully tokenized: do not introduce a one-off hex, rgba, radius, shadow, or animation value in component styles. Spacing and type scales are tokenized at the shell and body-copy level only, so `globals.css` still carries section-local px rhythm; prefer a `--space-*` or `--type-*` token when one already matches, and add the missing scale step rather than growing that raw set.
 
 The old short color aliases in the token file are compatibility aliases for the current page selectors. New work should prefer the semantic names below.
 
@@ -39,6 +39,8 @@ Apply a state class plus `orb-surface` to an orb, or put the state class on a wr
   <div className="orb-surface" aria-label="The next reset is still a while away" />
 </div>
 ```
+
+`--orb-shadow-*` is a compact inset shading cue per state, sized for the small orbs. A hero-scale orb overrides `--orb-shadow` with `--shadow-orb-hero` for its extra drop shadow, as `.hero-orb` does.
 
 Color and motion are supporting cues only. The state must also be communicated by visible text, a label, or an explicit control. The reduced-motion rule in `globals.css` stops orb, halo, and blink animation while retaining the same state colors, labels, focus styles, and controls.
 

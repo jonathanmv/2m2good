@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function render() {
@@ -135,4 +135,106 @@ test("marketing token contract owns the landing-page visual vocabulary", async (
   assert.match(page, /orb-state-approaching/);
   assert.match(page, /2m2better/);
   assert.doesNotMatch(page, /2M2Better/);
+});
+
+async function builtStylesheet() {
+  const dir = new URL("../dist/client/assets/", import.meta.url);
+  const sheets = await Promise.all(
+    (await readdir(dir))
+      .filter((name) => name.endsWith(".css"))
+      .map((name) => readFile(new URL(name, dir), "utf8")),
+  );
+  assert.ok(sheets.length > 0, "expected a built CSS bundle");
+  return sheets.join("\n");
+}
+
+function declarationsFor(css, selector) {
+  const declarations = {};
+  for (const [, selectors, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!selectors.split(",").some((one) => one.trim() === selector)) continue;
+    for (const declaration of body.split(";")) {
+      const split = declaration.indexOf(":");
+      if (split > 0) {
+        declarations[declaration.slice(0, split).trim()] = declaration
+          .slice(split + 1)
+          .trim();
+      }
+    }
+  }
+  return declarations;
+}
+
+function resolveValue(value, variables, pending = new Set()) {
+  return value.replace(
+    /var\(\s*(--[\w-]+)\s*(?:,\s*([^()]*(?:\([^()]*\)[^()]*)*))?\)/g,
+    (_match, name, fallback) => {
+      if (pending.has(name)) return "";
+      const next = variables[name] ?? fallback ?? "";
+      return resolveValue(next, variables, new Set([...pending, name]));
+    },
+  );
+}
+
+test("orb state classes resolve to three distinct proximity treatments", async () => {
+  const css = await builtStylesheet();
+  const rootVariables = declarationsFor(css, ":root");
+  const resolved = (selector, property) => {
+    const declared = declarationsFor(css, selector)[property];
+    assert.ok(declared, `${selector} should declare ${property}`);
+    return resolveValue(declared, rootVariables).replace(/\s+/g, " ").trim();
+  };
+
+  assert.ok(declarationsFor(css, ".orb-surface")["box-shadow"]);
+  assert.ok(declarationsFor(css, ".orb-surface").background);
+
+  const shadows = {
+    resting: resolved(".orb-state-resting", "--orb-shadow"),
+    approaching: resolved(".orb-state-approaching", "--orb-shadow"),
+    imminent: resolved(".orb-state-imminent", "--orb-shadow"),
+  };
+  const surfaces = {
+    resting: resolved(".orb-state-resting", "--orb-surface"),
+    approaching: resolved(".orb-state-approaching", "--orb-surface"),
+    imminent: resolved(".orb-state-imminent", "--orb-surface"),
+  };
+
+  for (const group of [shadows, surfaces]) {
+    for (const [state, value] of Object.entries(group)) {
+      assert.doesNotMatch(value, /var\(|^$/, `${state} should fully resolve`);
+    }
+    assert.equal(new Set(Object.values(group)).size, 3);
+  }
+
+  for (const [state, shadow] of Object.entries(shadows)) {
+    assert.match(shadow, /^inset -5px -7px 14px \S+$/, `${state} should stay a compact inset cue`);
+  }
+
+  const heroShadow = resolveValue(
+    declarationsFor(css, ".hero-orb")["--orb-shadow"],
+    rootVariables,
+  ).replace(/\s+/g, " ").trim();
+  assert.match(heroShadow, /^inset -10px -14px 25px \S+, 0 24px 45px \S+$/);
+});
+
+test("every rendered orb consumes the shared surface and an owned state", async () => {
+  const html = await (await render()).text();
+  const orbs = [...html.matchAll(/class="([^"]*)"/g)]
+    .map(([, value]) => value.split(/\s+/))
+    .filter((classes) => classes.some((one) => /^[a-z]+-orb$/.test(one)));
+
+  assert.deepEqual(
+    orbs.map((classes) => classes.find((one) => /^[a-z]+-orb$/.test(one))).sort(),
+    ["closing-orb", "dialog-orb", "hero-orb", "mini-orb", "privacy-orb"],
+  );
+  for (const classes of orbs) {
+    assert.ok(
+      classes.includes("orb-surface"),
+      `${classes.join(" ")} should consume the shared orb surface`,
+    );
+  }
+
+  const stateClasses = new Set(
+    [...html.matchAll(/orb-state-[a-z]+/g)].map(([one]) => one),
+  );
+  assert.deepEqual([...stateClasses].sort(), ["orb-state-approaching", "orb-state-resting"]);
 });

@@ -265,6 +265,7 @@ h1 {
   align-items: center;
   justify-content: center;
   gap: 19px;
+  --orb-shadow: var(--shadow-orb-hero);
   animation: orb-breathe var(--motion-duration-orb) var(--motion-ease-gentle) infinite;
   z-index: 2;
 }
@@ -407,8 +408,6 @@ h1 {
   justify-content: center;
   align-items: center;
   gap: var(--space-2);
-  background: var(--orb-surface, var(--orb-surface-near));
-  box-shadow: var(--orb-shadow, var(--orb-shadow-near));
 }
 
 .mini-orb {
@@ -806,8 +805,6 @@ h1 {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: var(--orb-surface, var(--orb-surface-distant));
-  box-shadow: var(--orb-shadow, var(--orb-shadow-distant));
 }
 
 .dialog-orb i {

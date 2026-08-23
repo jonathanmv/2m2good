@@ -112,7 +112,7 @@ export default function Home() {
 
           <div className="checkin-window" aria-label="Example break check-in">
             <div className="window-top">
-              <div className="mini-orb orb-state-approaching" aria-hidden="true">
+              <div className="mini-orb orb-surface orb-state-approaching" aria-hidden="true">
                 <i />
                 <i />
               </div>
@@ -204,7 +204,7 @@ export default function Home() {
 
       <section className="privacy shell" id="privacy">
         <div className="privacy-orbit" aria-hidden="true">
-          <div className="privacy-orb orb-state-resting">
+          <div className="privacy-orb orb-surface orb-state-resting">
             <i />
             <i />
           </div>
@@ -226,7 +226,7 @@ export default function Home() {
 
       <section className="closing">
         <div className="shell closing-inner">
-          <div className="closing-orb orb-state-resting" aria-hidden="true">
+          <div className="closing-orb orb-surface orb-state-resting" aria-hidden="true">
             <i />
             <i />
           </div>
@@ -270,7 +270,7 @@ export default function Home() {
           >
             <span aria-hidden="true">×</span>
           </button>
-          <div className="dialog-orb orb-state-resting" aria-hidden="true">
+          <div className="dialog-orb orb-surface orb-state-resting" aria-hidden="true">
             <i />
             <i />
           </div>
