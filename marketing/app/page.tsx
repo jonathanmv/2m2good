@@ -13,9 +13,7 @@ const BREAK_PROMPT = "Ready for a gentle reset?";
 const PREVIEW_SECONDS = 12;
 const CUE_SECONDS = PREVIEW_SECONDS / AREAS.length;
 const LAST_CUE_INDEX = AREAS.length - 1;
-const INSTALL_COMMAND = `curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install-preview.sh -o install-preview.sh
-cat install-preview.sh
-sh install-preview.sh --ref main --destination "$HOME/2m2good-developer-preview"`;
+const INSTALL_COMMAND = `curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install-preview.sh -o install-preview.sh && sh install-preview.sh --ref main --destination "$HOME/2m2good-developer-preview"`;
 
 type OrbState = "resting" | "approaching" | "due";
 type DemoState = "ready" | "active" | "paused" | "done";
@@ -464,9 +462,9 @@ export default function Home() {
               <p className="eyebrow">Early developer preview</p>
               <h2 id="installer-title">See the source. Build the companion.</h2>
               <p>
-                This is not a signed consumer download. The public installer
-                checks out the source and builds a local app for macOS 14 or
-                newer.
+                This is an unsigned developer preview, not a consumer download.
+                The public installer checks out the source and builds a local app
+                for macOS 14 or newer.
               </p>
               <ul className="requirements">
                 <li>macOS 14+ on arm64 or x86_64</li>
@@ -484,11 +482,13 @@ export default function Home() {
                 {copyStatus}
               </button>
               <p className="copy-invite" aria-live="polite">
-                Copy this into your terminal, or ask your agent to install it for you.
+                Copy this into your terminal, or ask your coding agent to install it for you.
               </p>
               <p className="command-note">
-                Inspect the downloaded script first. It is a developer preview with
-                no signing, notarization, hosted artifact, or automatic updates.
+                The one-liner downloads the script and then runs it. The exact file
+                it ran stays on disk afterward, so you can audit it. This unsigned
+                developer preview has no notarization, hosted artifact, or automatic
+                updates.
               </p>
             </div>
           </div>
