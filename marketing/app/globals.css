@@ -771,7 +771,7 @@ h3 {
   align-items: center;
   gap: var(--space-demo-status-gap);
   color: var(--color-content-secondary);
-  font-size: var(--type-stage-strong-size);
+  font-size: var(--type-demo-status-size);
   font-weight: var(--type-weight-link);
 }
 
@@ -829,7 +829,7 @@ h3 {
 .demo-time {
   min-width: var(--layout-demo-time-min-width);
   color: var(--color-content-secondary);
-  font-size: var(--type-stage-strong-size);
+  font-size: var(--type-demo-time-size);
   font-variant-numeric: tabular-nums;
 }
 
@@ -854,8 +854,8 @@ h3 {
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--color-content-primary);
-  font-size: var(--type-stage-strong-size);
-  font-weight: var(--type-weight-wordmark);
+  font-size: var(--type-demo-control-size);
+  font-weight: var(--type-weight-demo-control);
 }
 
 .button-demo-control:disabled,
@@ -978,7 +978,7 @@ h3 {
   border-radius: var(--radius-pill);
   color: var(--color-content-accent);
   font-size: var(--type-caption-size);
-  font-weight: var(--type-weight-wordmark);
+  font-weight: var(--type-weight-privacy-note);
 }
 
 .installer {
@@ -1058,7 +1058,7 @@ h3 {
   background: var(--color-alpha-ink-18);
   color: var(--color-content-on-dark-strong);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: var(--type-stage-strong-size);
+  font-size: var(--type-command-size);
   line-height: var(--type-command-leading);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -1072,7 +1072,7 @@ h3 {
   border-radius: var(--radius-pill);
   background: var(--color-content-signal-soft);
   color: var(--color-content-primary);
-  font-size: var(--type-stage-strong-size);
+  font-size: var(--type-copy-button-size);
   font-weight: var(--type-weight-label);
 }
 
@@ -1084,7 +1084,7 @@ h3 {
   margin: var(--space-copy-invite-top) 0 0;
   color: var(--color-surface-raised);
   font-size: var(--type-support-size);
-  font-weight: var(--type-weight-wordmark);
+  font-weight: var(--type-weight-copy-invite);
   line-height: var(--type-requirements-leading);
 }
 
@@ -1285,7 +1285,7 @@ h3 {
   }
 
   .nav-action {
-    font-size: var(--type-stage-strong-size);
+    font-size: var(--type-navigation-compact-size);
   }
 
   .nav-action span {
@@ -1388,7 +1388,7 @@ h3 {
 
   .area-row > span:last-child {
     grid-column: 2;
-    font-size: var(--type-stage-strong-size);
+    font-size: var(--type-area-note-compact-size);
   }
 
   .checkin-window,

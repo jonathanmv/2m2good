@@ -118,6 +118,13 @@
   --type-micro-size: 9px;
   --type-index-size: 10px;
   --type-stage-strong-size: 12px;
+  --type-demo-status-size: 12px;
+  --type-demo-time-size: 12px;
+  --type-demo-control-size: 12px;
+  --type-command-size: 12px;
+  --type-copy-button-size: 12px;
+  --type-navigation-compact-size: 12px;
+  --type-area-note-compact-size: 12px;
   --type-area-promise-size: clamp(31px, 3.5vw, 48px);
   --type-area-promise-leading: 1;
   --type-area-promise-tracking: -0.045em;
@@ -144,6 +151,9 @@
   --type-weight-display: 400;
   --type-weight-wordmark: 700;
   --type-weight-wordmark-digit: 500;
+  --type-weight-demo-control: 700;
+  --type-weight-privacy-note: 700;
+  --type-weight-copy-invite: 700;
   --type-weight-label: 750;
   --type-weight-navigation: 600;
   --type-weight-action: 750;

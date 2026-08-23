@@ -52,8 +52,10 @@ async function builtStyles() {
   ).join("\n");
 }
 
+const CONDITIONAL_AT_RULE = /^@(?:media|supports|container)\b/;
+
 function cssRules(styles) {
-  const source = styles.replace(/\/\*[\\s\\S]*?\*\//g, "");
+  const source = styles.replace(/\/\*[\s\S]*?\*\//g, "");
   const rules = [];
 
   function matchingBrace(open) {
@@ -68,7 +70,7 @@ function cssRules(styles) {
     throw new Error("unterminated CSS block");
   }
 
-  function scan(start, end) {
+  function scan(start, end, conditions) {
     let cursor = start;
     while (cursor < end) {
       const open = source.indexOf("{", cursor);
@@ -78,7 +80,11 @@ function cssRules(styles) {
       const header = source.slice(cursor, open).trim();
       const body = source.slice(open + 1, close);
       if (body.includes("{")) {
-        scan(open + 1, close);
+        scan(
+          open + 1,
+          close,
+          CONDITIONAL_AT_RULE.test(header) ? [...conditions, header] : conditions,
+        );
       } else if (header && !header.startsWith("@")) {
         const declarations = new Map();
         for (const declaration of body.split(";")) {
@@ -92,19 +98,28 @@ function cssRules(styles) {
         rules.push({
           selectors: header.split(",").map((selector) => selector.trim()),
           declarations,
+          conditions,
         });
       }
       cursor = close + 1;
     }
   }
 
-  scan(0, source.length);
+  scan(0, source.length, []);
   return rules;
 }
 
-function ruleFor(rules, selector) {
-  const rule = rules.find(({ selectors }) => selectors.includes(selector));
-  assert.ok(rule, `expected built CSS rule for ${selector}`);
+function ruleFor(rules, selector, condition) {
+  const rule = rules.find(({ selectors, conditions }) =>
+    selectors.includes(selector) &&
+    (condition
+      ? conditions.some((entry) => condition.test(entry))
+      : conditions.length === 0),
+  );
+  assert.ok(
+    rule,
+    `expected built CSS rule for ${selector}${condition ? ` under ${condition}` : " outside any media query"}`,
+  );
   return rule;
 }
 
@@ -196,13 +211,19 @@ test("built landing regions resolve their rendered styles through design tokens"
   const html = await response.text();
   const styles = await builtStyles();
   const rules = cssRules(styles);
-  const root = rules.find(({ selectors, declarations }) =>
-    selectors.includes(":root") && declarations.has("--type-display-size"),
+  const root = rules.find(({ selectors, declarations, conditions }) =>
+    conditions.length === 0 &&
+    selectors.includes(":root") &&
+    declarations.has("--type-display-size"),
   )?.declarations;
   assert.ok(root, "expected marketing design tokens in the built CSS");
 
   for (const className of ["hero", "areas-grid", "area-row", "demo-card", "installer-inner", "command-card"]) {
-    assert.match(html, new RegExp(`class="[^\"]*\\b${className}\\b`));
+    assert.match(
+      html,
+      new RegExp(`class="(?:[^"]*\\s)?${className}(?=\\s|")`),
+      `expected the ${className} region in the rendered page`,
+    );
   }
 
   for (const [selector, property] of [
@@ -224,13 +245,27 @@ test("built landing regions resolve their rendered styles through design tokens"
   assert.ok(root.has("--orb-surface-near"));
   assert.ok(root.has("--orb-shadow-near"));
 
-  const reducedMotion = rules.find(
-    ({ selectors, declarations }) =>
-      selectors.includes("*") && declarations.has("animation-duration"),
-  )?.declarations;
-  assert.ok(reducedMotion, "expected reduced-motion animation contract in built CSS");
+  const reducedMotion = ruleFor(
+    rules,
+    "*",
+    /prefers-reduced-motion\s*:\s*reduce/,
+  ).declarations;
   assert.equal(reducedMotion.get("animation-duration"), "var(--motion-reduced-duration)!important");
   assert.ok(root.has("--motion-reduced-duration"));
+  assert.ok(
+    !ruleFor(rules, "*").declarations.has("animation-duration"),
+    "the animation override must stay inside the reduced-motion query",
+  );
+
+  const compact = /max-width\s*:\s*560px|width\s*<=\s*560px/;
+  for (const [selector, property] of [
+    [".nav-action", "font-size"],
+    [".area-row", "grid-template-columns"],
+  ]) {
+    const declaration = ruleFor(rules, selector, compact).declarations.get(property);
+    const token = tokenFrom(declaration ?? "");
+    assert.ok(root.has(token), `compact ${selector} must resolve a declared token`);
+  }
 });
 
 test("orb and area fallback are present in the built visual output", async () => {
