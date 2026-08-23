@@ -40,8 +40,10 @@ curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/ins
 For a deliberately non-interactive invocation, add `--confirm` only after
 reviewing the printed plan. `--no-launch` builds without opening the app.
 `--repo URL` accepts an HTTPS Git repository, and `--ref REF` accepts a branch,
-tag, or hexadecimal commit revision. The selected ref is shown before the
-checkout; a moving branch is not an integrity guarantee.
+tag, or full 40-character commit SHA. An abbreviated SHA is rejected before the
+destination is created, because Git can only ask a remote for a complete object
+id. The selected ref is shown before the checkout; a moving branch is not an
+integrity guarantee.
 
 The installer refuses an existing destination, including a symlink, and never
 clones into an existing checkout. It may create missing parent directories,
@@ -81,8 +83,8 @@ BREAK_SDK_PATH=/path/to/MacOSX.sdk \
 ## What happens after confirmation
 
 1. The installer creates the new destination exclusively.
-2. It performs a shallow `git clone` of the displayed repository and ref. An
-   exact hexadecimal revision is fetched and detached separately.
+2. It performs a shallow `git clone` of the displayed repository and ref. A
+   full 40-character commit SHA is fetched and detached separately.
 3. It runs `(cd <destination> && ./scripts/build-app.sh)`.
 4. It verifies `<destination>/.build/app/2m2good.app` and, unless `--no-launch`
    was selected, runs `open` on that path.

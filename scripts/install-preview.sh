@@ -25,8 +25,8 @@ Usage:
 
 Options:
   --repo URL          HTTPS Git repository (default: the public 2m2good repo)
-  --ref REF           Branch, tag, or commit revision (default: main)
-  --destination DIR  New checkout directory (default: ~/2m2good-developer-preview)
+  --ref REF           Branch, tag, or full 40-character commit SHA (default: main)
+  --destination DIR   New checkout directory (default: ~/2m2good-developer-preview)
   --no-launch         Build the app but do not ask macOS to open it
   --dry-run           Validate, print the plan, and make no changes or network requests
   --confirm           Skip the interactive confirmation after printing the plan
@@ -56,7 +56,7 @@ while [ "$#" -gt 0 ]; do
             shift 2
             ;;
         --ref)
-            [ "$#" -ge 2 ] || fail "--ref requires a branch, tag, or commit revision."
+            [ "$#" -ge 2 ] || fail "--ref requires a branch, tag, or full 40-character commit SHA."
             ref=$2
             shift 2
             ;;
@@ -106,12 +106,22 @@ case "$repository" in
 esac
 
 # Keep the ref printable and prevent it from becoming another option. This
-# covers normal Git branch/tag names and hexadecimal abbreviated/full commits.
+# covers normal Git branch/tag names and full hexadecimal commit SHAs.
 case "$ref" in
     ""|-*|*[!A-Za-z0-9._/+@-]*)
-        fail "ref must be a non-empty branch, tag, or hexadecimal commit revision without spaces or shell punctuation."
+        fail "ref must be a non-empty branch, tag, or full 40-character commit SHA without spaces or shell punctuation."
         ;;
 esac
+
+# Classify the ref before anything is created. Git can only ask a remote for a
+# complete object id, so an abbreviated SHA has to be rejected here rather than
+# after the destination exists.
+ref_is_revision=0
+if printf '%s\n' "$ref" | grep -Eq '^[0-9a-fA-F]{40}$'; then
+    ref_is_revision=1
+elif printf '%s\n' "$ref" | grep -Eq '^[0-9a-fA-F]{7,39}$'; then
+    fail "abbreviated commit SHAs cannot be fetched; pass the full 40-character commit SHA, or a branch or tag name. No files or network requests were made."
+fi
 
 case "$destination" in
     /*) ;;
@@ -200,10 +210,6 @@ if [ -d "$destination_parent" ] && [ ! -w "$destination_parent" ]; then
     fail "destination parent is not writable: $destination_parent (sudo is not used)"
 fi
 
-ref_is_revision=0
-if printf '%s\n' "$ref" | grep -Eq '^[0-9a-fA-F]{7,40}$'; then
-    ref_is_revision=1
-fi
 app_path="$destination/.build/app/2m2good.app"
 
 printf '\n%s\n' '2m2good EARLY DEVELOPER PREVIEW'

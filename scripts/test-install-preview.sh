@@ -113,6 +113,18 @@ if output=$(run_installer --dry-run --ref 'feature with spaces' --destination "$
 fi
 assert_contains "$output" 'ref must be a non-empty branch'
 
+if output=$(run_installer --dry-run --ref d0ee7e55 --destination "$test_root/abbrev-ref" 2>&1); then
+    fail_test 'abbreviated commit SHA unexpectedly succeeded'
+fi
+assert_contains "$output" 'abbreviated commit SHAs cannot be fetched'
+[ ! -e "$test_root/abbrev-ref" ] || fail_test 'abbreviated ref rejection created a destination'
+
+full_sha=d0ee7e5574877a042f83bf480c51db083d5eb32e
+sha_output=$(run_installer --dry-run --ref "$full_sha" --destination "$test_root/full-sha" 2>&1)
+assert_contains "$sha_output" "$full_sha"
+assert_contains "$sha_output" 'Dry run complete'
+[ ! -e "$test_root/full-sha" ] || fail_test 'full-SHA dry run created a destination'
+
 existing="$test_root/existing-checkout"
 mkdir "$existing"
 printf '%s\n' 'leave this uncommitted marker alone' > "$existing/marker.txt"
