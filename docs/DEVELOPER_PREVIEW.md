@@ -92,9 +92,10 @@ BREAK_SDK_PATH=/path/to/MacOSX.sdk \
 ## What happens after confirmation
 
 1. The installer creates the new destination exclusively.
-2. It performs a shallow `git clone` of the displayed repository and ref. A
-   full 40-character commit SHA is fetched and detached separately; any other
-   ref is cloned directly as a branch or tag.
+2. It obtains the displayed repository and ref shallowly. A branch or tag is
+   cloned directly. A full 40-character commit SHA is fetched into a new empty
+   repository and checked out detached, so exactly that commit is downloaded and
+   the remote's default branch does not have to be available.
 3. It runs `(cd <destination> && ./scripts/build-app.sh)`.
 4. It takes the app bundle path from that script's own output, verifies the
    bundle it names, and, unless `--no-launch` was selected, runs `open` on that
@@ -115,8 +116,12 @@ behavior remain visible so the user can inspect them directly.
 ## Safe installer checks
 
 The shell harness uses temporary directories, fake prerequisite commands, and
-installer dry runs. Its fake Git refuses clone/build operations; it never
-changes a home directory or an existing checkout:
+installer dry runs. It never reaches the network, changes a home directory, or
+touches an existing checkout: its fake Git either refuses a checkout or copies a
+local stub checkout whose stub build script only creates a directory, and its
+fake `open` records the path it was given instead of launching anything. That
+stub covers the post-build path, including a renamed app bundle and product
+executable, a build that produces no bundle, and the full-SHA fetch:
 
 ```sh
 ./scripts/test-install-preview.sh

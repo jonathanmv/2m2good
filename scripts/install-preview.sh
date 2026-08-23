@@ -60,17 +60,17 @@ confirm=0
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --repo)
-            [ "$#" -ge 2 ] || fail "--repo requires an HTTPS repository URL."
+            [ "$#" -ge 2 ] && [ -n "$2" ] || fail "--repo requires a non-empty HTTPS repository URL."
             repository=$2
             shift 2
             ;;
         --ref)
-            [ "$#" -ge 2 ] || fail "--ref requires a branch, tag, or full 40-character commit SHA."
+            [ "$#" -ge 2 ] && [ -n "$2" ] || fail "--ref requires a non-empty branch, tag, or full 40-character commit SHA."
             ref=$2
             shift 2
             ;;
         --destination)
-            [ "$#" -ge 2 ] || fail "--destination requires a directory path."
+            [ "$#" -ge 2 ] && [ -n "$2" ] || fail "--destination requires a non-empty directory path."
             destination=$2
             shift 2
             ;;
@@ -269,11 +269,9 @@ fi
 
 printf '%s\n' 'Fetching source...'
 if [ "$ref_is_revision" -eq 1 ]; then
-    if ! GIT_TERMINAL_PROMPT=0 git clone --depth 1 --no-single-branch -- "$repository" "$destination"; then
-        fail_after_destination "source checkout failed."
-    fi
-    if ! (cd "$destination" && GIT_TERMINAL_PROMPT=0 git fetch --depth 1 origin "$ref" && git checkout --detach FETCH_HEAD); then
-        fail_after_destination "revision '$ref' could not be fetched or checked out."
+    if ! (cd "$destination" && git init --quiet . && git remote add origin "$repository" && \
+        GIT_TERMINAL_PROMPT=0 git fetch --depth 1 origin "$ref" && git checkout --detach FETCH_HEAD); then
+        fail_after_destination "revision '$ref' could not be fetched or checked out; Git reported the cause above."
     fi
 else
     if ! GIT_TERMINAL_PROMPT=0 git clone --depth 1 --branch "$ref" -- "$repository" "$destination"; then
@@ -303,8 +301,17 @@ case "$app_path" in
     /*) ;;
     *) fail "scripts/build-app.sh did not report an absolute app bundle path (got '$app_path'); destination left intact: $destination" ;;
 esac
-[ -x "$app_path/Contents/MacOS/BreakCompanion" ] || \
-    fail "build did not produce the expected app: $app_path"
+[ -d "$app_path/Contents/MacOS" ] || \
+    fail "build did not produce the expected app bundle: $app_path"
+bundle_executable=
+for candidate in "$app_path"/Contents/MacOS/*; do
+    if [ -f "$candidate" ] && [ -x "$candidate" ]; then
+        bundle_executable=$candidate
+        break
+    fi
+done
+[ -n "$bundle_executable" ] || \
+    fail "the reported app bundle contains no executable in Contents/MacOS: $app_path"
 printf 'Built app bundle: %s\n' "$app_path"
 
 if [ "$launch" -eq 1 ]; then

@@ -27,14 +27,14 @@ fail_test() {
 assert_contains() {
     haystack=$1
     needle=$2
-    printf '%s\n' "$haystack" | grep -Fq "$needle" || \
+    printf '%s\n' "$haystack" | grep -Fq -e "$needle" || \
         fail_test "expected output to contain: $needle"
 }
 
 assert_lacks() {
     haystack=$1
     needle=$2
-    if printf '%s\n' "$haystack" | grep -Fq "$needle"; then
+    if printf '%s\n' "$haystack" | grep -Fq -e "$needle"; then
         fail_test "expected output not to contain: $needle"
     fi
 }
@@ -54,6 +54,7 @@ printf '%s\n' "${PREVIEW_TEST_MACOS_VERSION:-14.0}"
 EOF
 cat > "$fake_bin/git" <<'EOF'
 #!/bin/sh
+[ -z "${PREVIEW_TEST_GIT_LOG:-}" ] || printf '%s\n' "$*" >> "$PREVIEW_TEST_GIT_LOG"
 if [ "${1:-}" = "--version" ]; then
     printf 'git version %s\n' "${PREVIEW_TEST_GIT_VERSION:-2.48.1}"
     exit 0
@@ -62,10 +63,25 @@ if [ "${1:-}" = "-C" ] && [ "${3:-}" = "rev-parse" ]; then
     printf '%s\n' "${PREVIEW_TEST_GIT_REVISION:-d0ee7e5574877a042f83bf480c51db083d5eb32e}"
     exit 0
 fi
-if [ "${1:-}" = "clone" ] && [ -n "${PREVIEW_TEST_GIT_STUB_REPO:-}" ]; then
-    for argument in "$@"; do clone_target=$argument; done
-    cp -R "$PREVIEW_TEST_GIT_STUB_REPO/." "$clone_target/"
-    exit 0
+if [ -n "${PREVIEW_TEST_GIT_STUB_REPO:-}" ]; then
+    case "${1:-}" in
+        clone)
+            for argument in "$@"; do clone_target=$argument; done
+            cp -R "$PREVIEW_TEST_GIT_STUB_REPO/." "$clone_target/"
+            exit 0
+            ;;
+        init)
+            mkdir -p .git
+            exit 0
+            ;;
+        remote|fetch)
+            exit 0
+            ;;
+        checkout)
+            cp -R "$PREVIEW_TEST_GIT_STUB_REPO/." .
+            exit 0
+            ;;
+    esac
 fi
 if [ "${1:-}" = "clone" ] && [ -n "${PREVIEW_TEST_GIT_PARTIAL_CLONE:-}" ]; then
     for argument in "$@"; do clone_target=$argument; done
@@ -115,10 +131,11 @@ cat > "$stub_repo/build-app.sh" <<'EOF'
 set -eu
 project_dir=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
 app_dir="$project_dir/.build/app/${PREVIEW_TEST_APP_BUNDLE_NAME:-2M2Better.app}"
+executable="$app_dir/Contents/MacOS/${PREVIEW_TEST_APP_EXECUTABLE_NAME:-BreakCompanion}"
 if [ -z "${PREVIEW_TEST_BUILD_PRODUCES_NOTHING:-}" ]; then
     mkdir -p "$app_dir/Contents/MacOS"
-    printf '#!/bin/sh\nexit 0\n' > "$app_dir/Contents/MacOS/BreakCompanion"
-    chmod +x "$app_dir/Contents/MacOS/BreakCompanion"
+    printf '#!/bin/sh\nexit 0\n' > "$executable"
+    chmod +x "$executable"
 fi
 printf '%s\n' "$app_dir"
 EOF
@@ -152,6 +169,16 @@ if output=$(run_installer --dry-run --unknown-option 2>&1); then
     fail_test 'unknown option unexpectedly succeeded'
 fi
 assert_contains "$output" "unknown option '--unknown-option'"
+
+for empty_option in --repo --ref --destination; do
+    if output=$(run_installer --dry-run "$empty_option" "" --destination "$test_root/empty-value" 2>&1); then
+        fail_test "empty $empty_option value unexpectedly succeeded"
+    fi
+    assert_contains "$output" "$empty_option requires a non-empty"
+done
+[ ! -e "$test_root/home/2m2good-developer-preview" ] || \
+    fail_test 'an empty --destination fell back to the home default'
+[ ! -e "$test_root/empty-value" ] || fail_test 'an empty option value created a destination'
 
 if output=$(run_installer --dry-run --repo "file:///tmp/repository" 2>&1); then
     fail_test 'non-HTTPS repository unexpectedly succeeded'
@@ -252,6 +279,26 @@ output=$(PREVIEW_TEST_GIT_STUB_REPO="$test_root/stub-repo" \
 assert_contains "$output" "$renamed/.build/app/2m2better.app"
 [ "$(cat "$open_log")" = "$renamed/.build/app/2m2better.app" ] || \
     fail_test "installer launched the wrong path: $(cat "$open_log")"
+
+renamed_executable="$test_root/renamed-executable-preview"
+output=$(PREVIEW_TEST_GIT_STUB_REPO="$test_root/stub-repo" \
+    PREVIEW_TEST_APP_BUNDLE_NAME=2m2better.app \
+    PREVIEW_TEST_APP_EXECUTABLE_NAME=2m2better \
+    run_installer --confirm --no-launch --destination "$renamed_executable" 2>&1) || \
+    fail_test "post-build run with a renamed product executable failed: $output"
+assert_contains "$output" "$renamed_executable/.build/app/2m2better.app"
+
+# The full-SHA path must fetch only the requested commit, never clone a default
+# branch first.
+revision="$test_root/revision-preview"
+git_log="$test_root/git-log.txt"
+output=$(PREVIEW_TEST_GIT_STUB_REPO="$test_root/stub-repo" \
+    PREVIEW_TEST_GIT_LOG="$git_log" \
+    run_installer --confirm --no-launch --ref "$full_sha" --destination "$revision" 2>&1) || \
+    fail_test "full-SHA post-build run failed: $output"
+assert_contains "$output" "$revision/.build/app/2M2Better.app"
+assert_contains "$(cat "$git_log")" "fetch --depth 1 origin $full_sha"
+assert_lacks "$(cat "$git_log")" 'clone'
 
 missing="$test_root/missing-bundle-preview"
 if output=$(PREVIEW_TEST_GIT_STUB_REPO="$test_root/stub-repo" \
