@@ -16,6 +16,15 @@ fail() {
     exit 1
 }
 
+# Only ever removes the destination this run created while it is still empty:
+# rmdir refuses a non-empty directory, so any partial checkout is preserved.
+fail_after_destination() {
+    if rmdir "$destination" 2>/dev/null; then
+        fail "$1 The destination was still empty and was removed, so the same path can be reused: $destination"
+    fi
+    fail "$1 What was already written was left intact for inspection: $destination"
+}
+
 usage() {
     cat <<'EOF'
 2m2good early developer-preview installer
@@ -113,14 +122,15 @@ case "$ref" in
         ;;
 esac
 
-# Classify the ref before anything is created. Git can only ask a remote for a
-# complete object id, so an abbreviated SHA has to be rejected here rather than
-# after the destination exists.
+# Only a complete object id can be requested from a remote, so exactly one
+# spelling takes the exact-revision path. Every other name, including one that
+# merely looks hexadecimal, is resolved as a branch or tag.
 ref_is_revision=0
+ref_is_abbreviated_hex=0
 if printf '%s\n' "$ref" | grep -Eq '^[0-9a-fA-F]{40}$'; then
     ref_is_revision=1
 elif printf '%s\n' "$ref" | grep -Eq '^[0-9a-fA-F]{7,39}$'; then
-    fail "abbreviated commit SHAs cannot be fetched; pass the full 40-character commit SHA, or a branch or tag name. No files or network requests were made."
+    ref_is_abbreviated_hex=1
 fi
 
 case "$destination" in
@@ -261,14 +271,17 @@ fi
 printf '%s\n' 'Fetching source...'
 if [ "$ref_is_revision" -eq 1 ]; then
     if ! GIT_TERMINAL_PROMPT=0 git clone --depth 1 --no-single-branch -- "$repository" "$destination"; then
-        fail "source checkout failed. The new partial destination was left intact for inspection: $destination"
+        fail_after_destination "source checkout failed."
     fi
     if ! (cd "$destination" && GIT_TERMINAL_PROMPT=0 git fetch --depth 1 origin "$ref" && git checkout --detach FETCH_HEAD); then
-        fail "revision '$ref' could not be fetched or checked out. The destination was left intact: $destination"
+        fail_after_destination "revision '$ref' could not be fetched or checked out."
     fi
 else
     if ! GIT_TERMINAL_PROMPT=0 git clone --depth 1 --branch "$ref" -- "$repository" "$destination"; then
-        fail "source checkout for ref '$ref' failed. The new partial destination was left intact for inspection: $destination"
+        if [ "$ref_is_abbreviated_hex" -eq 1 ]; then
+            fail_after_destination "ref '$ref' is not a branch or tag on this remote; an abbreviated commit SHA cannot be fetched, so pass the full 40-character commit SHA instead."
+        fi
+        fail_after_destination "source checkout for ref '$ref' failed."
     fi
 fi
 

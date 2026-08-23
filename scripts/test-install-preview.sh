@@ -47,6 +47,12 @@ if [ "${1:-}" = "--version" ]; then
     printf 'git version %s\n' "${PREVIEW_TEST_GIT_VERSION:-2.48.1}"
     exit 0
 fi
+if [ "${1:-}" = "clone" ] && [ -n "${PREVIEW_TEST_GIT_PARTIAL_CLONE:-}" ]; then
+    for argument in "$@"; do clone_target=$argument; done
+    printf 'partial checkout\n' > "$clone_target/partial-marker.txt"
+    printf 'fake git: clone interrupted after writing\n' >&2
+    exit 1
+fi
 printf 'fake git: unexpected network or checkout operation\n' >&2
 exit 97
 EOF
@@ -113,17 +119,41 @@ if output=$(run_installer --dry-run --ref 'feature with spaces' --destination "$
 fi
 assert_contains "$output" 'ref must be a non-empty branch'
 
-if output=$(run_installer --dry-run --ref d0ee7e55 --destination "$test_root/abbrev-ref" 2>&1); then
-    fail_test 'abbreviated commit SHA unexpectedly succeeded'
-fi
-assert_contains "$output" 'abbreviated commit SHAs cannot be fetched'
-[ ! -e "$test_root/abbrev-ref" ] || fail_test 'abbreviated ref rejection created a destination'
+hex_tag_output=$(run_installer --dry-run --ref 20250823 --destination "$test_root/hex-tag" 2>&1) || \
+    fail_test "hex-shaped branch/tag ref was rejected: $hex_tag_output"
+assert_contains "$hex_tag_output" '20250823'
+assert_contains "$hex_tag_output" 'Dry run complete'
+[ ! -e "$test_root/hex-tag" ] || fail_test 'hex-shaped ref dry run created a destination'
 
 full_sha=d0ee7e5574877a042f83bf480c51db083d5eb32e
-sha_output=$(run_installer --dry-run --ref "$full_sha" --destination "$test_root/full-sha" 2>&1)
+sha_output=$(run_installer --dry-run --ref "$full_sha" --destination "$test_root/full-sha" 2>&1) || \
+    fail_test "full-SHA ref was rejected: $sha_output"
 assert_contains "$sha_output" "$full_sha"
 assert_contains "$sha_output" 'Dry run complete'
 [ ! -e "$test_root/full-sha" ] || fail_test 'full-SHA dry run created a destination'
+
+# The fake git refuses to clone, so these exercise the post-destination
+# checkout-failure path without any network access or real checkout.
+if output=$(run_installer --confirm --no-launch --ref beef1234 --destination "$test_root/abbrev-clone" 2>&1); then
+    fail_test 'refused clone unexpectedly succeeded'
+fi
+assert_contains "$output" "ref 'beef1234' is not a branch or tag on this remote"
+assert_contains "$output" 'full 40-character commit SHA'
+[ ! -e "$test_root/abbrev-clone" ] || fail_test 'empty destination survived a failed checkout'
+
+if output=$(run_installer --confirm --no-launch --ref main --destination "$test_root/branch-clone" 2>&1); then
+    fail_test 'refused branch clone unexpectedly succeeded'
+fi
+assert_contains "$output" "source checkout for ref 'main' failed"
+[ ! -e "$test_root/branch-clone" ] || fail_test 'empty destination survived a failed branch checkout'
+
+partial="$test_root/partial-clone"
+if output=$(PREVIEW_TEST_GIT_PARTIAL_CLONE=1 run_installer --confirm --no-launch --destination "$partial" 2>&1); then
+    fail_test 'partial clone unexpectedly succeeded'
+fi
+assert_contains "$output" 'left intact for inspection'
+[ "$(cat "$partial/partial-marker.txt")" = 'partial checkout' ] || \
+    fail_test 'partial checkout was not preserved'
 
 existing="$test_root/existing-checkout"
 mkdir "$existing"

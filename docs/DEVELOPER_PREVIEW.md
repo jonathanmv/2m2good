@@ -40,17 +40,22 @@ curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/ins
 For a deliberately non-interactive invocation, add `--confirm` only after
 reviewing the printed plan. `--no-launch` builds without opening the app.
 `--repo URL` accepts an HTTPS Git repository, and `--ref REF` accepts a branch,
-tag, or full 40-character commit SHA. An abbreviated SHA is rejected before the
-destination is created, because Git can only ask a remote for a complete object
-id. The selected ref is shown before the checkout; a moving branch is not an
-integrity guarantee.
+tag, or full 40-character commit SHA. Only a full 40-character SHA is treated as
+an exact commit revision, because a remote can only be asked for a complete
+object id; every other value, including a branch or tag whose name happens to
+look hexadecimal, is resolved as a branch or tag. An abbreviated SHA is
+therefore reported as an unknown branch or tag, with a request for the full
+40-character SHA. The selected ref is shown before the checkout; a moving branch
+is not an integrity guarantee.
 
 The installer refuses an existing destination, including a symlink, and never
 clones into an existing checkout. It may create missing parent directories,
 but it does not use `sudo`, ask for credentials, overwrite files, remove files,
 write to `/Applications`, install a login item, or add an update service. A
 failed checkout or build is left in place for inspection rather than being
-silently deleted. Choose a new destination for a retry.
+silently deleted; only a destination that this run created and left completely
+empty is removed, so the same path can be reused after a checkout that wrote
+nothing.
 
 ## Requirements
 
@@ -84,7 +89,8 @@ BREAK_SDK_PATH=/path/to/MacOSX.sdk \
 
 1. The installer creates the new destination exclusively.
 2. It performs a shallow `git clone` of the displayed repository and ref. A
-   full 40-character commit SHA is fetched and detached separately.
+   full 40-character commit SHA is fetched and detached separately; any other
+   ref is cloned directly as a branch or tag.
 3. It runs `(cd <destination> && ./scripts/build-app.sh)`.
 4. It verifies `<destination>/.build/app/2m2good.app` and, unless `--no-launch`
    was selected, runs `open` on that path.
