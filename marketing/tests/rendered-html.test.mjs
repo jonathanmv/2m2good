@@ -148,9 +148,39 @@ async function builtStylesheet() {
   return sheets.join("\n");
 }
 
+function unconditionalRules(css) {
+  const rules = [];
+  const walk = (source) => {
+    let index = 0;
+    while (index < source.length) {
+      const open = source.indexOf("{", index);
+      if (open < 0) return;
+      const prelude = source.slice(index, open).trim();
+      let depth = 0;
+      let close = open;
+      for (; close < source.length; close += 1) {
+        if (source[close] === "{") depth += 1;
+        else if (source[close] === "}") {
+          depth -= 1;
+          if (depth === 0) break;
+        }
+      }
+      const body = source.slice(open + 1, close);
+      if (prelude.startsWith("@")) {
+        if (/@layer[^;]*$/.test(prelude)) walk(body);
+      } else {
+        rules.push([prelude, body]);
+      }
+      index = close + 1;
+    }
+  };
+  walk(css);
+  return rules;
+}
+
 function declarationsFor(css, selector) {
   const declarations = {};
-  for (const [, selectors, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+  for (const [selectors, body] of unconditionalRules(css)) {
     if (!selectors.split(",").some((one) => one.trim() === selector)) continue;
     for (const declaration of body.split(";")) {
       const split = declaration.indexOf(":");
@@ -164,38 +194,61 @@ function declarationsFor(css, selector) {
   return declarations;
 }
 
-function resolveValue(value, variables, pending = new Set()) {
+function substitute(value, declared, inherited, pending = new Set()) {
   return value.replace(
     /var\(\s*(--[\w-]+)\s*(?:,\s*([^()]*(?:\([^()]*\)[^()]*)*))?\)/g,
     (_match, name, fallback) => {
       if (pending.has(name)) return "";
-      const next = variables[name] ?? fallback ?? "";
-      return resolveValue(next, variables, new Set([...pending, name]));
+      const next = new Set([...pending, name]);
+      if (name in declared) return substitute(declared[name], declared, inherited, next);
+      if (name in inherited) return inherited[name];
+      return fallback ? substitute(fallback, declared, inherited, next) : "";
     },
   );
 }
 
+function rootScope(css) {
+  const declared = declarationsFor(css, ":root");
+  return Object.fromEntries(
+    Object.entries(declared).map(([name, value]) => [
+      name,
+      substitute(value, declared, {}),
+    ]),
+  );
+}
+
+function computedOn(css, selectors, property, inherited) {
+  const declared = Object.assign(
+    {},
+    ...selectors.map((selector) => declarationsFor(css, selector)),
+  );
+  assert.ok(
+    property in declared,
+    `${selectors.join(" ")} should declare ${property}`,
+  );
+  return substitute(declared[property], declared, inherited)
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 test("orb state classes resolve to three distinct proximity treatments", async () => {
   const css = await builtStylesheet();
-  const rootVariables = declarationsFor(css, ":root");
-  const resolved = (selector, property) => {
-    const declared = declarationsFor(css, selector)[property];
-    assert.ok(declared, `${selector} should declare ${property}`);
-    return resolveValue(declared, rootVariables).replace(/\s+/g, " ").trim();
-  };
+  const root = rootScope(css);
 
   assert.ok(declarationsFor(css, ".orb-surface")["box-shadow"]);
   assert.ok(declarationsFor(css, ".orb-surface").background);
 
+  const forState = (state, property) =>
+    computedOn(css, [`.orb-state-${state}`], property, root);
   const shadows = {
-    resting: resolved(".orb-state-resting", "--orb-shadow"),
-    approaching: resolved(".orb-state-approaching", "--orb-shadow"),
-    imminent: resolved(".orb-state-imminent", "--orb-shadow"),
+    resting: forState("resting", "--orb-shadow"),
+    approaching: forState("approaching", "--orb-shadow"),
+    imminent: forState("imminent", "--orb-shadow"),
   };
   const surfaces = {
-    resting: resolved(".orb-state-resting", "--orb-surface"),
-    approaching: resolved(".orb-state-approaching", "--orb-surface"),
-    imminent: resolved(".orb-state-imminent", "--orb-surface"),
+    resting: forState("resting", "--orb-surface"),
+    approaching: forState("approaching", "--orb-surface"),
+    imminent: forState("imminent", "--orb-surface"),
   };
 
   for (const group of [shadows, surfaces]) {
@@ -209,10 +262,7 @@ test("orb state classes resolve to three distinct proximity treatments", async (
     assert.match(shadow, /^inset -5px -7px 14px \S.*$/, `${state} should stay a compact inset cue`);
   }
 
-  const heroShadow = resolveValue(
-    declarationsFor(css, ".hero-orb")["--orb-shadow"],
-    rootVariables,
-  ).replace(/\s+/g, " ").trim();
+  const heroShadow = computedOn(css, [".hero-orb"], "--orb-shadow", root);
   assert.match(heroShadow, /^inset -10px -14px 25px .+, 0 24px 45px .+$/);
 });
 
@@ -241,15 +291,9 @@ test("every rendered orb consumes the shared surface and an owned state", async 
 
 test("each resting orb keeps its own established depth", async () => {
   const css = await builtStylesheet();
-  const scope = (selector) => ({
-    ...declarationsFor(css, ":root"),
-    ...declarationsFor(css, ".orb-state-resting"),
-    ...declarationsFor(css, selector),
-  });
-  const effective = (selector, property) => {
-    const variables = scope(selector);
-    return resolveValue(variables[property], variables).replace(/\s+/g, " ").trim();
-  };
+  const root = rootScope(css);
+  const effective = (selector, property) =>
+    computedOn(css, [".orb-state-resting", selector], property, root);
 
   const orbs = [".hero-orb", ".privacy-orb", ".closing-orb", ".dialog-orb"];
   const surfaces = orbs.map((selector) => effective(selector, "--orb-surface"));

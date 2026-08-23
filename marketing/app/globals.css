@@ -687,8 +687,7 @@ h1 {
 .closing-orb {
   width: 68px;
   height: 68px;
-  --orb-surface-highlight: var(--color-alpha-white-44);
-  --orb-surface-light: var(--orb-resting-light-quiet);
+  --orb-surface: var(--orb-surface-resting-on-signal);
   --orb-shadow: var(--shadow-orb-small);
   margin-bottom: 34px;
 }
@@ -804,8 +803,7 @@ h1 {
 .dialog-orb {
   width: 58px;
   height: 58px;
-  --orb-surface-highlight: var(--color-alpha-white-46);
-  --orb-surface-light: var(--orb-resting-light-quiet);
+  --orb-surface: var(--orb-surface-resting-in-dialog);
   margin-bottom: 32px;
   border-radius: var(--radius-orb);
   display: flex;

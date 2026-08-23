@@ -41,7 +41,7 @@ Apply a state class plus `orb-surface` to an orb, or put the state class on a wr
 </div>
 ```
 
-`--orb-shadow-*` is a compact inset shading cue per state, sized for the small orbs. A section can keep its own established depth without leaving the token system: override `--orb-surface-highlight` and `--orb-surface-light` to tune the resting sheen and light stop, and `--orb-shadow` to pick a different shading token. The hero orb does this with `--orb-surface-hero` and `--shadow-orb-hero` for its deeper multi-stop gradient and drop shadow.
+`--orb-shadow-*` is a compact inset shading cue per state, sized for the small orbs. A section that needs its own depth assigns a different complete token on the orb element itself - `--orb-surface: var(--orb-surface-hero)` plus `--orb-shadow: var(--shadow-orb-hero)` on `.hero-orb`, `--orb-surface-resting-on-signal` on `.closing-orb`, `--orb-surface-resting-in-dialog` on `.dialog-orb`. Assign a whole surface or shadow token; do not expect a `:root` token to read a variable set later on the element, because custom properties are substituted where they are declared.
 
 Color and motion are supporting cues only. The state must also be communicated by visible text, a label, or an explicit control. The reduced-motion rule in `globals.css` stops orb, halo, and blink animation while retaining the same state colors, labels, focus styles, and controls.
 
