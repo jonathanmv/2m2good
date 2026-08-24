@@ -63,6 +63,15 @@ struct LocalActivitySignal: Equatable {
         )
     }
 
+    static func currentWorkActivity() -> LocalActivitySignal {
+        LocalActivitySignal(
+            keyboardIdle: secondsSinceLastEvent(.keyDown),
+            mouseMovementIdle: secondsSinceLastEvent(.mouseMoved),
+            mouseClickIdle: .infinity,
+            scrollWheelIdle: .infinity
+        )
+    }
+
     private static func secondsSinceLastEvent(_ eventType: CGEventType) -> TimeInterval {
         CGEventSource.secondsSinceLastEventType(
             .combinedSessionState,

@@ -290,7 +290,7 @@ final class CompanionStore: ObservableObject {
     }
 
     private var userIsActive: Bool {
-        let signal = LocalActivitySignal.current()
+        let signal = LocalActivitySignal.currentWorkActivity()
         return signal.workActivityIdle < idleThreshold
     }
 
