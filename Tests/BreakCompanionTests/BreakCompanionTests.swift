@@ -429,16 +429,13 @@ final class BreakCompanionTests: XCTestCase {
             defaults: defaults
         )
         store.continueWithBalancedDefaults()
-        // The detector protection window is measured from the wall clock inside the store, so
-        // anchor the injected poll times to the same reference.
-        let now = Date()
-        store.startRoutine(at: now.addingTimeInterval(-6), activitySignal: activitySignal(30, 30))
-        store.noteCompanionInteraction()
+        store.startRoutine(at: referenceDate(0), activitySignal: activitySignal(30, 30))
+        store.noteCompanionInteraction(at: referenceDate(6))
 
         XCTAssertEqual(
             store.evaluateRoutineActivity(
                 signal: activitySignal(0.2, 0.2),
-                at: now.addingTimeInterval(1)
+                at: referenceDate(7)
             ),
             .companionInteraction
         )
@@ -447,8 +444,57 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertEqual(
             store.evaluateRoutineActivity(
                 signal: activitySignal(0.2, 0.2),
-                at: now.addingTimeInterval(4)
+                at: referenceDate(10)
             ),
+            .resumedWork
+        )
+        XCTAssertEqual(store.mode, .checkIn)
+    }
+
+    @MainActor
+    func testNextRestartsActivityDetectionForTheNewRoutine() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults
+        )
+        store.continueWithBalancedDefaults()
+        store.startRoutine(at: referenceDate(0), activitySignal: activitySignal(60, 60))
+        // Spend the first routine's whole companion-protection budget.
+        for poll in stride(from: 1.0, through: 30.0, by: 1.0) {
+            store.noteCompanionInteraction(at: referenceDate(poll))
+        }
+
+        let previousRoutine = store.routine
+        store.nextRoutine(at: referenceDate(30), activitySignal: activitySignal(90, 0.2))
+        XCTAssertNotEqual(store.routine, previousRoutine)
+
+        // Settling into the new routine is covered by its own grace period.
+        XCTAssertEqual(
+            store.evaluateRoutineActivity(signal: activitySignal(91, 0.3), at: referenceDate(31)),
+            .noNewActivity
+        )
+        XCTAssertEqual(
+            store.evaluateRoutineActivity(signal: activitySignal(92, 0.4), at: referenceDate(32)),
+            .initialGracePeriod
+        )
+        XCTAssertEqual(store.mode, .routine)
+
+        // The new routine also gets its own protection budget.
+        store.noteCompanionInteraction(at: referenceDate(36))
+        XCTAssertEqual(
+            store.evaluateRoutineActivity(signal: activitySignal(96, 0.3), at: referenceDate(37)),
+            .companionInteraction
+        )
+        XCTAssertEqual(store.mode, .routine)
+        XCTAssertEqual(store.stepIndex, 0)
+
+        XCTAssertEqual(
+            store.evaluateRoutineActivity(signal: activitySignal(100, 0.3), at: referenceDate(41)),
             .resumedWork
         )
         XCTAssertEqual(store.mode, .checkIn)

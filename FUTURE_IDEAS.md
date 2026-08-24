@@ -8,7 +8,8 @@ protection after companion controls prevent the companion’s own Start, Pause,
 Resume, Next, and End interactions from immediately cancelling a routine. That
 protection is also granted by hovering a routine control or opening the
 menu-bar menu, and is capped at thirty seconds per routine so it can never be
-renewed indefinitely. Input that keeps going while a sample is protected still
+renewed indefinitely. Next starts a brand-new routine, so detection restarts
+with it: a fresh grace period and a fresh protection budget. Input that keeps going while a sample is protected still
 qualifies once the protection ends, because activity inside the last polling
 second counts as well as a drop in the aggregate age. Keyboard evidence
 qualifies at once; pointer evidence must hold on two consecutive polls, so

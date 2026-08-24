@@ -530,23 +530,50 @@ enum SelfCheck {
             withIsolatedDefaults("activity-companion-protection") { defaults in
                 let store = CompanionStore(environment: ["BREAK_INTERVAL_SECONDS": "3600"], defaults: defaults)
                 store.continueWithBalancedDefaults()
-                // Companion protection is stamped from the wall clock inside the store, so the
-                // polled instants have to be anchored to the same reference.
-                let now = Date()
-                store.startRoutine(at: now.addingTimeInterval(-6), activitySignal: LocalActivitySignal(keyboardIdle: 30, pointerIdle: 30))
-                store.noteCompanionInteraction()
+                store.startRoutine(at: start, activitySignal: LocalActivitySignal(keyboardIdle: 30, pointerIdle: 30))
+                store.noteCompanionInteraction(at: start.addingTimeInterval(6))
                 if store.evaluateRoutineActivity(
                     signal: LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 0.2),
-                    at: now.addingTimeInterval(1)
+                    at: start.addingTimeInterval(7)
                 ) != .companionInteraction || store.mode != .routine {
                     failures.append("interacting with the companion should not cancel the routine")
                 }
                 if store.evaluateRoutineActivity(
                     signal: LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 0.2),
-                    at: now.addingTimeInterval(4)
+                    at: start.addingTimeInterval(10)
                 ) != .resumedWork || store.mode != .checkIn {
                     failures.append("work resumed after companion protection should recover")
                 }
+            }
+
+            withIsolatedDefaults("activity-next-restart") { defaults in
+                let store = CompanionStore(environment: ["BREAK_INTERVAL_SECONDS": "3600"], defaults: defaults)
+                store.continueWithBalancedDefaults()
+                store.startRoutine(at: start, activitySignal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 60))
+                var poll = 1.0
+                while poll <= 30 {
+                    store.noteCompanionInteraction(at: start.addingTimeInterval(poll))
+                    poll += 1
+                }
+                store.nextRoutine(at: start.addingTimeInterval(30), activitySignal: LocalActivitySignal(keyboardIdle: 90, pointerIdle: 0.2))
+                _ = store.evaluateRoutineActivity(
+                    signal: LocalActivitySignal(keyboardIdle: 91, pointerIdle: 0.3),
+                    at: start.addingTimeInterval(31)
+                )
+                if store.evaluateRoutineActivity(
+                    signal: LocalActivitySignal(keyboardIdle: 92, pointerIdle: 0.4),
+                    at: start.addingTimeInterval(32)
+                ) != .initialGracePeriod || store.mode != .routine {
+                    failures.append("Next should give the new routine its own grace period")
+                }
+                store.noteCompanionInteraction(at: start.addingTimeInterval(36))
+                if store.evaluateRoutineActivity(
+                    signal: LocalActivitySignal(keyboardIdle: 96, pointerIdle: 0.3),
+                    at: start.addingTimeInterval(37)
+                ) != .companionInteraction {
+                    failures.append("Next should give the new routine its own protection budget")
+                }
+                store.endRoutine()
             }
         }
     }

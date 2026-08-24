@@ -173,8 +173,12 @@ final class CompanionStore: ObservableObject {
     /// Called from every interactive surface of the companion itself - its window and its
     /// menu-bar menu - so intentional use of the app is never read as resumed work.
     func noteCompanionInteraction() {
+        noteCompanionInteraction(at: Date())
+    }
+
+    func noteCompanionInteraction(at date: Date) {
         guard mode == .routine else { return }
-        routineActivityDetector.noteCompanionInteraction(at: Date())
+        routineActivityDetector.noteCompanionInteraction(at: date)
     }
 
     func togglePause() {
@@ -185,6 +189,12 @@ final class CompanionStore: ObservableObject {
     }
 
     func nextRoutine() {
+        nextRoutine(at: Date(), activitySignal: activitySignalProvider())
+    }
+
+    /// Next starts a brand-new routine, so activity detection restarts with it: its own
+    /// grace period, its own pointer-persistence state, and its own protection budget.
+    func nextRoutine(at date: Date, activitySignal: LocalActivitySignal) {
         guard mode == .routine,
               let next = sessionSelection.nextSession(
                 after: routine,
@@ -192,13 +202,13 @@ final class CompanionStore: ObservableObject {
                 selectedAreas: selectedAreas
               ) else { return }
 
-        noteCompanionInteraction()
         speaker.stop()
         routine = next
         stepIndex = 0
         elapsedInStep = 0
         isPaused = false
         statusText = nil
+        routineActivityDetector.start(at: date, signal: activitySignal)
         notifySizeChange()
         speaker.speak(currentStep.spokenInstruction)
     }
