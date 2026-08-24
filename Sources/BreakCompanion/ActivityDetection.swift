@@ -5,18 +5,63 @@ import Foundation
 /// macOS. No event values, locations, applications, or event streams are retained.
 struct LocalActivitySignal: Equatable {
     let keyboardIdle: TimeInterval
-    let pointerIdle: TimeInterval
+    let mouseMovementIdle: TimeInterval
+    let mouseClickIdle: TimeInterval
+    let scrollWheelIdle: TimeInterval
+
+    var pointerIdle: TimeInterval {
+        min(mouseMovementIdle, min(mouseClickIdle, scrollWheelIdle))
+    }
+
+    init(keyboardIdle: TimeInterval, pointerIdle: TimeInterval) {
+        self.init(
+            keyboardIdle: keyboardIdle,
+            mouseMovementIdle: pointerIdle,
+            mouseClickIdle: .infinity,
+            scrollWheelIdle: .infinity
+        )
+    }
+
+    init(
+        keyboardIdle: TimeInterval,
+        mouseMovementIdle: TimeInterval,
+        mouseClickIdle: TimeInterval,
+        scrollWheelIdle: TimeInterval
+    ) {
+        self.keyboardIdle = keyboardIdle
+        self.mouseMovementIdle = mouseMovementIdle
+        self.mouseClickIdle = mouseClickIdle
+        self.scrollWheelIdle = scrollWheelIdle
+    }
 
     static func current() -> LocalActivitySignal {
         LocalActivitySignal(
-            keyboardIdle: CGEventSource.secondsSinceLastEventType(
-                .combinedSessionState,
-                eventType: .keyDown
+            keyboardIdle: secondsSinceLastEvent(.keyDown),
+            mouseMovementIdle: min(
+                secondsSinceLastEvent(.mouseMoved),
+                min(
+                    secondsSinceLastEvent(.leftMouseDragged),
+                    min(
+                        secondsSinceLastEvent(.rightMouseDragged),
+                        secondsSinceLastEvent(.otherMouseDragged)
+                    )
+                )
             ),
-            pointerIdle: CGEventSource.secondsSinceLastEventType(
-                .combinedSessionState,
-                eventType: .mouseMoved
-            )
+            mouseClickIdle: min(
+                secondsSinceLastEvent(.leftMouseDown),
+                min(
+                    secondsSinceLastEvent(.rightMouseDown),
+                    secondsSinceLastEvent(.otherMouseDown)
+                )
+            ),
+            scrollWheelIdle: secondsSinceLastEvent(.scrollWheel)
+        )
+    }
+
+    private static func secondsSinceLastEvent(_ eventType: CGEventType) -> TimeInterval {
+        CGEventSource.secondsSinceLastEventType(
+            .combinedSessionState,
+            eventType: eventType
         )
     }
 

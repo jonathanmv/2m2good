@@ -315,6 +315,54 @@ final class BreakCompanionTests: XCTestCase {
         )
     }
 
+    func testMouseClicksAndScrollsQualifyWithoutPointerMovement() {
+        var clickDetector = RoutineActivityDetector()
+        clickDetector.start(
+            at: referenceDate(100),
+            signal: activitySignal(60, 60, mouseClickIdle: 60, scrollWheelIdle: 60)
+        )
+        XCTAssertEqual(
+            clickDetector.decision(
+                at: referenceDate(110),
+                isPaused: false,
+                signal: activitySignal(70, 70, mouseClickIdle: 0.3, scrollWheelIdle: 70)
+            ),
+            .noNewActivity
+        )
+        XCTAssertEqual(
+            clickDetector.decision(
+                at: referenceDate(111),
+                isPaused: false,
+                signal: activitySignal(71, 71, mouseClickIdle: 0.4, scrollWheelIdle: 71)
+            ),
+            .resumedWork,
+            "A click without pointer movement is resumed work"
+        )
+
+        var scrollDetector = RoutineActivityDetector()
+        scrollDetector.start(
+            at: referenceDate(200),
+            signal: activitySignal(60, 60, mouseClickIdle: 60, scrollWheelIdle: 60)
+        )
+        XCTAssertEqual(
+            scrollDetector.decision(
+                at: referenceDate(210),
+                isPaused: false,
+                signal: activitySignal(70, 70, mouseClickIdle: 70, scrollWheelIdle: 0.3)
+            ),
+            .noNewActivity
+        )
+        XCTAssertEqual(
+            scrollDetector.decision(
+                at: referenceDate(211),
+                isPaused: false,
+                signal: activitySignal(71, 71, mouseClickIdle: 71, scrollWheelIdle: 0.4)
+            ),
+            .resumedWork,
+            "Scrolling without pointer movement is resumed work"
+        )
+    }
+
     func testCompanionProtectionCannotBeRenewedWithoutBound() {
         var detector = RoutineActivityDetector()
         detector.start(at: referenceDate(200), signal: activitySignal(60, 60))
@@ -1259,8 +1307,18 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertEqual(PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 3, y: 4)), .drag)
     }
 
-    private func activitySignal(_ keyboardIdle: TimeInterval, _ pointerIdle: TimeInterval) -> LocalActivitySignal {
-        LocalActivitySignal(keyboardIdle: keyboardIdle, pointerIdle: pointerIdle)
+    private func activitySignal(
+        _ keyboardIdle: TimeInterval,
+        _ pointerIdle: TimeInterval,
+        mouseClickIdle: TimeInterval = .infinity,
+        scrollWheelIdle: TimeInterval = .infinity
+    ) -> LocalActivitySignal {
+        LocalActivitySignal(
+            keyboardIdle: keyboardIdle,
+            mouseMovementIdle: pointerIdle,
+            mouseClickIdle: mouseClickIdle,
+            scrollWheelIdle: scrollWheelIdle
+        )
     }
 
     private func referenceDate(_ secondsSinceReference: TimeInterval) -> Date {

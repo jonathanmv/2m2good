@@ -2,9 +2,10 @@
 
 ## Session integrity and activity detection - implemented for the v1 launch
 
-An active routine now watches only macOS’s aggregate time-since-last-keyboard/mouse
-activity signal. A conservative five-second initial grace period and three-second
-protection after companion controls prevent the companion’s own Start, Pause,
+An active routine now watches only macOS’s aggregate time-since-last keyboard,
+mouse-movement, mouse-button, and scroll activity signals. A conservative
+five-second initial grace period and three-second protection after companion
+controls prevent the companion’s own Start, Pause,
 Resume, Next, and End interactions from immediately cancelling a routine. That
 protection is also granted by hovering a routine control or opening the
 menu-bar menu, and is capped at thirty seconds per routine so it can never be

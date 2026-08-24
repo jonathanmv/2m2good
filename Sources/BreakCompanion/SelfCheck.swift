@@ -550,6 +550,72 @@ enum SelfCheck {
             failures.append("pointer movement across consecutive polls should qualify as resumed work")
         }
 
+        var clicking = RoutineActivityDetector()
+        clicking.start(
+            at: start,
+            signal: LocalActivitySignal(
+                keyboardIdle: 60,
+                mouseMovementIdle: 60,
+                mouseClickIdle: 60,
+                scrollWheelIdle: 60
+            )
+        )
+        _ = clicking.decision(
+            at: start.addingTimeInterval(10),
+            isPaused: false,
+            signal: LocalActivitySignal(
+                keyboardIdle: 70,
+                mouseMovementIdle: 70,
+                mouseClickIdle: 0.3,
+                scrollWheelIdle: 70
+            )
+        )
+        if clicking.decision(
+            at: start.addingTimeInterval(11),
+            isPaused: false,
+            signal: LocalActivitySignal(
+                keyboardIdle: 71,
+                mouseMovementIdle: 71,
+                mouseClickIdle: 0.4,
+                scrollWheelIdle: 71
+            )
+        ) != .resumedWork {
+            failures.append("mouse clicks without movement should qualify as resumed work")
+        }
+
+        var scrolling = RoutineActivityDetector()
+        scrolling.start(
+            at: start,
+            signal: LocalActivitySignal(
+                keyboardIdle: 60,
+                mouseMovementIdle: 60,
+                mouseClickIdle: 60,
+                scrollWheelIdle: 60
+            )
+        )
+        _ = scrolling.decision(
+            at: start.addingTimeInterval(10),
+            isPaused: false,
+            signal: LocalActivitySignal(
+                keyboardIdle: 70,
+                mouseMovementIdle: 70,
+                mouseClickIdle: 70,
+                scrollWheelIdle: 0.3
+            )
+        )
+        if scrolling.decision(
+            at: start.addingTimeInterval(11),
+            isPaused: false,
+            signal: LocalActivitySignal(
+                keyboardIdle: 71,
+                mouseMovementIdle: 71,
+                mouseClickIdle: 71,
+                scrollWheelIdle: 0.4
+            )
+        ) != .resumedWork {
+            failures.append("scrolling without movement should qualify as resumed work")
+        }
+
         var budgeted = RoutineActivityDetector()
         budgeted.start(at: start, signal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 60))
         var poll = 6.0
