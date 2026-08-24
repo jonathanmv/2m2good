@@ -66,6 +66,10 @@ On the first spoken check-in, macOS asks for **Microphone** and **Speech Recogni
 
 The app does not need Accessibility permission. It reads only macOS’s aggregate “time since last keyboard/mouse event,” not the keys pressed or the content of events.
 
+While a routine is actively guiding, the app polls those same aggregate ages for a reset that indicates local work resumed. A five-second grace period covers starting and settling into the companion; intentional routine controls add a three-second tolerance. A qualifying reset returns to the check-in screen with a brief, non-judgmental explanation, clears the pending session, and offers a fresh Start, Later, or Tomorrow choice. Pause is protected: activity while paused never cancels, and activity after Resume is eligible again. Idle timing, check-in, and completion screens do not use this detector.
+
+This integrity check is local-only and deliberately coarse. It stores no key values, pointer coordinates or paths, application content, account information, analytics, or network data, and does not install an event monitor or require Accessibility permission. Activity from another app is indistinguishable from resumed work; the grace and control tolerances are the conservative boundary for keeping 2m2better’s own buttons usable.
+
 ## Fast testing
 
 The normal active-work interval is 3,600 seconds. Override it when launching the executable:

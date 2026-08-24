@@ -163,39 +163,50 @@ struct CompanionView: View {
                 Spacer(minLength: 0)
             }
 
-            if let status = store.statusText {
+            if let explanation = store.activityRecoveryExplanation {
+                Text(explanation)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color(red: 0.24, green: 0.42, blue: 0.38))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                checkInControls
+            } else if let status = store.statusText {
                 Text(status)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Color(red: 0.24, green: 0.42, blue: 0.38))
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                VStack(spacing: 10) {
-                    Button("Start  ·  2 min", action: store.startRoutine)
-                        .buttonStyle(PrimaryButtonStyle())
-                    HStack(spacing: 9) {
-                        Button("Later", action: { store.postpone(minutes: 60) })
-                        Button("Tomorrow", action: store.postponeUntilTomorrow)
-                    }
-                    .buttonStyle(QuietButtonStyle())
-                }
-
-                HStack(spacing: 7) {
-                    Image(systemName: voice.isListening ? "waveform" : "mic")
-                        .symbolEffect(.variableColor.iterative, isActive: voice.isListening)
-                    Text(voiceStatus)
-                        .lineLimit(2)
-                    Spacer()
-                    if !voice.isListening {
-                        Button("Try voice", action: voice.requestAndListen)
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
+                checkInControls
             }
         }
         .padding(25)
+    }
+
+    private var checkInControls: some View {
+        VStack(spacing: 10) {
+            Button("Start  ·  2 min", action: store.startRoutine)
+                .buttonStyle(PrimaryButtonStyle())
+            HStack(spacing: 9) {
+                Button("Later", action: { store.postpone(minutes: 60) })
+                Button("Tomorrow", action: store.postponeUntilTomorrow)
+            }
+            .buttonStyle(QuietButtonStyle())
+
+            HStack(spacing: 7) {
+                Image(systemName: voice.isListening ? "waveform" : "mic")
+                    .symbolEffect(.variableColor.iterative, isActive: voice.isListening)
+                Text(voiceStatus)
+                    .lineLimit(2)
+                Spacer()
+                if !voice.isListening {
+                    Button("Try voice", action: voice.requestAndListen)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(.tertiary)
+        }
     }
 
     private var routineView: some View {

@@ -97,6 +97,159 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertFalse(state.isCurrent(first), "A stale task from an earlier completion must not close a future screen")
     }
 
+    func testRoutineActivityDetectorGraceAndResetToleranceAreDeterministic() {
+        var detector = RoutineActivityDetector()
+        detector.start(at: Date(timeIntervalSinceReferenceDate: 100), signal: activitySignal(8, 8))
+
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 104.9),
+                isPaused: false,
+                signal: activitySignal(0, 0)
+            ),
+            .initialGracePeriod
+        )
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 105.1),
+                isPaused: false,
+                signal: activitySignal(0.1, 0.1)
+            ),
+            .noNewActivity,
+            "Activity observed during the grace period must not be replayed as a cancellation"
+        )
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 106),
+                isPaused: false,
+                signal: activitySignal(4, 4)
+            ),
+            .noNewActivity
+        )
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 107),
+                isPaused: false,
+                signal: activitySignal(0, 7)
+            ),
+            .resumedWork
+        )
+    }
+
+    func testRoutineActivityDetectorProtectsCompanionControlsAndPause() {
+        var detector = RoutineActivityDetector()
+        detector.start(at: Date(timeIntervalSinceReferenceDate: 200), signal: activitySignal(8, 8))
+        _ = detector.decision(
+            at: Date(timeIntervalSinceReferenceDate: 206),
+            isPaused: false,
+            signal: activitySignal(6, 6)
+        )
+
+        detector.noteCompanionInteraction(at: Date(timeIntervalSinceReferenceDate: 206))
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 207),
+                isPaused: false,
+                signal: activitySignal(0, 7)
+            ),
+            .companionInteraction
+        )
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 210),
+                isPaused: false,
+                signal: activitySignal(3, 10)
+            ),
+            .noNewActivity
+        )
+
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 211),
+                isPaused: false,
+                signal: activitySignal(0, 11)
+            ),
+            .resumedWork
+        )
+
+        detector.start(at: Date(timeIntervalSinceReferenceDate: 300), signal: activitySignal(8, 8))
+        _ = detector.decision(
+            at: Date(timeIntervalSinceReferenceDate: 306),
+            isPaused: false,
+            signal: activitySignal(6, 6)
+        )
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 307),
+                isPaused: true,
+                signal: activitySignal(0, 7)
+            ),
+            .paused
+        )
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 308),
+                isPaused: true,
+                signal: activitySignal(1, 8)
+            ),
+            .noNewActivity
+        )
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 309),
+                isPaused: false,
+                signal: activitySignal(0, 9)
+            ),
+            .resumedWork,
+            "Activity after Resume is eligible even when activity during Pause was ignored"
+        )
+    }
+
+    @MainActor
+    func testResumedActivityReturnsToFreshCheckInWithoutCompletionCredit() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults
+        )
+        store.continueWithBalancedDefaults()
+        defaults.set(["shoulder-rolls"], forKey: "session.recentCompletedMoveIDs")
+        store.startRoutine(at: Date(timeIntervalSinceReferenceDate: 400), activitySignal: activitySignal(8, 8))
+        let pendingBeforeRecovery = defaults.stringArray(forKey: "session.pendingMoveIDs")
+
+        XCTAssertEqual(
+            store.evaluateRoutineActivity(
+                signal: activitySignal(6, 6),
+                at: Date(timeIntervalSinceReferenceDate: 406)
+            ),
+            .noNewActivity
+        )
+        XCTAssertEqual(
+            store.evaluateRoutineActivity(
+                signal: activitySignal(0, 7),
+                at: Date(timeIntervalSinceReferenceDate: 407)
+            ),
+            .resumedWork
+        )
+
+        XCTAssertEqual(store.mode, .checkIn)
+        XCTAssertNotNil(store.activityRecoveryExplanation)
+        XCTAssertEqual(defaults.stringArray(forKey: "session.recentCompletedMoveIDs"), ["shoulder-rolls"])
+        XCTAssertNotEqual(defaults.stringArray(forKey: "session.pendingMoveIDs"), pendingBeforeRecovery)
+
+        store.startRoutine(at: Date(timeIntervalSinceReferenceDate: 408), activitySignal: activitySignal(0, 0))
+        XCTAssertEqual(store.mode, .routine)
+        XCTAssertEqual(store.stepIndex, 0)
+        XCTAssertEqual(store.elapsedInStep, 0)
+        XCTAssertFalse(store.isPaused)
+        XCTAssertEqual(defaults.stringArray(forKey: "session.recentCompletedMoveIDs"), ["shoulder-rolls"])
+        store.endRoutine()
+    }
+
     func testBodyAreaOptionsMatchTheScoutRecommendation() {
         XCTAssertEqual(
             BodyArea.allCases.map(\.label),
@@ -630,6 +783,10 @@ final class BreakCompanionTests: XCTestCase {
     func testPointerMovementClassifierKeepsTapDeadZone() {
         XCTAssertEqual(PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 4, y: 0)), .tap)
         XCTAssertEqual(PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 3, y: 4)), .drag)
+    }
+
+    private func activitySignal(_ keyboardIdle: TimeInterval, _ pointerIdle: TimeInterval) -> LocalActivitySignal {
+        LocalActivitySignal(keyboardIdle: keyboardIdle, pointerIdle: pointerIdle)
     }
 
     private func makeMove(

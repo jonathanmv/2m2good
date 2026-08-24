@@ -1,5 +1,28 @@
 # Future ideas and deferred work
 
+## Session integrity and activity detection - implemented for the v1 launch
+
+An active routine now watches only macOS’s aggregate time-since-last-keyboard/mouse
+activity signal. A conservative five-second initial grace period and three-second
+protection after companion controls prevent the companion’s own Start, Pause,
+Resume, Next, and End interactions from immediately cancelling a routine.
+Pause is an explicitly protected state: activity while paused is ignored, while
+activity after Resume can qualify as resumed work.
+
+A qualifying activity reset stops guidance, gives no completion credit, clears
+the pending session with the existing local history semantics, and returns to a
+fresh check-in with Start, Later, and Tomorrow controls. The explanation is
+non-judgmental and the next Start begins at the first movement. No activity
+values, pointer locations, application content, accounts, analytics, or network
+data are recorded, and Accessibility permission remains out of scope.
+
+Intentionally out of scope are identifying which application caused activity,
+interpreting keys or pointer paths, distinguishing a person from another local
+input source, Accessibility/event-stream monitoring, and preserving partial
+progress as completion. The detector remains limited to active `.routine`
+state; idle timing, check-in, pause, and completion behavior otherwise retain
+their existing roles.
+
 ## Early developer-preview terminal installation - limited preview implemented
 
 The early developer-preview path described here is now implemented as a

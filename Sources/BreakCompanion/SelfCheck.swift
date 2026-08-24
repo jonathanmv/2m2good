@@ -12,9 +12,10 @@ enum SelfCheck {
         checkConfigurationFlow(&failures)
         checkSupportiveCopy(&failures)
         checkPointer(&failures)
+        checkActivityDetectionAndRecovery(&failures)
 
         if failures.isEmpty {
-            print("Self-check passed: \(ProductIdentity.name) standing session composition, body-area selection, first-run and menu-bar configuration, legacy migration, supportive wording, recent-shown persistence, focus balance, voice variants, completion dismissal, progress color, and pointer movement.")
+            print("Self-check passed: \(ProductIdentity.name) standing session composition, body-area selection, first-run and menu-bar configuration, legacy migration, supportive wording, recent-shown persistence, focus balance, voice variants, completion dismissal, progress color, pointer movement, and routine activity recovery.")
             return true
         }
 
@@ -410,6 +411,48 @@ enum SelfCheck {
         }
         if PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 3, y: 4)) != .drag {
             failures.append("movement past the pointer threshold should become a drag")
+        }
+    }
+
+    private static func checkActivityDetectionAndRecovery(_ failures: inout [String]) {
+        var detector = RoutineActivityDetector()
+        let start = Date(timeIntervalSinceReferenceDate: 400)
+        detector.start(at: start, signal: LocalActivitySignal(keyboardIdle: 8, pointerIdle: 8))
+        _ = detector.decision(
+            at: start.addingTimeInterval(6),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 6, pointerIdle: 6)
+        )
+        if detector.decision(
+            at: start.addingTimeInterval(7),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 0, pointerIdle: 7)
+        ) != .resumedWork {
+            failures.append("a post-grace activity reset should qualify as resumed work")
+        }
+
+        MainActor.assumeIsolated {
+            withIsolatedDefaults("activity-recovery") { defaults in
+                let store = CompanionStore(environment: ["BREAK_INTERVAL_SECONDS": "3600"], defaults: defaults)
+                store.continueWithBalancedDefaults()
+                defaults.set(["shoulder-rolls"], forKey: "session.recentCompletedMoveIDs")
+                store.startRoutine(at: start, activitySignal: LocalActivitySignal(keyboardIdle: 8, pointerIdle: 8))
+                _ = store.evaluateRoutineActivity(
+                    signal: LocalActivitySignal(keyboardIdle: 6, pointerIdle: 6),
+                    at: start.addingTimeInterval(6)
+                )
+                _ = store.evaluateRoutineActivity(
+                    signal: LocalActivitySignal(keyboardIdle: 0, pointerIdle: 7),
+                    at: start.addingTimeInterval(7)
+                )
+                if store.mode != .checkIn
+                    || store.activityRecoveryExplanation == nil
+                    || defaults.stringArray(forKey: "session.recentCompletedMoveIDs") != ["shoulder-rolls"] {
+                    failures.append("resumed activity should recover without completion credit")
+                }
+                store.startRoutine(at: start.addingTimeInterval(8), activitySignal: LocalActivitySignal(keyboardIdle: 0, pointerIdle: 0))
+                store.endRoutine()
+            }
         }
     }
 

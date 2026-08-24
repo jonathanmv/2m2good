@@ -18,6 +18,7 @@ final class CompanionStore: ObservableObject {
     @Published private(set) var elapsedInStep = 0
     @Published private(set) var isPaused = false
     @Published private(set) var statusText: String?
+    @Published private(set) var activityRecoveryExplanation: String?
     @Published private(set) var checkInProgress: Double = 0
     @Published private(set) var nextCheckInRemainingSeconds: TimeInterval = 0
     @Published private(set) var selectedAreas: Set<BodyArea>
@@ -36,10 +37,13 @@ final class CompanionStore: ObservableObject {
     private var timer: Timer?
     private var completionDismissTask: Task<Void, Never>?
     private var completionDismissalState = CompletionDismissalState()
+    private var routineActivityDetector = RoutineActivityDetector()
+    private let activitySignalProvider: () -> LocalActivitySignal
 
     init(
         environment: [String: String] = ProcessInfo.processInfo.environment,
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        activitySignalProvider: @escaping () -> LocalActivitySignal = LocalActivitySignal.current
     ) {
         let configuredInterval = Double(environment["BREAK_INTERVAL_SECONDS"] ?? "")
         workInterval = max(5, configuredInterval ?? 60 * 60)
@@ -47,6 +51,7 @@ final class CompanionStore: ObservableObject {
         idleThreshold = max(10, configuredIdle ?? 60)
         sessionSelection = SessionSelectionStore(defaults: defaults)
         bodyAreaPreferences = BodyAreaPreferences(defaults: defaults)
+        self.activitySignalProvider = activitySignalProvider
         selectedAreas = bodyAreaPreferences.selectedAreas
         routine = BreakRoutine.fallback
         nextCheckInRemainingSeconds = workInterval
@@ -121,6 +126,10 @@ final class CompanionStore: ObservableObject {
     }
 
     func startRoutine() {
+        startRoutine(at: Date(), activitySignal: activitySignalProvider())
+    }
+
+    func startRoutine(at date: Date, activitySignal: LocalActivitySignal) {
         cancelCompletionAutoDismiss()
         voice.stopListening()
         mode = .routine
@@ -128,6 +137,8 @@ final class CompanionStore: ObservableObject {
         elapsedInStep = 0
         isPaused = false
         statusText = nil
+        activityRecoveryExplanation = nil
+        routineActivityDetector.start(at: date, signal: activitySignal)
         notifySizeChange()
         speaker.speak(currentStep.spokenInstruction)
     }
@@ -142,6 +153,7 @@ final class CompanionStore: ObservableObject {
         accumulatedActiveTime = 0
         updateCheckInProgress(at: now)
         statusText = minutes == 60 ? "I’ll check back in an hour." : "I’ll check back in \(minutes) minutes."
+        activityRecoveryExplanation = nil
         returnToIdle(after: 1.5)
     }
 
@@ -154,10 +166,13 @@ final class CompanionStore: ObservableObject {
         accumulatedActiveTime = 0
         updateCheckInProgress(at: now)
         statusText = "See you tomorrow."
+        activityRecoveryExplanation = nil
         returnToIdle(after: 1.5)
     }
 
     func togglePause() {
+        guard mode == .routine else { return }
+        routineActivityDetector.noteCompanionInteraction(at: Date())
         isPaused.toggle()
         if isPaused { speaker.stop() } else { speaker.speak(currentStep.spokenInstruction) }
     }
@@ -170,6 +185,7 @@ final class CompanionStore: ObservableObject {
                 selectedAreas: selectedAreas
               ) else { return }
 
+        routineActivityDetector.noteCompanionInteraction(at: Date())
         speaker.stop()
         routine = next
         stepIndex = 0
@@ -181,6 +197,8 @@ final class CompanionStore: ObservableObject {
     }
 
     func endRoutine() {
+        guard mode == .routine else { return }
+        routineActivityDetector.noteCompanionInteraction(at: Date())
         speaker.stop()
         finishRoutine(countAsCompleted: false)
     }
@@ -218,6 +236,9 @@ final class CompanionStore: ObservableObject {
         lastTick = now
 
         if mode == .routine {
+            if evaluateRoutineActivity(signal: activitySignalProvider(), at: now) == .resumedWork {
+                return
+            }
             guard !isPaused else { return }
             elapsedInStep += 1
             if elapsedInStep >= currentStep.duration { advanceStep() }
@@ -245,12 +266,28 @@ final class CompanionStore: ObservableObject {
     }
 
     private var userIsActive: Bool {
-        let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: .mouseMoved)
-        let keyboardIdle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: .keyDown)
-        return min(idle, keyboardIdle) < idleThreshold
+        let signal = LocalActivitySignal.current()
+        return min(signal.pointerIdle, signal.keyboardIdle) < idleThreshold
     }
 
-    private func showCheckIn() {
+    @discardableResult
+    func evaluateRoutineActivity(
+        signal: LocalActivitySignal,
+        at date: Date
+    ) -> RoutineActivityDecision {
+        guard mode == .routine else { return .noNewActivity }
+        let decision = routineActivityDetector.decision(
+            at: date,
+            isPaused: isPaused,
+            signal: signal
+        )
+        if decision == .resumedWork {
+            recoverFromResumedActivity()
+        }
+        return decision
+    }
+
+    private func showCheckIn(activityRecoveryExplanation: String? = nil) {
         guard mode == .idle else { return }
         cancelCompletionAutoDismiss()
         accumulatedActiveTime = 0
@@ -260,6 +297,7 @@ final class CompanionStore: ObservableObject {
         ) else { return }
         routine = suggestion
         statusText = nil
+        self.activityRecoveryExplanation = activityRecoveryExplanation
         mode = .checkIn
         notifySizeChange()
         // Keep the spoken prompt free of command words so recognition cannot act on
@@ -292,7 +330,27 @@ final class CompanionStore: ObservableObject {
         }
     }
 
+    private func recoverFromResumedActivity() {
+        guard mode == .routine else { return }
+        speaker.stop()
+        voice.stopListening()
+        routineActivityDetector.reset()
+        sessionSelection.clearPendingSession()
+        accumulatedActiveTime = 0
+        scheduledCheckIn = nil
+        isPaused = false
+        stepIndex = 0
+        elapsedInStep = 0
+        statusText = nil
+        mode = .idle
+        notifySizeChange()
+        showCheckIn(
+            activityRecoveryExplanation: "No problem — it looks like you’re back at work. Start a fresh reset whenever you’re ready."
+        )
+    }
+
     private func finishRoutine(countAsCompleted: Bool) {
+        routineActivityDetector.reset()
         if countAsCompleted {
             sessionSelection.markCompleted(routine)
         } else {
@@ -303,6 +361,7 @@ final class CompanionStore: ObservableObject {
         scheduledCheckIn = nil
         updateCheckInProgress(at: Date())
         statusText = nil
+        activityRecoveryExplanation = nil
         speaker.speak("That’s it. Welcome back.")
         scheduleCompletionAutoDismiss()
         notifySizeChange()
@@ -335,6 +394,7 @@ final class CompanionStore: ObservableObject {
             guard self.mode == .checkIn else { return }
             self.mode = .idle
             self.statusText = nil
+            self.activityRecoveryExplanation = nil
             self.notifySizeChange()
         }
     }
