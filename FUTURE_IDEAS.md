@@ -2,40 +2,11 @@
 
 ## Session integrity and activity detection - implemented for the v1 launch
 
-An active routine now watches only macOS’s aggregate time-since-last keyboard,
-mouse-movement, mouse-button, and scroll activity signals. A conservative
-five-second initial grace period and three-second protection after companion
-controls prevent the companion’s own Start, Pause,
-Resume, Next, and End interactions from immediately cancelling a routine. That
-protection is also granted by hovering a routine control or opening the
-menu-bar menu, and is capped at thirty seconds per routine so it can never be
-renewed indefinitely. Next starts a brand-new routine, so detection restarts
-with it: a fresh grace period and a fresh protection budget. Input that keeps going while a sample is protected still
-qualifies once the protection ends, because activity inside the last polling
-second counts as well as a drop in the aggregate age. Keyboard evidence
-qualifies at once; pointer evidence must hold on two consecutive unprotected
-polls, and every grace, paused, or protected poll discards the pointer evidence
-gathered so far, so reaching for a control, withdrawing from one, or nudging the
-mouse cannot cancel a routine while continuous mousing still does. Keystrokes
-while the companion panel holds keyboard focus are companion interaction, which
-keeps keyboard navigation of its controls usable. The recovery check-in is
-silent and does not open the microphone or take focus.
-Pause is an explicitly protected state: activity while paused is ignored, while
-activity after Resume can qualify as resumed work.
-
-A qualifying activity reset stops guidance, gives no completion credit, clears
-the pending session with the existing local history semantics, and returns to a
-fresh check-in with Start, Later, and Tomorrow controls. The explanation is
-non-judgmental and the next Start begins at the first movement. No activity
-values, pointer locations, application content, accounts, analytics, or network
-data are recorded, and Accessibility permission remains out of scope.
-
-Intentionally out of scope are identifying which application caused activity,
-interpreting keys or pointer paths, distinguishing a person from another local
-input source, Accessibility/event-stream monitoring, and preserving partial
-progress as completion. The detector remains limited to active `.routine`
-state; idle timing, check-in, pause, and completion behavior otherwise retain
-their existing roles.
+The deferred session-integrity idea is implemented. The [`README.md`](README.md)
+**Permissions** section is the authoritative description of its interaction,
+privacy, accessibility, pause, and recovery policy; it also owns the intentional
+out-of-scope boundaries. This section remains a status pointer rather than a
+second copy of that policy.
 
 ## Early developer-preview terminal installation - limited preview implemented
 
