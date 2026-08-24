@@ -12,6 +12,8 @@ final class CompanionStore: ObservableObject {
         case complete
     }
 
+    static let checkInPrompt = "Time for a small pause."
+
     @Published private(set) var mode: Mode = .idle
     @Published private(set) var routine: BreakRoutine
     @Published private(set) var stepIndex = 0
@@ -25,8 +27,11 @@ final class CompanionStore: ObservableObject {
 
     let voice = VoiceService()
     var onSizeChange: ((Mode) -> Void)?
+    /// Set by the app so keystrokes aimed at the companion's own panel are read as
+    /// intentional interaction instead of resumed work.
+    var companionHasKeyboardFocus: () -> Bool = { false }
 
-    private let speaker = GuideSpeaker()
+    private let speaker: RoutineSpeaking
     private let workInterval: TimeInterval
     private let idleThreshold: TimeInterval
     private let sessionSelection: SessionSelectionStore
@@ -43,7 +48,8 @@ final class CompanionStore: ObservableObject {
     init(
         environment: [String: String] = ProcessInfo.processInfo.environment,
         defaults: UserDefaults = .standard,
-        activitySignalProvider: @escaping () -> LocalActivitySignal = LocalActivitySignal.current
+        activitySignalProvider: @escaping () -> LocalActivitySignal = LocalActivitySignal.current,
+        speaker: RoutineSpeaking? = nil
     ) {
         let configuredInterval = Double(environment["BREAK_INTERVAL_SECONDS"] ?? "")
         workInterval = max(5, configuredInterval ?? 60 * 60)
@@ -52,6 +58,7 @@ final class CompanionStore: ObservableObject {
         sessionSelection = SessionSelectionStore(defaults: defaults)
         bodyAreaPreferences = BodyAreaPreferences(defaults: defaults)
         self.activitySignalProvider = activitySignalProvider
+        self.speaker = speaker ?? GuideSpeaker()
         selectedAreas = bodyAreaPreferences.selectedAreas
         routine = BreakRoutine.fallback
         nextCheckInRemainingSeconds = workInterval
@@ -296,6 +303,7 @@ final class CompanionStore: ObservableObject {
         let decision = routineActivityDetector.decision(
             at: date,
             isPaused: isPaused,
+            companionHasKeyboardFocus: companionHasKeyboardFocus(),
             signal: signal
         )
         if decision == .resumedWork {
@@ -317,9 +325,12 @@ final class CompanionStore: ObservableObject {
         self.activityRecoveryExplanation = activityRecoveryExplanation
         mode = .checkIn
         notifySizeChange()
+        // Someone who just went back to work should not be spoken to or have the
+        // microphone and app focus taken from them; the written explanation carries it.
+        guard activityRecoveryExplanation == nil else { return }
         // Keep the spoken prompt free of command words so recognition cannot act on
         // the companion's own voice as the microphone comes online.
-        speaker.speak("Time for a small pause.")
+        speaker.speak(Self.checkInPrompt)
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(1_200))
             guard self.mode == .checkIn else { return }

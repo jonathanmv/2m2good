@@ -489,6 +489,32 @@ enum SelfCheck {
             failures.append("pointer evidence gathered while protected should not cancel a routine")
         }
 
+        var focused = RoutineActivityDetector()
+        focused.start(at: start, signal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 60))
+        if focused.decision(
+            at: start.addingTimeInterval(10),
+            isPaused: false,
+            companionHasKeyboardFocus: true,
+            signal: LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 70)
+        ) != .companionInteraction {
+            failures.append("keyboard input aimed at the companion panel should not cancel a routine")
+        }
+
+        var boundary = RoutineActivityDetector()
+        boundary.start(at: start, signal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 60))
+        _ = boundary.decision(
+            at: start.addingTimeInterval(4.5),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 64.5, pointerIdle: 0.3)
+        )
+        if boundary.decision(
+            at: start.addingTimeInterval(5.5),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 65.5, pointerIdle: 0.1)
+        ) != .noNewActivity {
+            failures.append("one mouse motion spanning the grace boundary should not cancel a routine")
+        }
+
         var settling = RoutineActivityDetector()
         settling.start(at: start, signal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 60))
         _ = settling.decision(
@@ -604,7 +630,7 @@ enum SelfCheck {
                     at: start.addingTimeInterval(31)
                 )
                 if store.evaluateRoutineActivity(
-                    signal: LocalActivitySignal(keyboardIdle: 92, pointerIdle: 0.4),
+                    signal: LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 0.4),
                     at: start.addingTimeInterval(32)
                 ) != .initialGracePeriod || store.mode != .routine {
                     failures.append("Next should give the new routine its own grace period")
@@ -615,7 +641,7 @@ enum SelfCheck {
                     at: start.addingTimeInterval(37)
                 )
                 if store.evaluateRoutineActivity(
-                    signal: LocalActivitySignal(keyboardIdle: 97, pointerIdle: 0.4),
+                    signal: LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 0.4),
                     at: start.addingTimeInterval(38)
                 ) != .companionInteraction {
                     failures.append("Next should give the new routine its own protection budget")

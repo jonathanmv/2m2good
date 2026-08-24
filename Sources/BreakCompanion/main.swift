@@ -51,6 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         panel.contentView = NSHostingView(rootView: CompanionView(store: store))
         panel.setFrameOrigin(origin(for: panel.frame.size))
+        store.companionHasKeyboardFocus = { [weak panel] in panel?.isKeyWindow ?? false }
         self.panel = panel
         resizePanel(for: store.mode)
     }

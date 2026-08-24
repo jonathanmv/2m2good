@@ -66,6 +66,15 @@ struct RoutineActivityPolicy {
         )
     }
 
+    /// True while a poll cannot qualify as resumed work, whatever the activity ages say.
+    func suppressesActivity(
+        elapsedSinceStart: TimeInterval,
+        isPaused: Bool,
+        companionInteractionRemaining: TimeInterval
+    ) -> Bool {
+        elapsedSinceStart < Self.initialGracePeriod || isPaused || companionInteractionRemaining > 0
+    }
+
     func decision(
         elapsedSinceStart: TimeInterval,
         isPaused: Bool,
@@ -120,28 +129,37 @@ struct RoutineActivityDetector {
     mutating func decision(
         at date: Date,
         isPaused: Bool,
+        companionHasKeyboardFocus: Bool = false,
         signal: LocalActivitySignal
     ) -> RoutineActivityDecision {
         let previous = previousSignal
         previousSignal = signal
+        let keyboardActive = policy.hasKeyboardActivity(previousSignal: previous, currentSignal: signal)
         let pointerActive = policy.hasPointerActivity(previousSignal: previous, currentSignal: signal)
         consecutivePointerActivityPolls = pointerActive ? consecutivePointerActivityPolls + 1 : 0
         guard let startedAt else { return .noNewActivity }
+        // Typing goes to whichever window has key focus, so keystrokes while the companion
+        // holds it are companion interaction - budgeted like every other control grant.
+        if companionHasKeyboardFocus && keyboardActive {
+            noteCompanionInteraction(at: date)
+        }
+        let elapsedSinceStart = date.timeIntervalSince(startedAt)
         let remainingProtection = max(0, (companionProtectedUntil ?? date).timeIntervalSince(date))
         let decision = policy.decision(
-            elapsedSinceStart: date.timeIntervalSince(startedAt),
+            elapsedSinceStart: elapsedSinceStart,
             isPaused: isPaused,
             companionInteractionRemaining: remainingProtection,
-            hasKeyboardActivity: policy.hasKeyboardActivity(previousSignal: previous, currentSignal: signal),
+            hasKeyboardActivity: keyboardActive,
             consecutivePointerActivityPolls: consecutivePointerActivityPolls
         )
         // Pointer persistence has to be established by unprotected polls, so a reach whose
         // polls fall inside grace, pause, or control protection cannot carry over.
-        switch decision {
-        case .initialGracePeriod, .paused, .companionInteraction:
+        if policy.suppressesActivity(
+            elapsedSinceStart: elapsedSinceStart,
+            isPaused: isPaused,
+            companionInteractionRemaining: remainingProtection
+        ) {
             consecutivePointerActivityPolls = 0
-        case .noNewActivity, .resumedWork:
-            break
         }
         return decision
     }

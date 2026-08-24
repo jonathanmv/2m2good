@@ -264,7 +264,7 @@ final class BreakCompanionTests: XCTestCase {
         )
         XCTAssertEqual(
             detector.decision(at: referenceDate(42), isPaused: false, signal: activitySignal(102, 0.3)),
-            .companionInteraction
+            .noNewActivity
         )
         XCTAssertEqual(
             detector.decision(at: referenceDate(43), isPaused: false, signal: activitySignal(103, 0.7)),
@@ -287,7 +287,7 @@ final class BreakCompanionTests: XCTestCase {
         )
         XCTAssertEqual(
             detector.decision(at: referenceDate(2), isPaused: false, signal: activitySignal(62, 0.3)),
-            .initialGracePeriod
+            .noNewActivity
         )
         XCTAssertEqual(
             detector.decision(at: referenceDate(5.2), isPaused: false, signal: activitySignal(65.2, 0.6)),
@@ -320,7 +320,7 @@ final class BreakCompanionTests: XCTestCase {
         detector.start(at: referenceDate(200), signal: activitySignal(60, 60))
 
         var poll = 206.0
-        var protectedPolls = 0
+        var uncancelledPolls = 0
         var decision = RoutineActivityDecision.noNewActivity
         while poll < 300 {
             detector.noteCompanionInteraction(at: referenceDate(poll))
@@ -330,13 +330,13 @@ final class BreakCompanionTests: XCTestCase {
                 signal: activitySignal(60 + poll - 200, 0.2)
             )
             if decision == .resumedWork { break }
-            if decision == .companionInteraction { protectedPolls += 1 }
+            uncancelledPolls += 1
             poll += 1
         }
 
         XCTAssertEqual(decision, .resumedWork, "Companion protection must not be renewable without bound")
         XCTAssertGreaterThan(
-            protectedPolls,
+            uncancelledPolls,
             10,
             "The protection budget must still cover a generous amount of deliberate control use"
         )
@@ -533,7 +533,7 @@ final class BreakCompanionTests: XCTestCase {
             .noNewActivity
         )
         XCTAssertEqual(
-            store.evaluateRoutineActivity(signal: activitySignal(92, 0.4), at: referenceDate(32)),
+            store.evaluateRoutineActivity(signal: activitySignal(0.2, 0.4), at: referenceDate(32)),
             .initialGracePeriod
         )
         XCTAssertEqual(store.mode, .routine)
@@ -545,7 +545,7 @@ final class BreakCompanionTests: XCTestCase {
             .noNewActivity
         )
         XCTAssertEqual(
-            store.evaluateRoutineActivity(signal: activitySignal(97, 0.4), at: referenceDate(38)),
+            store.evaluateRoutineActivity(signal: activitySignal(0.2, 0.4), at: referenceDate(38)),
             .companionInteraction
         )
         XCTAssertEqual(store.mode, .routine)
@@ -563,6 +563,165 @@ final class BreakCompanionTests: XCTestCase {
 
         store.startRoutine(at: referenceDate(43), activitySignal: activitySignal(0, 0))
         store.endRoutine()
+    }
+
+    func testFirstPointerPollInsideGraceIsNotCarriedPastTheGraceBoundary() {
+        var detector = RoutineActivityDetector()
+        detector.start(at: referenceDate(0), signal: activitySignal(60, 60))
+
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(4.5), isPaused: false, signal: activitySignal(64.5, 0.3)),
+            .noNewActivity
+        )
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(5.5), isPaused: false, signal: activitySignal(65.5, 0.1)),
+            .noNewActivity,
+            "One mouse motion spanning the grace boundary must not cancel a routine just started"
+        )
+    }
+
+    func testFirstPointerPollInsideCompanionProtectionIsNotCarriedPastIt() {
+        var detector = RoutineActivityDetector()
+        detector.start(at: referenceDate(0), signal: activitySignal(60, 60))
+        detector.noteCompanionInteraction(at: referenceDate(40))
+
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(41), isPaused: false, signal: activitySignal(101, 41)),
+            .noNewActivity
+        )
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(42), isPaused: false, signal: activitySignal(102, 0.3)),
+            .noNewActivity
+        )
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(43), isPaused: false, signal: activitySignal(103, 0.7)),
+            .noNewActivity,
+            "Pointer evidence seen while protected must not qualify on the first unprotected poll"
+        )
+    }
+
+    func testKeyboardInputWhileTheCompanionHasKeyFocusIsCompanionInteraction() {
+        var detector = RoutineActivityDetector()
+        detector.start(at: referenceDate(0), signal: activitySignal(60, 60))
+
+        XCTAssertEqual(
+            detector.decision(
+                at: referenceDate(10),
+                isPaused: false,
+                companionHasKeyboardFocus: true,
+                signal: activitySignal(0.2, 70)
+            ),
+            .companionInteraction,
+            "Keyboard navigation aimed at the companion's own panel must not cancel the routine"
+        )
+        XCTAssertEqual(
+            detector.decision(
+                at: referenceDate(11),
+                isPaused: false,
+                companionHasKeyboardFocus: true,
+                signal: activitySignal(0.2, 71)
+            ),
+            .companionInteraction
+        )
+
+        var poll = 12.0
+        var decision = RoutineActivityDecision.companionInteraction
+        while poll < 100 {
+            decision = detector.decision(
+                at: referenceDate(poll),
+                isPaused: false,
+                companionHasKeyboardFocus: true,
+                signal: activitySignal(0.2, 60 + poll)
+            )
+            if decision == .resumedWork { break }
+            poll += 1
+        }
+        XCTAssertEqual(decision, .resumedWork, "Keyboard focus protection must share the bounded per-routine budget")
+        XCTAssertLessThanOrEqual(
+            detector.companionProtectionUsed,
+            RoutineActivityPolicy.companionProtectionBudget
+        )
+    }
+
+    @MainActor
+    func testTypingIntoTheCompanionPanelDoesNotCancelTheRoutine() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults
+        )
+        store.continueWithBalancedDefaults()
+        store.companionHasKeyboardFocus = { true }
+        store.startRoutine(at: referenceDate(0), activitySignal: activitySignal(30, 30))
+
+        XCTAssertEqual(
+            store.evaluateRoutineActivity(signal: activitySignal(0.2, 40), at: referenceDate(7)),
+            .companionInteraction
+        )
+        XCTAssertEqual(store.mode, .routine)
+
+        store.companionHasKeyboardFocus = { false }
+        XCTAssertEqual(
+            store.evaluateRoutineActivity(signal: activitySignal(0.2, 44), at: referenceDate(11)),
+            .resumedWork,
+            "Typing once the companion no longer holds key focus is resumed work again"
+        )
+        XCTAssertEqual(store.mode, .checkIn)
+
+        store.startRoutine(at: referenceDate(12), activitySignal: activitySignal(0, 0))
+        store.endRoutine()
+    }
+
+    @MainActor
+    func testActivityRecoveryCheckInIsSilentWhileANormalCheckInSpeaks() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let recoverySpeaker = RecordingSpeaker()
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults,
+            speaker: recoverySpeaker
+        )
+        store.continueWithBalancedDefaults()
+        store.startRoutine(at: referenceDate(0), activitySignal: activitySignal(30, 30))
+        XCTAssertEqual(
+            store.evaluateRoutineActivity(signal: activitySignal(0.2, 40), at: referenceDate(7)),
+            .resumedWork
+        )
+        XCTAssertEqual(store.mode, .checkIn)
+        XCTAssertNotNil(store.activityRecoveryExplanation)
+        XCTAssertFalse(
+            recoverySpeaker.spoken.contains(CompanionStore.checkInPrompt),
+            "Someone who just went back to work must not be prompted out loud"
+        )
+        store.startRoutine(at: referenceDate(8), activitySignal: activitySignal(0, 0))
+        store.endRoutine()
+
+        let promptSuiteName = "\(suiteName).prompt"
+        let promptDefaults = UserDefaults(suiteName: promptSuiteName)!
+        promptDefaults.removePersistentDomain(forName: promptSuiteName)
+        defer { promptDefaults.removePersistentDomain(forName: promptSuiteName) }
+
+        let promptSpeaker = RecordingSpeaker()
+        let promptStore = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: promptDefaults,
+            speaker: promptSpeaker
+        )
+        promptStore.continueWithBalancedDefaults()
+        promptStore.offerBreakNow()
+        XCTAssertEqual(promptStore.mode, .checkIn)
+        XCTAssertNil(promptStore.activityRecoveryExplanation)
+        XCTAssertTrue(promptSpeaker.spoken.contains(CompanionStore.checkInPrompt))
+        promptStore.startRoutine(at: referenceDate(1), activitySignal: activitySignal(0, 0))
+        promptStore.endRoutine()
     }
 
     func testBodyAreaOptionsMatchTheScoutRecommendation() {
@@ -1123,4 +1282,14 @@ final class BreakCompanionTests: XCTestCase {
             supportsStanding: true
         )
     }
+}
+
+private final class RecordingSpeaker: RoutineSpeaking {
+    private(set) var spoken: [String] = []
+
+    func speak(_ text: String) {
+        spoken.append(text)
+    }
+
+    func stop() {}
 }

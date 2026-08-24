@@ -13,9 +13,12 @@ with it: a fresh grace period and a fresh protection budget. Input that keeps go
 qualifies once the protection ends, because activity inside the last polling
 second counts as well as a drop in the aggregate age. Keyboard evidence
 qualifies at once; pointer evidence must hold on two consecutive unprotected
-polls, and pointer evidence seen during grace, pause, or control protection is
-discarded at that boundary, so reaching for a control, withdrawing from one, or
-nudging the mouse cannot cancel a routine while continuous mousing still does.
+polls, and every grace, paused, or protected poll discards the pointer evidence
+gathered so far, so reaching for a control, withdrawing from one, or nudging the
+mouse cannot cancel a routine while continuous mousing still does. Keystrokes
+while the companion panel holds keyboard focus are companion interaction, which
+keeps keyboard navigation of its controls usable. The recovery check-in is
+silent and does not open the microphone or take focus.
 Pause is an explicitly protected state: activity while paused is ignored, while
 activity after Resume can qualify as resumed work.
 
