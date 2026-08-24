@@ -418,17 +418,36 @@ enum SelfCheck {
         var detector = RoutineActivityDetector()
         let start = Date(timeIntervalSinceReferenceDate: 400)
         detector.start(at: start, signal: LocalActivitySignal(keyboardIdle: 8, pointerIdle: 8))
-        _ = detector.decision(
+        if detector.decision(
             at: start.addingTimeInterval(6),
             isPaused: false,
-            signal: LocalActivitySignal(keyboardIdle: 6, pointerIdle: 6)
-        )
+            signal: LocalActivitySignal(keyboardIdle: 14, pointerIdle: 14)
+        ) != .noNewActivity {
+            failures.append("ageing idle signals should not read as resumed work")
+        }
         if detector.decision(
             at: start.addingTimeInterval(7),
             isPaused: false,
-            signal: LocalActivitySignal(keyboardIdle: 0, pointerIdle: 7)
+            signal: LocalActivitySignal(keyboardIdle: 0, pointerIdle: 15)
         ) != .resumedWork {
             failures.append("a post-grace activity reset should qualify as resumed work")
+        }
+
+        var sustained = RoutineActivityDetector()
+        sustained.start(at: start, signal: LocalActivitySignal(keyboardIdle: 30, pointerIdle: 0.1))
+        if sustained.decision(
+            at: start.addingTimeInterval(1),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 1.1)
+        ) != .initialGracePeriod {
+            failures.append("activity inside the initial grace period should be tolerated")
+        }
+        if sustained.decision(
+            at: start.addingTimeInterval(5),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 5.1)
+        ) != .resumedWork {
+            failures.append("typing that continues past the grace period should qualify as resumed work")
         }
 
         MainActor.assumeIsolated {
@@ -437,12 +456,14 @@ enum SelfCheck {
                 store.continueWithBalancedDefaults()
                 defaults.set(["shoulder-rolls"], forKey: "session.recentCompletedMoveIDs")
                 store.startRoutine(at: start, activitySignal: LocalActivitySignal(keyboardIdle: 8, pointerIdle: 8))
-                _ = store.evaluateRoutineActivity(
-                    signal: LocalActivitySignal(keyboardIdle: 6, pointerIdle: 6),
+                if store.evaluateRoutineActivity(
+                    signal: LocalActivitySignal(keyboardIdle: 14, pointerIdle: 14),
                     at: start.addingTimeInterval(6)
-                )
+                ) != .noNewActivity {
+                    failures.append("an unattended routine should keep running")
+                }
                 _ = store.evaluateRoutineActivity(
-                    signal: LocalActivitySignal(keyboardIdle: 0, pointerIdle: 7),
+                    signal: LocalActivitySignal(keyboardIdle: 0, pointerIdle: 15),
                     at: start.addingTimeInterval(7)
                 )
                 if store.mode != .checkIn
@@ -452,6 +473,28 @@ enum SelfCheck {
                 }
                 store.startRoutine(at: start.addingTimeInterval(8), activitySignal: LocalActivitySignal(keyboardIdle: 0, pointerIdle: 0))
                 store.endRoutine()
+            }
+
+            withIsolatedDefaults("activity-companion-protection") { defaults in
+                let store = CompanionStore(environment: ["BREAK_INTERVAL_SECONDS": "3600"], defaults: defaults)
+                store.continueWithBalancedDefaults()
+                // Companion protection is stamped from the wall clock inside the store, so the
+                // polled instants have to be anchored to the same reference.
+                let now = Date()
+                store.startRoutine(at: now.addingTimeInterval(-6), activitySignal: LocalActivitySignal(keyboardIdle: 30, pointerIdle: 30))
+                store.noteCompanionInteraction()
+                if store.evaluateRoutineActivity(
+                    signal: LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 0.2),
+                    at: now.addingTimeInterval(1)
+                ) != .companionInteraction || store.mode != .routine {
+                    failures.append("interacting with the companion should not cancel the routine")
+                }
+                if store.evaluateRoutineActivity(
+                    signal: LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 0.2),
+                    at: now.addingTimeInterval(4)
+                ) != .resumedWork || store.mode != .checkIn {
+                    failures.append("work resumed after companion protection should recover")
+                }
             }
         }
     }

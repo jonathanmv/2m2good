@@ -24,6 +24,12 @@ struct LocalActivitySignal: Equatable {
         keyboardIdle + tolerance < previous.keyboardIdle
             || pointerIdle + tolerance < previous.pointerIdle
     }
+
+    /// True when either aggregate age shows input inside the most recent polling window, so
+    /// input that keeps going is still visible after a sample was ignored as protected.
+    func hasSustainedActivity(within window: TimeInterval) -> Bool {
+        min(keyboardIdle, pointerIdle) <= window
+    }
 }
 
 enum RoutineActivityDecision: Equatable {
@@ -39,6 +45,7 @@ struct RoutineActivityPolicy {
     static let initialGracePeriod: TimeInterval = 5
     static let companionInteractionTolerance: TimeInterval = 3
     static let activityResetTolerance: TimeInterval = 0.5
+    static let sustainedActivityWindow: TimeInterval = 1
 
     func decision(
         elapsedSinceStart: TimeInterval,
@@ -47,11 +54,11 @@ struct RoutineActivityPolicy {
         previousSignal: LocalActivitySignal?,
         currentSignal: LocalActivitySignal
     ) -> RoutineActivityDecision {
-        guard let previousSignal,
-              currentSignal.hasActivityReset(
-                from: previousSignal,
-                tolerance: Self.activityResetTolerance
-              ) else {
+        let hasResetEdge = previousSignal.map {
+            currentSignal.hasActivityReset(from: $0, tolerance: Self.activityResetTolerance)
+        } ?? false
+        let isStillActive = currentSignal.hasSustainedActivity(within: Self.sustainedActivityWindow)
+        guard hasResetEdge || isStillActive else {
             return .noNewActivity
         }
         if elapsedSinceStart < Self.initialGracePeriod {

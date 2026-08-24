@@ -170,9 +170,16 @@ final class CompanionStore: ObservableObject {
         returnToIdle(after: 1.5)
     }
 
-    func togglePause() {
+    /// Called from every interactive surface of the companion itself - its window and its
+    /// menu-bar menu - so intentional use of the app is never read as resumed work.
+    func noteCompanionInteraction() {
         guard mode == .routine else { return }
         routineActivityDetector.noteCompanionInteraction(at: Date())
+    }
+
+    func togglePause() {
+        guard mode == .routine else { return }
+        noteCompanionInteraction()
         isPaused.toggle()
         if isPaused { speaker.stop() } else { speaker.speak(currentStep.spokenInstruction) }
     }
@@ -185,7 +192,7 @@ final class CompanionStore: ObservableObject {
                 selectedAreas: selectedAreas
               ) else { return }
 
-        routineActivityDetector.noteCompanionInteraction(at: Date())
+        noteCompanionInteraction()
         speaker.stop()
         routine = next
         stepIndex = 0
@@ -198,7 +205,7 @@ final class CompanionStore: ObservableObject {
 
     func endRoutine() {
         guard mode == .routine else { return }
-        routineActivityDetector.noteCompanionInteraction(at: Date())
+        noteCompanionInteraction()
         speaker.stop()
         finishRoutine(countAsCompleted: false)
     }

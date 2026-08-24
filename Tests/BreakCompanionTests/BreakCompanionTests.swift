@@ -103,46 +103,121 @@ final class BreakCompanionTests: XCTestCase {
 
         XCTAssertEqual(
             detector.decision(
-                at: Date(timeIntervalSinceReferenceDate: 104.9),
+                at: Date(timeIntervalSinceReferenceDate: 101),
                 isPaused: false,
-                signal: activitySignal(0, 0)
+                signal: activitySignal(0.1, 9)
             ),
             .initialGracePeriod
         )
         XCTAssertEqual(
             detector.decision(
-                at: Date(timeIntervalSinceReferenceDate: 105.1),
+                at: Date(timeIntervalSinceReferenceDate: 104.9),
                 isPaused: false,
-                signal: activitySignal(0.1, 0.1)
-            ),
-            .noNewActivity,
-            "Activity observed during the grace period must not be replayed as a cancellation"
-        )
-        XCTAssertEqual(
-            detector.decision(
-                at: Date(timeIntervalSinceReferenceDate: 106),
-                isPaused: false,
-                signal: activitySignal(4, 4)
+                signal: activitySignal(4, 12.9)
             ),
             .noNewActivity
         )
         XCTAssertEqual(
             detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 106),
+                isPaused: false,
+                signal: activitySignal(5.1, 14)
+            ),
+            .noNewActivity,
+            "The grace period expiring must not by itself read as resumed work"
+        )
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 106.5),
+                isPaused: false,
+                signal: activitySignal(4.7, 14.5)
+            ),
+            .noNewActivity,
+            "An aggregate age wobble inside the reset tolerance is not activity"
+        )
+        XCTAssertEqual(
+            detector.decision(
                 at: Date(timeIntervalSinceReferenceDate: 107),
                 isPaused: false,
-                signal: activitySignal(0, 7)
+                signal: activitySignal(0, 15)
             ),
             .resumedWork
+        )
+    }
+
+    func testSustainedTypingThroughTheGracePeriodStillQualifiesAfterIt() {
+        var detector = RoutineActivityDetector()
+        detector.start(at: Date(timeIntervalSinceReferenceDate: 200), signal: activitySignal(30, 0.1))
+
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 201),
+                isPaused: false,
+                signal: activitySignal(0.2, 1.1)
+            ),
+            .initialGracePeriod
+        )
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 202),
+                isPaused: false,
+                signal: activitySignal(0.25, 2.1)
+            ),
+            .initialGracePeriod
+        )
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 205),
+                isPaused: false,
+                signal: activitySignal(0.2, 5.1)
+            ),
+            .resumedWork,
+            "Typing that never stopped must not be permanently consumed by a sample ignored during grace"
+        )
+    }
+
+    func testSustainedTypingIsStillEligibleAfterPauseAndAfterCompanionControls() {
+        var detector = RoutineActivityDetector()
+        detector.start(at: Date(timeIntervalSinceReferenceDate: 300), signal: activitySignal(30, 30))
+
+        detector.noteCompanionInteraction(at: Date(timeIntervalSinceReferenceDate: 306))
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 307),
+                isPaused: false,
+                signal: activitySignal(0.2, 37)
+            ),
+            .companionInteraction
+        )
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 308),
+                isPaused: true,
+                signal: activitySignal(0.2, 38)
+            ),
+            .paused
+        )
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 310),
+                isPaused: false,
+                signal: activitySignal(0.2, 40)
+            ),
+            .resumedWork,
+            "Sustained typing stays eligible once pause and companion protection have ended"
         )
     }
 
     func testRoutineActivityDetectorProtectsCompanionControlsAndPause() {
         var detector = RoutineActivityDetector()
         detector.start(at: Date(timeIntervalSinceReferenceDate: 200), signal: activitySignal(8, 8))
-        _ = detector.decision(
-            at: Date(timeIntervalSinceReferenceDate: 206),
-            isPaused: false,
-            signal: activitySignal(6, 6)
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 206),
+                isPaused: false,
+                signal: activitySignal(14, 14)
+            ),
+            .noNewActivity
         )
 
         detector.noteCompanionInteraction(at: Date(timeIntervalSinceReferenceDate: 206))
@@ -150,7 +225,7 @@ final class BreakCompanionTests: XCTestCase {
             detector.decision(
                 at: Date(timeIntervalSinceReferenceDate: 207),
                 isPaused: false,
-                signal: activitySignal(0, 7)
+                signal: activitySignal(0, 15)
             ),
             .companionInteraction
         )
@@ -158,31 +233,35 @@ final class BreakCompanionTests: XCTestCase {
             detector.decision(
                 at: Date(timeIntervalSinceReferenceDate: 210),
                 isPaused: false,
-                signal: activitySignal(3, 10)
+                signal: activitySignal(3, 18)
             ),
-            .noNewActivity
+            .noNewActivity,
+            "Companion protection expiring must not by itself read as resumed work"
         )
 
         XCTAssertEqual(
             detector.decision(
                 at: Date(timeIntervalSinceReferenceDate: 211),
                 isPaused: false,
-                signal: activitySignal(0, 11)
+                signal: activitySignal(0, 19)
             ),
             .resumedWork
         )
 
         detector.start(at: Date(timeIntervalSinceReferenceDate: 300), signal: activitySignal(8, 8))
-        _ = detector.decision(
-            at: Date(timeIntervalSinceReferenceDate: 306),
-            isPaused: false,
-            signal: activitySignal(6, 6)
+        XCTAssertEqual(
+            detector.decision(
+                at: Date(timeIntervalSinceReferenceDate: 306),
+                isPaused: false,
+                signal: activitySignal(14, 14)
+            ),
+            .noNewActivity
         )
         XCTAssertEqual(
             detector.decision(
                 at: Date(timeIntervalSinceReferenceDate: 307),
                 isPaused: true,
-                signal: activitySignal(0, 7)
+                signal: activitySignal(0, 15)
             ),
             .paused
         )
@@ -190,15 +269,16 @@ final class BreakCompanionTests: XCTestCase {
             detector.decision(
                 at: Date(timeIntervalSinceReferenceDate: 308),
                 isPaused: true,
-                signal: activitySignal(1, 8)
+                signal: activitySignal(1, 16)
             ),
-            .noNewActivity
+            .paused,
+            "Activity that continues while paused stays protected"
         )
         XCTAssertEqual(
             detector.decision(
                 at: Date(timeIntervalSinceReferenceDate: 309),
                 isPaused: false,
-                signal: activitySignal(0, 9)
+                signal: activitySignal(0, 17)
             ),
             .resumedWork,
             "Activity after Resume is eligible even when activity during Pause was ignored"
@@ -223,14 +303,14 @@ final class BreakCompanionTests: XCTestCase {
 
         XCTAssertEqual(
             store.evaluateRoutineActivity(
-                signal: activitySignal(6, 6),
+                signal: activitySignal(14, 14),
                 at: Date(timeIntervalSinceReferenceDate: 406)
             ),
             .noNewActivity
         )
         XCTAssertEqual(
             store.evaluateRoutineActivity(
-                signal: activitySignal(0, 7),
+                signal: activitySignal(0, 15),
                 at: Date(timeIntervalSinceReferenceDate: 407)
             ),
             .resumedWork
@@ -248,6 +328,43 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertFalse(store.isPaused)
         XCTAssertEqual(defaults.stringArray(forKey: "session.recentCompletedMoveIDs"), ["shoulder-rolls"])
         store.endRoutine()
+    }
+
+    @MainActor
+    func testCompanionSurfaceInteractionKeepsTheRoutineRunningUntilProtectionExpires() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults
+        )
+        store.continueWithBalancedDefaults()
+        // The detector protection window is measured from the wall clock inside the store, so
+        // anchor the injected poll times to the same reference.
+        let now = Date()
+        store.startRoutine(at: now.addingTimeInterval(-6), activitySignal: activitySignal(30, 30))
+        store.noteCompanionInteraction()
+
+        XCTAssertEqual(
+            store.evaluateRoutineActivity(
+                signal: activitySignal(0.2, 0.2),
+                at: now.addingTimeInterval(1)
+            ),
+            .companionInteraction
+        )
+        XCTAssertEqual(store.mode, .routine)
+
+        XCTAssertEqual(
+            store.evaluateRoutineActivity(
+                signal: activitySignal(0.2, 0.2),
+                at: now.addingTimeInterval(4)
+            ),
+            .resumedWork
+        )
+        XCTAssertEqual(store.mode, .checkIn)
     }
 
     func testBodyAreaOptionsMatchTheScoutRecommendation() {

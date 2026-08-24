@@ -35,6 +35,9 @@ struct CompanionView: View {
         }
         .padding(8)
         .background(Color.clear)
+        .onContinuousHover { phase in
+            if case .active = phase { store.noteCompanionInteraction() }
+        }
         .animation(.spring(response: 0.45, dampingFraction: 0.84), value: store.mode)
     }
 

@@ -6,7 +6,7 @@ private final class CompanionPanel: NSPanel {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, NSMenuDelegate {
     private let store = CompanionStore()
     private var panel: NSPanel?
     private var statusItem: NSStatusItem?
@@ -65,18 +65,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         menu.addItem(NSMenuItem.separator())
         menu.addItem(withTitle: "Quit \(ProductIdentity.name)", action: #selector(quit), keyEquivalent: "q")
         menu.items.forEach { $0.target = self }
+        menu.delegate = self
         item.menu = menu
         statusItem = item
     }
 
     @objc private func offerBreak() {
+        store.noteCompanionInteraction()
         panel?.orderFrontRegardless()
         store.offerBreakNow()
     }
 
     @objc private func configureAreas() {
+        store.noteCompanionInteraction()
         panel?.orderFrontRegardless()
         store.openAreaConfiguration()
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        store.noteCompanionInteraction()
+    }
+
+    func menu(_ menu: NSMenu, willHighlight item: NSMenuItem?) {
+        store.noteCompanionInteraction()
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        store.noteCompanionInteraction()
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
