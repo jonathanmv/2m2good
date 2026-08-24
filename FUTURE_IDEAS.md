@@ -6,11 +6,14 @@ An active routine now watches only macOS’s aggregate time-since-last-keyboard/
 activity signal. A conservative five-second initial grace period and three-second
 protection after companion controls prevent the companion’s own Start, Pause,
 Resume, Next, and End interactions from immediately cancelling a routine. That
-protection is also refreshed while the pointer moves over the companion window
-or its menu-bar menu, so reaching for those controls is never read as work.
-Input that keeps going while a sample is protected still qualifies once the
-protection ends, because activity inside the last polling second counts as well
-as a drop in the aggregate age.
+protection is also granted by hovering a routine control or opening the
+menu-bar menu, and is capped at thirty seconds per routine so it can never be
+renewed indefinitely. Input that keeps going while a sample is protected still
+qualifies once the protection ends, because activity inside the last polling
+second counts as well as a drop in the aggregate age. Keyboard evidence
+qualifies at once; pointer evidence must hold on two consecutive polls, so
+reaching for a control or nudging the mouse cannot cancel a routine while
+continuous mousing still does.
 Pause is an explicitly protected state: activity while paused is ignored, while
 activity after Resume can qualify as resumed work.
 

@@ -450,6 +450,58 @@ enum SelfCheck {
             failures.append("typing that continues past the grace period should qualify as resumed work")
         }
 
+        var pointer = RoutineActivityDetector()
+        pointer.start(at: start, signal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 25))
+        if pointer.decision(
+            at: start.addingTimeInterval(30.3),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 90.3, pointerIdle: 0.3)
+        ) != .noNewActivity {
+            failures.append("a brief pointer reach toward a companion control should not cancel a routine")
+        }
+        pointer.noteCompanionInteraction(at: start.addingTimeInterval(30.5))
+        if pointer.decision(
+            at: start.addingTimeInterval(31.3),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 91.3, pointerIdle: 0.5)
+        ) != .companionInteraction {
+            failures.append("a companion control should open onto a live routine")
+        }
+
+        var mousing = RoutineActivityDetector()
+        mousing.start(at: start, signal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 60))
+        _ = mousing.decision(
+            at: start.addingTimeInterval(10),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 70, pointerIdle: 0.3)
+        )
+        if mousing.decision(
+            at: start.addingTimeInterval(11),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 71, pointerIdle: 0.4)
+        ) != .resumedWork {
+            failures.append("pointer movement across consecutive polls should qualify as resumed work")
+        }
+
+        var budgeted = RoutineActivityDetector()
+        budgeted.start(at: start, signal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 60))
+        var poll = 6.0
+        var lastDecision = RoutineActivityDecision.noNewActivity
+        while poll < 100 {
+            budgeted.noteCompanionInteraction(at: start.addingTimeInterval(poll))
+            lastDecision = budgeted.decision(
+                at: start.addingTimeInterval(poll),
+                isPaused: false,
+                signal: LocalActivitySignal(keyboardIdle: 60 + poll, pointerIdle: 0.2)
+            )
+            if lastDecision == .resumedWork { break }
+            poll += 1
+        }
+        if lastDecision != .resumedWork
+            || budgeted.companionProtectionUsed > RoutineActivityPolicy.companionProtectionBudget {
+            failures.append("companion protection should be capped by its per-routine budget")
+        }
+
         MainActor.assumeIsolated {
             withIsolatedDefaults("activity-recovery") { defaults in
                 let store = CompanionStore(environment: ["BREAK_INTERVAL_SECONDS": "3600"], defaults: defaults)

@@ -208,6 +208,93 @@ final class BreakCompanionTests: XCTestCase {
         )
     }
 
+    func testBriefPointerReachTowardACompanionControlDoesNotCancelTheRoutine() {
+        var detector = RoutineActivityDetector()
+        detector.start(at: referenceDate(100), signal: activitySignal(60, 25))
+
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(129), isPaused: false, signal: activitySignal(89, 54)),
+            .noNewActivity
+        )
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(130.3), isPaused: false, signal: activitySignal(90.3, 0.3)),
+            .noNewActivity,
+            "A single poll of pointer movement is a reach, not resumed work"
+        )
+
+        detector.noteCompanionInteraction(at: referenceDate(130.5))
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(131.3), isPaused: false, signal: activitySignal(91.3, 0.5)),
+            .companionInteraction,
+            "The control the user was reaching for must open onto a live routine"
+        )
+    }
+
+    func testSinglePointerNudgeAtTheGraceBoundaryDoesNotCancelTheRoutine() {
+        var detector = RoutineActivityDetector()
+        detector.start(at: referenceDate(100), signal: activitySignal(60, 60))
+
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(104.2), isPaused: false, signal: activitySignal(64.2, 64.2)),
+            .noNewActivity
+        )
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(105.2), isPaused: false, signal: activitySignal(65.2, 0.9)),
+            .noNewActivity,
+            "Nudging the pointer aside just after Start must not cancel the routine"
+        )
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(106.2), isPaused: false, signal: activitySignal(66.2, 1.9)),
+            .noNewActivity
+        )
+    }
+
+    func testContinuousPointerMovementQualifiesOnTheSecondConsecutivePoll() {
+        var detector = RoutineActivityDetector()
+        detector.start(at: referenceDate(100), signal: activitySignal(60, 60))
+
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(110), isPaused: false, signal: activitySignal(70, 0.3)),
+            .noNewActivity
+        )
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(111), isPaused: false, signal: activitySignal(71, 0.4)),
+            .resumedWork,
+            "Pointer movement that spans consecutive polls is resumed work"
+        )
+    }
+
+    func testCompanionProtectionCannotBeRenewedWithoutBound() {
+        var detector = RoutineActivityDetector()
+        detector.start(at: referenceDate(200), signal: activitySignal(60, 60))
+
+        var poll = 206.0
+        var protectedPolls = 0
+        var decision = RoutineActivityDecision.noNewActivity
+        while poll < 300 {
+            detector.noteCompanionInteraction(at: referenceDate(poll))
+            decision = detector.decision(
+                at: referenceDate(poll),
+                isPaused: false,
+                signal: activitySignal(60 + poll - 200, 0.2)
+            )
+            if decision == .resumedWork { break }
+            if decision == .companionInteraction { protectedPolls += 1 }
+            poll += 1
+        }
+
+        XCTAssertEqual(decision, .resumedWork, "Companion protection must not be renewable without bound")
+        XCTAssertGreaterThan(
+            protectedPolls,
+            10,
+            "The protection budget must still cover a generous amount of deliberate control use"
+        )
+        XCTAssertLessThanOrEqual(
+            detector.companionProtectionUsed,
+            RoutineActivityPolicy.companionProtectionBudget
+        )
+    }
+
     func testRoutineActivityDetectorProtectsCompanionControlsAndPause() {
         var detector = RoutineActivityDetector()
         detector.start(at: Date(timeIntervalSinceReferenceDate: 200), signal: activitySignal(8, 8))
@@ -904,6 +991,10 @@ final class BreakCompanionTests: XCTestCase {
 
     private func activitySignal(_ keyboardIdle: TimeInterval, _ pointerIdle: TimeInterval) -> LocalActivitySignal {
         LocalActivitySignal(keyboardIdle: keyboardIdle, pointerIdle: pointerIdle)
+    }
+
+    private func referenceDate(_ secondsSinceReference: TimeInterval) -> Date {
+        Date(timeIntervalSinceReferenceDate: secondsSinceReference)
     }
 
     private func makeMove(

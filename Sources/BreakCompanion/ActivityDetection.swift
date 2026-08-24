@@ -20,15 +20,14 @@ struct LocalActivitySignal: Equatable {
         )
     }
 
-    func hasActivityReset(from previous: LocalActivitySignal, tolerance: TimeInterval) -> Bool {
-        keyboardIdle + tolerance < previous.keyboardIdle
-            || pointerIdle + tolerance < previous.pointerIdle
+    func hasKeyboardActivity(comparedTo previous: LocalActivitySignal?, window: TimeInterval, tolerance: TimeInterval) -> Bool {
+        keyboardIdle <= window
+            || previous.map { keyboardIdle + tolerance < $0.keyboardIdle } ?? false
     }
 
-    /// True when either aggregate age shows input inside the most recent polling window, so
-    /// input that keeps going is still visible after a sample was ignored as protected.
-    func hasSustainedActivity(within window: TimeInterval) -> Bool {
-        min(keyboardIdle, pointerIdle) <= window
+    func hasPointerActivity(comparedTo previous: LocalActivitySignal?, window: TimeInterval, tolerance: TimeInterval) -> Bool {
+        pointerIdle <= window
+            || previous.map { pointerIdle + tolerance < $0.pointerIdle } ?? false
     }
 }
 
@@ -44,21 +43,38 @@ enum RoutineActivityDecision: Equatable {
 struct RoutineActivityPolicy {
     static let initialGracePeriod: TimeInterval = 5
     static let companionInteractionTolerance: TimeInterval = 3
+    static let companionProtectionBudget: TimeInterval = 30
     static let activityResetTolerance: TimeInterval = 0.5
     static let sustainedActivityWindow: TimeInterval = 1
+    /// Reaching for a companion control also moves the pointer age, so pointer evidence
+    /// has to survive consecutive polls.
+    static let pointerPersistencePolls = 2
+
+    func hasKeyboardActivity(previousSignal: LocalActivitySignal?, currentSignal: LocalActivitySignal) -> Bool {
+        currentSignal.hasKeyboardActivity(
+            comparedTo: previousSignal,
+            window: Self.sustainedActivityWindow,
+            tolerance: Self.activityResetTolerance
+        )
+    }
+
+    func hasPointerActivity(previousSignal: LocalActivitySignal?, currentSignal: LocalActivitySignal) -> Bool {
+        currentSignal.hasPointerActivity(
+            comparedTo: previousSignal,
+            window: Self.sustainedActivityWindow,
+            tolerance: Self.activityResetTolerance
+        )
+    }
 
     func decision(
         elapsedSinceStart: TimeInterval,
         isPaused: Bool,
         companionInteractionRemaining: TimeInterval,
-        previousSignal: LocalActivitySignal?,
-        currentSignal: LocalActivitySignal
+        hasKeyboardActivity: Bool,
+        consecutivePointerActivityPolls: Int
     ) -> RoutineActivityDecision {
-        let hasResetEdge = previousSignal.map {
-            currentSignal.hasActivityReset(from: $0, tolerance: Self.activityResetTolerance)
-        } ?? false
-        let isStillActive = currentSignal.hasSustainedActivity(within: Self.sustainedActivityWindow)
-        guard hasResetEdge || isStillActive else {
+        let pointerQualifies = consecutivePointerActivityPolls >= Self.pointerPersistencePolls
+        guard hasKeyboardActivity || pointerQualifies else {
             return .noNewActivity
         }
         if elapsedSinceStart < Self.initialGracePeriod {
@@ -78,17 +94,27 @@ struct RoutineActivityDetector {
     private(set) var startedAt: Date?
     private(set) var previousSignal: LocalActivitySignal?
     private(set) var companionProtectedUntil: Date?
+    private(set) var consecutivePointerActivityPolls = 0
+    private(set) var companionProtectionUsed: TimeInterval = 0
     private let policy = RoutineActivityPolicy()
 
     mutating func start(at date: Date, signal: LocalActivitySignal) {
         startedAt = date
         previousSignal = signal
         companionProtectedUntil = nil
+        consecutivePointerActivityPolls = 0
+        companionProtectionUsed = 0
     }
 
+    /// Budget-capped so repeated grants can never suppress detection for a whole routine.
     mutating func noteCompanionInteraction(at date: Date) {
-        let protectedUntil = date.addingTimeInterval(RoutineActivityPolicy.companionInteractionTolerance)
-        companionProtectedUntil = max(companionProtectedUntil ?? date, protectedUntil)
+        let currentEnd = max(companionProtectedUntil ?? date, date)
+        let requestedEnd = date.addingTimeInterval(RoutineActivityPolicy.companionInteractionTolerance)
+        let remainingBudget = max(0, RoutineActivityPolicy.companionProtectionBudget - companionProtectionUsed)
+        let granted = min(max(0, requestedEnd.timeIntervalSince(currentEnd)), remainingBudget)
+        guard granted > 0 else { return }
+        companionProtectionUsed += granted
+        companionProtectedUntil = currentEnd.addingTimeInterval(granted)
     }
 
     mutating func decision(
@@ -98,14 +124,16 @@ struct RoutineActivityDetector {
     ) -> RoutineActivityDecision {
         let previous = previousSignal
         previousSignal = signal
+        let pointerActive = policy.hasPointerActivity(previousSignal: previous, currentSignal: signal)
+        consecutivePointerActivityPolls = pointerActive ? consecutivePointerActivityPolls + 1 : 0
         guard let startedAt else { return .noNewActivity }
         let remainingProtection = max(0, (companionProtectedUntil ?? date).timeIntervalSince(date))
         return policy.decision(
             elapsedSinceStart: date.timeIntervalSince(startedAt),
             isPaused: isPaused,
             companionInteractionRemaining: remainingProtection,
-            previousSignal: previous,
-            currentSignal: signal
+            hasKeyboardActivity: policy.hasKeyboardActivity(previousSignal: previous, currentSignal: signal),
+            consecutivePointerActivityPolls: consecutivePointerActivityPolls
         )
     }
 
@@ -113,5 +141,7 @@ struct RoutineActivityDetector {
         startedAt = nil
         previousSignal = nil
         companionProtectedUntil = nil
+        consecutivePointerActivityPolls = 0
+        companionProtectionUsed = 0
     }
 }

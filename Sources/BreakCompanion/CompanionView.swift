@@ -35,9 +35,6 @@ struct CompanionView: View {
         }
         .padding(8)
         .background(Color.clear)
-        .onContinuousHover { phase in
-            if case .active = phase { store.noteCompanionInteraction() }
-        }
         .animation(.spring(response: 0.45, dampingFraction: 0.84), value: store.mode)
     }
 
@@ -242,8 +239,11 @@ struct CompanionView: View {
 
             HStack(spacing: 10) {
                 Button(store.isPaused ? "Resume" : "Pause", action: store.togglePause)
+                    .onHover { if $0 { store.noteCompanionInteraction() } }
                 Button("Next", action: store.nextRoutine)
+                    .onHover { if $0 { store.noteCompanionInteraction() } }
                 Button("End", action: store.endRoutine)
+                    .onHover { if $0 { store.noteCompanionInteraction() } }
             }
             .buttonStyle(QuietButtonStyle())
         }
