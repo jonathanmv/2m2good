@@ -5,7 +5,7 @@ A deliberately small, local macOS break companion. After 60 minutes of active ke
 ## What is in the pilot
 
 - A small floating orb plus a menu-bar fallback; no dashboard, history, streaks, or account.
-- Active-use timing that pauses while the Mac is idle.
+- Active-use timing that pauses while the Mac is idle and starts a fresh interval when activity returns after at least the idle threshold; delayed timer callbacks and sleep gaps never count as work.
 - Warm check-ins with **Start**, **Later** (one hour), and **Tomorrow**.
 - Speech recognition for natural affirmatives such as “yeah,” “yes,” “yep,” “let’s do it,” and “let’s go,” plus “start,” “later,” “tomorrow,” “in 20 minutes,” or “in two hours.”
 - A library of gentle, standing-compatible desk-break movements. Each offered session combines six different 20-second movements into a fresh two-minute reset.
@@ -112,7 +112,7 @@ The normal active-work interval is 3,600 seconds. Override it when launching the
 BREAK_INTERVAL_SECONDS=5 ".build/app/2m2better.app/Contents/MacOS/BreakCompanion"
 ```
 
-`BREAK_IDLE_THRESHOLD_SECONDS` can also replace the default 60-second idle threshold. Values are clamped to sensible testing minimums.
+`BREAK_IDLE_THRESHOLD_SECONDS` can also replace the default 60-second idle threshold. When no keyboard or mouse activity has been seen for at least that threshold, the next active sample resets the interval before adding only the current timer tick; a sleep gap is never counted as active work. Values are clamped to sensible testing minimums.
 
 Run the packaged logic checks with:
 

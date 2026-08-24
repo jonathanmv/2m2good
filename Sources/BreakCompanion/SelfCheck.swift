@@ -9,6 +9,7 @@ enum SelfCheck {
         checkProgress(&failures)
         checkVoice(&failures)
         checkCompletion(&failures)
+        checkActiveUseTiming(&failures)
         checkMoveLibraryAndComposition(&failures)
         checkPersistence(&failures)
         checkConfigurationFlow(&failures)
@@ -17,7 +18,7 @@ enum SelfCheck {
         checkActivityDetectionAndRecovery(&failures)
 
         if failures.isEmpty {
-            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, standing session composition, body-area selection, first-run and menu-bar configuration, legacy migration, supportive wording, recent-shown persistence, focus balance, voice variants, completion dismissal, progress color, pointer movement, and routine activity recovery.")
+            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, standing session composition, body-area selection, first-run and menu-bar configuration, legacy migration, supportive wording, recent-shown persistence, focus balance, voice variants, completion dismissal, progress color, pointer movement, routine activity recovery, and idle-session reset.")
             return true
         }
 
@@ -137,6 +138,89 @@ enum SelfCheck {
         } catch {
             failures.append("an insecure asset failed with an unexpected error")
         }
+    }
+
+    private static func checkActiveUseTiming(_ failures: inout [String]) {
+        let start = Date(timeIntervalSinceReferenceDate: 1_000)
+        var tracker = nearDueTracker(start: start)
+        _ = tracker.tick(at: start.addingTimeInterval(3_600), userIsActive: false)
+        let resumed = tracker.tick(
+            at: start.addingTimeInterval(14_400),
+            userIsActive: true
+        )
+        if !resumed.didResetAfterIdle
+            || resumed.activeSeconds != ActiveUseTracker.maximumTimerDelta
+            || resumed.shouldOfferCheckIn {
+            failures.append("near-due active credit should reset after a long idle")
+        }
+
+        var delayed = nearDueTracker(start: start.addingTimeInterval(20_000))
+        let delayedResult = delayed.tick(
+            at: start.addingTimeInterval(20_000 + 4 * 60 * 60),
+            userIsActive: true
+        )
+        if !delayedResult.didResetAfterIdle
+            || delayedResult.activeSeconds != ActiveUseTracker.maximumTimerDelta
+            || delayedResult.shouldOfferCheckIn {
+            failures.append("a delayed post-sleep callback must not count the sleep gap")
+        }
+
+        var continuous = ActiveUseTracker(
+            activeInterval: 5,
+            idleThreshold: 60,
+            startedAt: start
+        )
+        for second in 1...4 {
+            if continuous.tick(
+                at: start.addingTimeInterval(TimeInterval(second)),
+                userIsActive: true
+            ).shouldOfferCheckIn {
+                failures.append("continuous active use offered too early")
+            }
+        }
+        if !continuous.tick(at: start.addingTimeInterval(5), userIsActive: true).shouldOfferCheckIn {
+            failures.append("continuous active use should reach the interval")
+        }
+
+        var fresh = ActiveUseTracker(
+            activeInterval: 3_600,
+            idleThreshold: 60,
+            startedAt: start
+        )
+        let firstSample = fresh.tick(at: start.addingTimeInterval(1), userIsActive: true)
+        if firstSample.activeSeconds != 1 || firstSample.shouldOfferCheckIn {
+            failures.append("a fresh launch should start with no active credit")
+        }
+
+        var masked = ActiveUseTracker(
+            activeInterval: 5,
+            idleThreshold: 60,
+            startedAt: start
+        )
+        _ = masked.tick(at: start.addingTimeInterval(1), userIsActive: true)
+        _ = masked.tick(at: start.addingTimeInterval(2), userIsActive: true)
+        _ = masked.tick(at: start.addingTimeInterval(63), userIsActive: false)
+        let maskedResult = masked.tick(at: start.addingTimeInterval(3_600), userIsActive: true)
+        if !maskedResult.didResetAfterIdle
+            || maskedResult.activeSeconds != ActiveUseTracker.maximumTimerDelta
+            || maskedResult.shouldOfferCheckIn {
+            failures.append("below-threshold credit should remain masked after idle")
+        }
+    }
+
+    private static func nearDueTracker(start: Date) -> ActiveUseTracker {
+        var tracker = ActiveUseTracker(
+            activeInterval: 3_600,
+            idleThreshold: 60,
+            startedAt: start
+        )
+        for second in 1...3_599 {
+            _ = tracker.tick(
+                at: start.addingTimeInterval(TimeInterval(second)),
+                userIsActive: true
+            )
+        }
+        return tracker
     }
 
     private static func checkProgress(_ failures: inout [String]) {

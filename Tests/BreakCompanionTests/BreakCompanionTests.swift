@@ -317,6 +317,125 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertFalse(state.isCurrent(first), "A stale task from an earlier completion must not close a future screen")
     }
 
+    func testNearThresholdActiveUseResetsAfterLongIdle() {
+        let start = referenceDate(1_000)
+        var tracker = makeNearDueTracker(start: start)
+        XCTAssertEqual(tracker.accumulatedActiveTime, 3_599)
+
+        _ = tracker.tick(at: start.addingTimeInterval(3_600), userIsActive: false)
+        let resumed = tracker.tick(
+            at: start.addingTimeInterval(14_400),
+            userIsActive: true
+        )
+
+        XCTAssertTrue(resumed.didResetAfterIdle)
+        XCTAssertEqual(resumed.activeSeconds, 2)
+        XCTAssertFalse(resumed.shouldOfferCheckIn)
+    }
+
+    func testDelayedPostSleepCallbackDoesNotCountTheSleepGap() {
+        let start = referenceDate(2_000)
+        var tracker = makeNearDueTracker(start: start)
+
+        let resumed = tracker.tick(
+            at: start.addingTimeInterval(4 * 60 * 60),
+            userIsActive: true
+        )
+
+        XCTAssertTrue(resumed.didResetAfterIdle)
+        XCTAssertEqual(resumed.activeSeconds, ActiveUseTracker.maximumTimerDelta)
+        XCTAssertFalse(resumed.shouldOfferCheckIn)
+    }
+
+    func testContinuousActiveUseStillReachesTheCheckInInterval() {
+        let start = referenceDate(3_000)
+        var tracker = ActiveUseTracker(
+            activeInterval: 5,
+            idleThreshold: 60,
+            startedAt: start
+        )
+
+        for second in 1...4 {
+            XCTAssertFalse(
+                tracker.tick(at: start.addingTimeInterval(TimeInterval(second)), userIsActive: true)
+                    .shouldOfferCheckIn
+            )
+        }
+        let due = tracker.tick(at: start.addingTimeInterval(5), userIsActive: true)
+
+        XCTAssertEqual(due.activeSeconds, 5)
+        XCTAssertTrue(due.shouldOfferCheckIn)
+    }
+
+    func testFreshRelaunchStartsWithNoActiveCredit() {
+        var tracker = ActiveUseTracker(
+            activeInterval: 3_600,
+            idleThreshold: 60,
+            startedAt: referenceDate(4_000)
+        )
+
+        let firstSample = tracker.tick(
+            at: referenceDate(4_001),
+            userIsActive: true
+        )
+
+        XCTAssertEqual(firstSample.activeSeconds, 1)
+        XCTAssertFalse(firstSample.shouldOfferCheckIn)
+    }
+
+    func testBelowThresholdLongIdleRemainsMaskedWithoutAnOffer() {
+        let start = referenceDate(5_000)
+        var tracker = ActiveUseTracker(
+            activeInterval: 5,
+            idleThreshold: 60,
+            startedAt: start
+        )
+        _ = tracker.tick(at: start.addingTimeInterval(1), userIsActive: true)
+        _ = tracker.tick(at: start.addingTimeInterval(2), userIsActive: true)
+        _ = tracker.tick(at: start.addingTimeInterval(63), userIsActive: false)
+
+        let resumed = tracker.tick(at: start.addingTimeInterval(3_600), userIsActive: true)
+
+        XCTAssertTrue(resumed.didResetAfterIdle)
+        XCTAssertEqual(resumed.activeSeconds, 2)
+        XCTAssertFalse(resumed.shouldOfferCheckIn)
+    }
+
+    @MainActor
+    func testManualOfferAndLaterTomorrowSchedulesRemainIntact() async {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let start = referenceDate(6_000)
+        var now = start
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults,
+            nowProvider: { now }
+        )
+        store.continueWithBalancedDefaults()
+        store.offerBreakNow()
+        XCTAssertEqual(store.mode, .checkIn)
+
+        store.postpone(minutes: 60)
+        XCTAssertEqual(store.statusText, "I’ll check back in an hour.")
+        try? await Task.sleep(for: .seconds(1.7))
+        XCTAssertEqual(store.mode, .idle)
+
+        now = start.addingTimeInterval(3_600)
+        store.tickForTesting(at: now, userIsActive: false)
+        XCTAssertEqual(store.mode, .idle)
+        store.tickForTesting(at: now, userIsActive: true)
+        XCTAssertEqual(store.mode, .checkIn)
+
+        store.postponeUntilTomorrow()
+        XCTAssertEqual(store.statusText, "See you tomorrow.")
+        try? await Task.sleep(for: .seconds(1.7))
+        XCTAssertEqual(store.mode, .idle)
+    }
+
     func testRoutineActivityDetectorGraceAndResetToleranceAreDeterministic() {
         var detector = RoutineActivityDetector()
         detector.start(at: Date(timeIntervalSinceReferenceDate: 100), signal: activitySignal(8, 8))
@@ -1582,6 +1701,22 @@ final class BreakCompanionTests: XCTestCase {
     private func referenceDate(_ secondsSinceReference: TimeInterval) -> Date {
         Date(timeIntervalSinceReferenceDate: secondsSinceReference)
     }
+
+    private func makeNearDueTracker(start: Date) -> ActiveUseTracker {
+        var tracker = ActiveUseTracker(
+            activeInterval: 3_600,
+            idleThreshold: 60,
+            startedAt: start
+        )
+        for second in 1...3_599 {
+            _ = tracker.tick(
+                at: start.addingTimeInterval(TimeInterval(second)),
+                userIsActive: true
+            )
+        }
+        return tracker
+    }
+
     private func makeMove(
         _ id: String,
         _ focuses: Set<BodyFocus>,
