@@ -249,6 +249,57 @@ final class BreakCompanionTests: XCTestCase {
         )
     }
 
+    func testPointerEvidenceGatheredWhileProtectedDoesNotCancelAfterResume() {
+        var detector = RoutineActivityDetector()
+        detector.start(at: referenceDate(0), signal: activitySignal(60, 60))
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(10), isPaused: true, signal: activitySignal(70, 70)),
+            .noNewActivity
+        )
+
+        detector.noteCompanionInteraction(at: referenceDate(40))
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(41), isPaused: false, signal: activitySignal(101, 0.4)),
+            .noNewActivity
+        )
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(42), isPaused: false, signal: activitySignal(102, 0.3)),
+            .companionInteraction
+        )
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(43), isPaused: false, signal: activitySignal(103, 0.7)),
+            .noNewActivity,
+            "Withdrawing the pointer from a control must not cancel the routine the user just resumed"
+        )
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(44), isPaused: false, signal: activitySignal(104, 1.7)),
+            .noNewActivity
+        )
+    }
+
+    func testPointerEvidenceGatheredDuringGraceDoesNotCancelAtTheBoundary() {
+        var detector = RoutineActivityDetector()
+        detector.start(at: referenceDate(0), signal: activitySignal(60, 60))
+
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(1), isPaused: false, signal: activitySignal(61, 0.4)),
+            .noNewActivity
+        )
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(2), isPaused: false, signal: activitySignal(62, 0.3)),
+            .initialGracePeriod
+        )
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(5.2), isPaused: false, signal: activitySignal(65.2, 0.6)),
+            .noNewActivity,
+            "Settling in during the grace period must not cancel the routine at the grace boundary"
+        )
+        XCTAssertEqual(
+            detector.decision(at: referenceDate(6.2), isPaused: false, signal: activitySignal(66.2, 1.6)),
+            .noNewActivity
+        )
+    }
+
     func testContinuousPointerMovementQualifiesOnTheSecondConsecutivePoll() {
         var detector = RoutineActivityDetector()
         detector.start(at: referenceDate(100), signal: activitySignal(60, 60))
@@ -449,6 +500,9 @@ final class BreakCompanionTests: XCTestCase {
             .resumedWork
         )
         XCTAssertEqual(store.mode, .checkIn)
+
+        store.startRoutine(at: referenceDate(11), activitySignal: activitySignal(0, 0))
+        store.endRoutine()
     }
 
     @MainActor
@@ -488,6 +542,10 @@ final class BreakCompanionTests: XCTestCase {
         store.noteCompanionInteraction(at: referenceDate(36))
         XCTAssertEqual(
             store.evaluateRoutineActivity(signal: activitySignal(96, 0.3), at: referenceDate(37)),
+            .noNewActivity
+        )
+        XCTAssertEqual(
+            store.evaluateRoutineActivity(signal: activitySignal(97, 0.4), at: referenceDate(38)),
             .companionInteraction
         )
         XCTAssertEqual(store.mode, .routine)
@@ -495,9 +553,16 @@ final class BreakCompanionTests: XCTestCase {
 
         XCTAssertEqual(
             store.evaluateRoutineActivity(signal: activitySignal(100, 0.3), at: referenceDate(41)),
+            .noNewActivity
+        )
+        XCTAssertEqual(
+            store.evaluateRoutineActivity(signal: activitySignal(101, 0.4), at: referenceDate(42)),
             .resumedWork
         )
         XCTAssertEqual(store.mode, .checkIn)
+
+        store.startRoutine(at: referenceDate(43), activitySignal: activitySignal(0, 0))
+        store.endRoutine()
     }
 
     func testBodyAreaOptionsMatchTheScoutRecommendation() {

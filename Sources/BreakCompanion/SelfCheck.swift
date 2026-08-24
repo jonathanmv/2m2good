@@ -468,6 +468,47 @@ enum SelfCheck {
             failures.append("a companion control should open onto a live routine")
         }
 
+        var withdrawing = RoutineActivityDetector()
+        withdrawing.start(at: start, signal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 60))
+        withdrawing.noteCompanionInteraction(at: start.addingTimeInterval(40))
+        _ = withdrawing.decision(
+            at: start.addingTimeInterval(41),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 101, pointerIdle: 0.4)
+        )
+        _ = withdrawing.decision(
+            at: start.addingTimeInterval(42),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 102, pointerIdle: 0.3)
+        )
+        if withdrawing.decision(
+            at: start.addingTimeInterval(43),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 103, pointerIdle: 0.7)
+        ) != .noNewActivity {
+            failures.append("pointer evidence gathered while protected should not cancel a routine")
+        }
+
+        var settling = RoutineActivityDetector()
+        settling.start(at: start, signal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 60))
+        _ = settling.decision(
+            at: start.addingTimeInterval(1),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 61, pointerIdle: 0.4)
+        )
+        _ = settling.decision(
+            at: start.addingTimeInterval(2),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 62, pointerIdle: 0.3)
+        )
+        if settling.decision(
+            at: start.addingTimeInterval(5.2),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 65.2, pointerIdle: 0.6)
+        ) != .noNewActivity {
+            failures.append("settling in during the grace period should not cancel at the grace boundary")
+        }
+
         var mousing = RoutineActivityDetector()
         mousing.start(at: start, signal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 60))
         _ = mousing.decision(
@@ -544,6 +585,8 @@ enum SelfCheck {
                 ) != .resumedWork || store.mode != .checkIn {
                     failures.append("work resumed after companion protection should recover")
                 }
+                store.startRoutine(at: start.addingTimeInterval(11), activitySignal: LocalActivitySignal(keyboardIdle: 0, pointerIdle: 0))
+                store.endRoutine()
             }
 
             withIsolatedDefaults("activity-next-restart") { defaults in
@@ -567,9 +610,13 @@ enum SelfCheck {
                     failures.append("Next should give the new routine its own grace period")
                 }
                 store.noteCompanionInteraction(at: start.addingTimeInterval(36))
-                if store.evaluateRoutineActivity(
+                _ = store.evaluateRoutineActivity(
                     signal: LocalActivitySignal(keyboardIdle: 96, pointerIdle: 0.3),
                     at: start.addingTimeInterval(37)
+                )
+                if store.evaluateRoutineActivity(
+                    signal: LocalActivitySignal(keyboardIdle: 97, pointerIdle: 0.4),
+                    at: start.addingTimeInterval(38)
                 ) != .companionInteraction {
                     failures.append("Next should give the new routine its own protection budget")
                 }

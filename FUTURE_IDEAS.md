@@ -12,9 +12,10 @@ renewed indefinitely. Next starts a brand-new routine, so detection restarts
 with it: a fresh grace period and a fresh protection budget. Input that keeps going while a sample is protected still
 qualifies once the protection ends, because activity inside the last polling
 second counts as well as a drop in the aggregate age. Keyboard evidence
-qualifies at once; pointer evidence must hold on two consecutive polls, so
-reaching for a control or nudging the mouse cannot cancel a routine while
-continuous mousing still does.
+qualifies at once; pointer evidence must hold on two consecutive unprotected
+polls, and pointer evidence seen during grace, pause, or control protection is
+discarded at that boundary, so reaching for a control, withdrawing from one, or
+nudging the mouse cannot cancel a routine while continuous mousing still does.
 Pause is an explicitly protected state: activity while paused is ignored, while
 activity after Resume can qualify as resumed work.
 

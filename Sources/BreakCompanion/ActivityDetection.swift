@@ -128,13 +128,22 @@ struct RoutineActivityDetector {
         consecutivePointerActivityPolls = pointerActive ? consecutivePointerActivityPolls + 1 : 0
         guard let startedAt else { return .noNewActivity }
         let remainingProtection = max(0, (companionProtectedUntil ?? date).timeIntervalSince(date))
-        return policy.decision(
+        let decision = policy.decision(
             elapsedSinceStart: date.timeIntervalSince(startedAt),
             isPaused: isPaused,
             companionInteractionRemaining: remainingProtection,
             hasKeyboardActivity: policy.hasKeyboardActivity(previousSignal: previous, currentSignal: signal),
             consecutivePointerActivityPolls: consecutivePointerActivityPolls
         )
+        // Pointer persistence has to be established by unprotected polls, so a reach whose
+        // polls fall inside grace, pause, or control protection cannot carry over.
+        switch decision {
+        case .initialGracePeriod, .paused, .companionInteraction:
+            consecutivePointerActivityPolls = 0
+        case .noNewActivity, .resumedWork:
+            break
+        }
+        return decision
     }
 
     mutating func reset() {
