@@ -291,7 +291,7 @@ final class CompanionStore: ObservableObject {
 
     private var userIsActive: Bool {
         let signal = LocalActivitySignal.current()
-        return min(signal.pointerIdle, signal.keyboardIdle) < idleThreshold
+        return signal.workActivityIdle < idleThreshold
     }
 
     @discardableResult

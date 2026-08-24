@@ -8,9 +8,14 @@ struct LocalActivitySignal: Equatable {
     let mouseMovementIdle: TimeInterval
     let mouseClickIdle: TimeInterval
     let scrollWheelIdle: TimeInterval
+    let mouseDragIdle: TimeInterval
 
     var pointerIdle: TimeInterval {
-        min(mouseMovementIdle, min(mouseClickIdle, scrollWheelIdle))
+        min(mouseMovementIdle, min(mouseDragIdle, min(mouseClickIdle, scrollWheelIdle)))
+    }
+
+    var workActivityIdle: TimeInterval {
+        min(mouseMovementIdle, keyboardIdle)
     }
 
     init(keyboardIdle: TimeInterval, pointerIdle: TimeInterval) {
@@ -26,27 +31,20 @@ struct LocalActivitySignal: Equatable {
         keyboardIdle: TimeInterval,
         mouseMovementIdle: TimeInterval,
         mouseClickIdle: TimeInterval,
-        scrollWheelIdle: TimeInterval
+        scrollWheelIdle: TimeInterval,
+        mouseDragIdle: TimeInterval = .infinity
     ) {
         self.keyboardIdle = keyboardIdle
         self.mouseMovementIdle = mouseMovementIdle
         self.mouseClickIdle = mouseClickIdle
         self.scrollWheelIdle = scrollWheelIdle
+        self.mouseDragIdle = mouseDragIdle
     }
 
     static func current() -> LocalActivitySignal {
         LocalActivitySignal(
             keyboardIdle: secondsSinceLastEvent(.keyDown),
-            mouseMovementIdle: min(
-                secondsSinceLastEvent(.mouseMoved),
-                min(
-                    secondsSinceLastEvent(.leftMouseDragged),
-                    min(
-                        secondsSinceLastEvent(.rightMouseDragged),
-                        secondsSinceLastEvent(.otherMouseDragged)
-                    )
-                )
-            ),
+            mouseMovementIdle: secondsSinceLastEvent(.mouseMoved),
             mouseClickIdle: min(
                 secondsSinceLastEvent(.leftMouseDown),
                 min(
@@ -54,7 +52,14 @@ struct LocalActivitySignal: Equatable {
                     secondsSinceLastEvent(.otherMouseDown)
                 )
             ),
-            scrollWheelIdle: secondsSinceLastEvent(.scrollWheel)
+            scrollWheelIdle: secondsSinceLastEvent(.scrollWheel),
+            mouseDragIdle: min(
+                secondsSinceLastEvent(.leftMouseDragged),
+                min(
+                    secondsSinceLastEvent(.rightMouseDragged),
+                    secondsSinceLastEvent(.otherMouseDragged)
+                )
+            )
         )
     }
 

@@ -145,6 +145,35 @@ final class BreakCompanionTests: XCTestCase {
         )
     }
 
+    func testRecoveryPointerSignalsDoNotChangeIdleTiming() {
+        let click = LocalActivitySignal(
+            keyboardIdle: 60,
+            mouseMovementIdle: 60,
+            mouseClickIdle: 0.2,
+            scrollWheelIdle: 60
+        )
+        XCTAssertEqual(click.pointerIdle, 0.2)
+        XCTAssertEqual(click.workActivityIdle, 60)
+
+        let drag = LocalActivitySignal(
+            keyboardIdle: 60,
+            mouseMovementIdle: 60,
+            mouseClickIdle: 60,
+            scrollWheelIdle: 60,
+            mouseDragIdle: 0.2
+        )
+        XCTAssertEqual(drag.pointerIdle, 0.2)
+        XCTAssertEqual(drag.workActivityIdle, 60)
+
+        let keyboard = LocalActivitySignal(
+            keyboardIdle: 0.2,
+            mouseMovementIdle: 60,
+            mouseClickIdle: 60,
+            scrollWheelIdle: 60
+        )
+        XCTAssertEqual(keyboard.workActivityIdle, 0.2)
+    }
+
     func testSustainedTypingThroughTheGracePeriodStillQualifiesAfterIt() {
         var detector = RoutineActivityDetector()
         detector.start(at: Date(timeIntervalSinceReferenceDate: 200), signal: activitySignal(30, 0.1))
