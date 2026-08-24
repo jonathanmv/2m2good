@@ -224,7 +224,13 @@ final class VoiceService: NSObject, ObservableObject {
 }
 
 @MainActor
-final class GuideSpeaker {
+/// The spoken side of the companion, injectable so guidance can be observed in tests.
+protocol RoutineSpeaking {
+    func speak(_ text: String)
+    func stop()
+}
+
+final class GuideSpeaker: RoutineSpeaking {
     private let synthesizer = AVSpeechSynthesizer()
 
     func speak(_ text: String) {

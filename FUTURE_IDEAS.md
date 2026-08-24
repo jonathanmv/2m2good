@@ -1,5 +1,13 @@
 # Future ideas and deferred work
 
+## Session integrity and activity detection - implemented for the v1 launch
+
+The deferred session-integrity idea is implemented. The [`README.md`](README.md)
+**Permissions** section is the authoritative description of its interaction,
+privacy, accessibility, pause, and recovery policy; it also owns the intentional
+out-of-scope boundaries. This section remains a status pointer rather than a
+second copy of that policy.
+
 ## Early developer-preview terminal installation - limited preview implemented
 
 The early developer-preview path described here is now implemented as a

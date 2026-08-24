@@ -12,9 +12,10 @@ enum SelfCheck {
         checkConfigurationFlow(&failures)
         checkSupportiveCopy(&failures)
         checkPointer(&failures)
+        checkActivityDetectionAndRecovery(&failures)
 
         if failures.isEmpty {
-            print("Self-check passed: \(ProductIdentity.name) standing session composition, body-area selection, first-run and menu-bar configuration, legacy migration, supportive wording, recent-shown persistence, focus balance, voice variants, completion dismissal, progress color, and pointer movement.")
+            print("Self-check passed: \(ProductIdentity.name) standing session composition, body-area selection, first-run and menu-bar configuration, legacy migration, supportive wording, recent-shown persistence, focus balance, voice variants, completion dismissal, progress color, pointer movement, and routine activity recovery.")
             return true
         }
 
@@ -410,6 +411,309 @@ enum SelfCheck {
         }
         if PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 3, y: 4)) != .drag {
             failures.append("movement past the pointer threshold should become a drag")
+        }
+    }
+
+    private static func checkActivityDetectionAndRecovery(_ failures: inout [String]) {
+        var detector = RoutineActivityDetector()
+        let start = Date(timeIntervalSinceReferenceDate: 400)
+        detector.start(at: start, signal: LocalActivitySignal(keyboardIdle: 8, pointerIdle: 8))
+        if detector.decision(
+            at: start.addingTimeInterval(6),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 14, pointerIdle: 14)
+        ) != .noNewActivity {
+            failures.append("ageing idle signals should not read as resumed work")
+        }
+        if detector.decision(
+            at: start.addingTimeInterval(7),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 0, pointerIdle: 15)
+        ) != .resumedWork {
+            failures.append("a post-grace activity reset should qualify as resumed work")
+        }
+
+        var sustained = RoutineActivityDetector()
+        sustained.start(at: start, signal: LocalActivitySignal(keyboardIdle: 30, pointerIdle: 0.1))
+        if sustained.decision(
+            at: start.addingTimeInterval(1),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 1.1)
+        ) != .initialGracePeriod {
+            failures.append("activity inside the initial grace period should be tolerated")
+        }
+        if sustained.decision(
+            at: start.addingTimeInterval(5),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 5.1)
+        ) != .resumedWork {
+            failures.append("typing that continues past the grace period should qualify as resumed work")
+        }
+
+        var pointer = RoutineActivityDetector()
+        pointer.start(at: start, signal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 25))
+        if pointer.decision(
+            at: start.addingTimeInterval(30.3),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 90.3, pointerIdle: 0.3)
+        ) != .noNewActivity {
+            failures.append("a brief pointer reach toward a companion control should not cancel a routine")
+        }
+        pointer.noteCompanionInteraction(at: start.addingTimeInterval(30.5))
+        if pointer.decision(
+            at: start.addingTimeInterval(31.3),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 91.3, pointerIdle: 0.5)
+        ) != .companionInteraction {
+            failures.append("a companion control should open onto a live routine")
+        }
+
+        var withdrawing = RoutineActivityDetector()
+        withdrawing.start(at: start, signal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 60))
+        withdrawing.noteCompanionInteraction(at: start.addingTimeInterval(40))
+        _ = withdrawing.decision(
+            at: start.addingTimeInterval(41),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 101, pointerIdle: 0.4)
+        )
+        _ = withdrawing.decision(
+            at: start.addingTimeInterval(42),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 102, pointerIdle: 0.3)
+        )
+        if withdrawing.decision(
+            at: start.addingTimeInterval(43),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 103, pointerIdle: 0.7)
+        ) != .noNewActivity {
+            failures.append("pointer evidence gathered while protected should not cancel a routine")
+        }
+
+        var focused = RoutineActivityDetector()
+        focused.start(at: start, signal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 60))
+        if focused.decision(
+            at: start.addingTimeInterval(10),
+            isPaused: false,
+            companionHasKeyboardFocus: true,
+            signal: LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 70)
+        ) != .companionInteraction {
+            failures.append("keyboard input aimed at the companion panel should not cancel a routine")
+        }
+
+        var boundary = RoutineActivityDetector()
+        boundary.start(at: start, signal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 60))
+        _ = boundary.decision(
+            at: start.addingTimeInterval(4.5),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 64.5, pointerIdle: 0.3)
+        )
+        if boundary.decision(
+            at: start.addingTimeInterval(5.5),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 65.5, pointerIdle: 0.1)
+        ) != .noNewActivity {
+            failures.append("one mouse motion spanning the grace boundary should not cancel a routine")
+        }
+
+        var settling = RoutineActivityDetector()
+        settling.start(at: start, signal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 60))
+        _ = settling.decision(
+            at: start.addingTimeInterval(1),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 61, pointerIdle: 0.4)
+        )
+        _ = settling.decision(
+            at: start.addingTimeInterval(2),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 62, pointerIdle: 0.3)
+        )
+        if settling.decision(
+            at: start.addingTimeInterval(5.2),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 65.2, pointerIdle: 0.6)
+        ) != .noNewActivity {
+            failures.append("settling in during the grace period should not cancel at the grace boundary")
+        }
+
+        var mousing = RoutineActivityDetector()
+        mousing.start(at: start, signal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 60))
+        _ = mousing.decision(
+            at: start.addingTimeInterval(10),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 70, pointerIdle: 0.3)
+        )
+        if mousing.decision(
+            at: start.addingTimeInterval(11),
+            isPaused: false,
+            signal: LocalActivitySignal(keyboardIdle: 71, pointerIdle: 0.4)
+        ) != .resumedWork {
+            failures.append("pointer movement across consecutive polls should qualify as resumed work")
+        }
+
+        var clicking = RoutineActivityDetector()
+        clicking.start(
+            at: start,
+            signal: LocalActivitySignal(
+                keyboardIdle: 60,
+                mouseMovementIdle: 60,
+                mouseClickIdle: 60,
+                scrollWheelIdle: 60
+            )
+        )
+        _ = clicking.decision(
+            at: start.addingTimeInterval(10),
+            isPaused: false,
+            signal: LocalActivitySignal(
+                keyboardIdle: 70,
+                mouseMovementIdle: 70,
+                mouseClickIdle: 0.3,
+                scrollWheelIdle: 70
+            )
+        )
+        if clicking.decision(
+            at: start.addingTimeInterval(11),
+            isPaused: false,
+            signal: LocalActivitySignal(
+                keyboardIdle: 71,
+                mouseMovementIdle: 71,
+                mouseClickIdle: 0.4,
+                scrollWheelIdle: 71
+            )
+        ) != .resumedWork {
+            failures.append("mouse clicks without movement should qualify as resumed work")
+        }
+
+        var scrolling = RoutineActivityDetector()
+        scrolling.start(
+            at: start,
+            signal: LocalActivitySignal(
+                keyboardIdle: 60,
+                mouseMovementIdle: 60,
+                mouseClickIdle: 60,
+                scrollWheelIdle: 60
+            )
+        )
+        _ = scrolling.decision(
+            at: start.addingTimeInterval(10),
+            isPaused: false,
+            signal: LocalActivitySignal(
+                keyboardIdle: 70,
+                mouseMovementIdle: 70,
+                mouseClickIdle: 70,
+                scrollWheelIdle: 0.3
+            )
+        )
+        if scrolling.decision(
+            at: start.addingTimeInterval(11),
+            isPaused: false,
+            signal: LocalActivitySignal(
+                keyboardIdle: 71,
+                mouseMovementIdle: 71,
+                mouseClickIdle: 71,
+                scrollWheelIdle: 0.4
+            )
+        ) != .resumedWork {
+            failures.append("scrolling without movement should qualify as resumed work")
+        }
+
+        var budgeted = RoutineActivityDetector()
+        budgeted.start(at: start, signal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 60))
+        var poll = 6.0
+        var lastDecision = RoutineActivityDecision.noNewActivity
+        while poll < 100 {
+            budgeted.noteCompanionInteraction(at: start.addingTimeInterval(poll))
+            lastDecision = budgeted.decision(
+                at: start.addingTimeInterval(poll),
+                isPaused: false,
+                signal: LocalActivitySignal(keyboardIdle: 60 + poll, pointerIdle: 0.2)
+            )
+            if lastDecision == .resumedWork { break }
+            poll += 1
+        }
+        if lastDecision != .resumedWork
+            || budgeted.companionProtectionUsed > RoutineActivityPolicy.companionProtectionBudget {
+            failures.append("companion protection should be capped by its per-routine budget")
+        }
+
+        MainActor.assumeIsolated {
+            withIsolatedDefaults("activity-recovery") { defaults in
+                let store = CompanionStore(environment: ["BREAK_INTERVAL_SECONDS": "3600"], defaults: defaults)
+                store.continueWithBalancedDefaults()
+                defaults.set(["shoulder-rolls"], forKey: "session.recentCompletedMoveIDs")
+                store.startRoutine(at: start, activitySignal: LocalActivitySignal(keyboardIdle: 8, pointerIdle: 8))
+                if store.evaluateRoutineActivity(
+                    signal: LocalActivitySignal(keyboardIdle: 14, pointerIdle: 14),
+                    at: start.addingTimeInterval(6)
+                ) != .noNewActivity {
+                    failures.append("an unattended routine should keep running")
+                }
+                _ = store.evaluateRoutineActivity(
+                    signal: LocalActivitySignal(keyboardIdle: 0, pointerIdle: 15),
+                    at: start.addingTimeInterval(7)
+                )
+                if store.mode != .checkIn
+                    || store.activityRecoveryExplanation == nil
+                    || defaults.stringArray(forKey: "session.recentCompletedMoveIDs") != ["shoulder-rolls"] {
+                    failures.append("resumed activity should recover without completion credit")
+                }
+                store.startRoutine(at: start.addingTimeInterval(8), activitySignal: LocalActivitySignal(keyboardIdle: 0, pointerIdle: 0))
+                store.endRoutine()
+            }
+
+            withIsolatedDefaults("activity-companion-protection") { defaults in
+                let store = CompanionStore(environment: ["BREAK_INTERVAL_SECONDS": "3600"], defaults: defaults)
+                store.continueWithBalancedDefaults()
+                store.startRoutine(at: start, activitySignal: LocalActivitySignal(keyboardIdle: 30, pointerIdle: 30))
+                store.noteCompanionInteraction(at: start.addingTimeInterval(6))
+                if store.evaluateRoutineActivity(
+                    signal: LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 0.2),
+                    at: start.addingTimeInterval(7)
+                ) != .companionInteraction || store.mode != .routine {
+                    failures.append("interacting with the companion should not cancel the routine")
+                }
+                if store.evaluateRoutineActivity(
+                    signal: LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 0.2),
+                    at: start.addingTimeInterval(10)
+                ) != .resumedWork || store.mode != .checkIn {
+                    failures.append("work resumed after companion protection should recover")
+                }
+                store.startRoutine(at: start.addingTimeInterval(11), activitySignal: LocalActivitySignal(keyboardIdle: 0, pointerIdle: 0))
+                store.endRoutine()
+            }
+
+            withIsolatedDefaults("activity-next-restart") { defaults in
+                let store = CompanionStore(environment: ["BREAK_INTERVAL_SECONDS": "3600"], defaults: defaults)
+                store.continueWithBalancedDefaults()
+                store.startRoutine(at: start, activitySignal: LocalActivitySignal(keyboardIdle: 60, pointerIdle: 60))
+                var poll = 1.0
+                while poll <= 30 {
+                    store.noteCompanionInteraction(at: start.addingTimeInterval(poll))
+                    poll += 1
+                }
+                store.nextRoutine(at: start.addingTimeInterval(30), activitySignal: LocalActivitySignal(keyboardIdle: 90, pointerIdle: 0.2))
+                _ = store.evaluateRoutineActivity(
+                    signal: LocalActivitySignal(keyboardIdle: 91, pointerIdle: 0.3),
+                    at: start.addingTimeInterval(31)
+                )
+                if store.evaluateRoutineActivity(
+                    signal: LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 0.4),
+                    at: start.addingTimeInterval(32)
+                ) != .initialGracePeriod || store.mode != .routine {
+                    failures.append("Next should give the new routine its own grace period")
+                }
+                store.noteCompanionInteraction(at: start.addingTimeInterval(36))
+                _ = store.evaluateRoutineActivity(
+                    signal: LocalActivitySignal(keyboardIdle: 96, pointerIdle: 0.3),
+                    at: start.addingTimeInterval(37)
+                )
+                if store.evaluateRoutineActivity(
+                    signal: LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 0.4),
+                    at: start.addingTimeInterval(38)
+                ) != .companionInteraction {
+                    failures.append("Next should give the new routine its own protection budget")
+                }
+                store.endRoutine()
+            }
         }
     }
 
