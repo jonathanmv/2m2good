@@ -2,6 +2,27 @@ import CoreGraphics
 import Foundation
 
 @MainActor
+protocol DelayedActionScheduling {
+    func schedule(after delay: TimeInterval, action: @escaping () -> Void)
+}
+
+@MainActor
+struct DelayedActionScheduler: DelayedActionScheduling {
+    nonisolated init() {}
+
+    func schedule(after delay: TimeInterval, action: @escaping () -> Void) {
+        guard delay > 0 else {
+            action()
+            return
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(delay))
+            action()
+        }
+    }
+}
+
+@MainActor
 final class CompanionStore: ObservableObject {
     enum Mode: Equatable {
         case idle
@@ -39,6 +60,7 @@ final class CompanionStore: ObservableObject {
     private var activeUseTracker: ActiveUseTracker
     private var scheduledCheckIn: ScheduledCheckInWindow?
     private let nowProvider: () -> Date
+    private let postponementScheduler: any DelayedActionScheduling
     private var timer: Timer?
     private var completionDismissTask: Task<Void, Never>?
     private var completionDismissalState = CompletionDismissalState()
@@ -50,7 +72,8 @@ final class CompanionStore: ObservableObject {
         defaults: UserDefaults = .standard,
         activitySignalProvider: @escaping () -> LocalActivitySignal = LocalActivitySignal.current,
         speaker: RoutineSpeaking? = nil,
-        nowProvider: @escaping () -> Date = Date.init
+        nowProvider: @escaping () -> Date = Date.init,
+        postponementScheduler: any DelayedActionScheduling = DelayedActionScheduler()
     ) {
         let configuredInterval = Double(environment["BREAK_INTERVAL_SECONDS"] ?? "")
         workInterval = max(5, configuredInterval ?? 60 * 60)
@@ -61,6 +84,7 @@ final class CompanionStore: ObservableObject {
         self.activitySignalProvider = activitySignalProvider
         self.speaker = speaker ?? GuideSpeaker()
         self.nowProvider = nowProvider
+        self.postponementScheduler = postponementScheduler
         activeUseTracker = ActiveUseTracker(
             activeInterval: workInterval,
             idleThreshold: idleThreshold,
@@ -434,14 +458,17 @@ final class CompanionStore: ObservableObject {
     }
 
     private func returnToIdle(after seconds: TimeInterval) {
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(seconds))
-            guard self.mode == .checkIn else { return }
-            self.mode = .idle
-            self.statusText = nil
-            self.activityRecoveryExplanation = nil
-            self.notifySizeChange()
+        postponementScheduler.schedule(after: seconds) { [weak self] in
+            self?.transitionToIdle()
         }
+    }
+
+    private func transitionToIdle() {
+        guard mode == .checkIn else { return }
+        mode = .idle
+        statusText = nil
+        activityRecoveryExplanation = nil
+        notifySizeChange()
     }
 
     private func notifySizeChange() {

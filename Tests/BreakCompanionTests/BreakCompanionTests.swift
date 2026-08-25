@@ -1,6 +1,21 @@
 import XCTest
 @testable import BreakCompanion
 
+@MainActor
+private final class ManualDelayedActionScheduler: DelayedActionScheduling {
+    private var pendingAction: (() -> Void)?
+
+    func schedule(after _: TimeInterval, action: @escaping () -> Void) {
+        pendingAction = action
+    }
+
+    func runPendingAction() {
+        let action = pendingAction
+        pendingAction = nil
+        action?()
+    }
+}
+
 final class BreakCompanionTests: XCTestCase {
     func testSemanticVersionIsSharedAndOrdersReleaseTags() {
         let currentVersion = ProductIdentity.currentVersion
@@ -402,7 +417,7 @@ final class BreakCompanionTests: XCTestCase {
     }
 
     @MainActor
-    func testManualOfferAndLaterTomorrowSchedulesRemainIntact() async {
+    func testManualOfferAndLaterTomorrowSchedulesRemainIntact() {
         let suiteName = "BreakCompanionTests.\(#function)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
@@ -410,10 +425,12 @@ final class BreakCompanionTests: XCTestCase {
 
         let start = referenceDate(6_000)
         var now = start
+        let scheduler = ManualDelayedActionScheduler()
         let store = CompanionStore(
             environment: ["BREAK_INTERVAL_SECONDS": "3600"],
             defaults: defaults,
-            nowProvider: { now }
+            nowProvider: { now },
+            postponementScheduler: scheduler
         )
         store.continueWithBalancedDefaults()
         store.offerBreakNow()
@@ -421,7 +438,7 @@ final class BreakCompanionTests: XCTestCase {
 
         store.postpone(minutes: 60)
         XCTAssertEqual(store.statusText, "I’ll check back in an hour.")
-        try? await Task.sleep(for: .seconds(1.7))
+        scheduler.runPendingAction()
         XCTAssertEqual(store.mode, .idle)
 
         now = start.addingTimeInterval(3_600)
@@ -432,7 +449,7 @@ final class BreakCompanionTests: XCTestCase {
 
         store.postponeUntilTomorrow()
         XCTAssertEqual(store.statusText, "See you tomorrow.")
-        try? await Task.sleep(for: .seconds(1.7))
+        scheduler.runPendingAction()
         XCTAssertEqual(store.mode, .idle)
     }
 
