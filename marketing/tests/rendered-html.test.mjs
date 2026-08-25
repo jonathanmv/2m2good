@@ -327,7 +327,19 @@ test("rendered demo exposes a click-only, bounded, accessible flow", async () =>
   assert.match(demo, />End(?:\s|<)/);
   assert.match(demo, /Click-only preview/);
   assert.equal((text.match(/Ready for a gentle reset\?/g) ?? []).length, 2);
-  assert.doesNotMatch(demo, /microphone|voice input|Try Voice/i);
+});
+
+test("rendered check-in offers only the three visible keyboard-accessible responses", async () => {
+  const html = await (await render()).text();
+  const checkin = section(html, "checkin-section");
+  const responseButtons = checkin.match(/<button\b/g) ?? [];
+
+  assert.match(checkin, /aria-label="Available responses"/);
+  assert.equal(responseButtons.length, 3);
+  for (const label of ["Start", "Later", "Tomorrow"]) {
+    assert.match(checkin, new RegExp(`>${label}<`));
+  }
+  assert.match(checkin, /Buttons always work|click-only decision/);
 });
 
 test("rendered developer-preview section gives one auditable download-then-run command", async () => {

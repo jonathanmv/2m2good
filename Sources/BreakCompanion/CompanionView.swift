@@ -2,14 +2,8 @@ import SwiftUI
 
 struct CompanionView: View {
     @ObservedObject var store: CompanionStore
-    @ObservedObject private var voice: VoiceService
     @State private var hovered = false
     @State private var draftAreas: Set<BodyArea> = []
-
-    init(store: CompanionStore) {
-        self.store = store
-        _voice = ObservedObject(wrappedValue: store.voice)
-    }
 
     var body: some View {
         ZStack {
@@ -186,26 +180,13 @@ struct CompanionView: View {
         VStack(spacing: 10) {
             Button("Start  ·  2 min", action: store.startRoutine)
                 .buttonStyle(PrimaryButtonStyle())
+                .keyboardShortcut(.defaultAction)
             HStack(spacing: 9) {
                 Button("Later", action: { store.postpone(minutes: 60) })
                 Button("Tomorrow", action: store.postponeUntilTomorrow)
             }
             .buttonStyle(QuietButtonStyle())
 
-            HStack(spacing: 7) {
-                Image(systemName: voice.isListening ? "waveform" : "mic")
-                    .symbolEffect(.variableColor.iterative, isActive: voice.isListening)
-                Text(voiceStatus)
-                    .lineLimit(2)
-                Spacer()
-                if !voice.isListening {
-                    Button("Try voice", action: voice.requestAndListen)
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .font(.system(size: 11))
-            .foregroundStyle(.tertiary)
         }
     }
 
@@ -264,13 +245,6 @@ struct CompanionView: View {
                 .keyboardShortcut(.defaultAction)
         }
         .padding(25)
-    }
-
-    private var voiceStatus: String {
-        if voice.isListening {
-            return voice.transcript.isEmpty ? "Listening — say start, later, or tomorrow" : "“\(voice.transcript)”"
-        }
-        return voice.availabilityMessage ?? "Voice-first, with buttons when you need them"
     }
 
     private func timeString(_ seconds: Int) -> String {

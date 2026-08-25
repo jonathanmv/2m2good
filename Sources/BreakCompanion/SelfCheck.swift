@@ -1,5 +1,26 @@
 import Foundation
 
+@MainActor
+private final class SelfCheckSpeaker: RoutineSpeaking {
+    func speak(_ text: String) {}
+    func stop() {}
+}
+
+@MainActor
+private final class SelfCheckDelayedActionScheduler: DelayedActionScheduling {
+    private var pendingAction: (() -> Void)?
+
+    func schedule(after _: TimeInterval, action: @escaping () -> Void) {
+        pendingAction = action
+    }
+
+    func runPendingAction() {
+        let action = pendingAction
+        pendingAction = nil
+        action?()
+    }
+}
+
 enum SelfCheck {
     static func run() -> Bool {
         var failures: [String] = []
@@ -7,7 +28,7 @@ enum SelfCheck {
         checkReleaseIdentity(&failures)
         checkUpdateSupport(&failures)
         checkProgress(&failures)
-        checkVoice(&failures)
+        checkCheckInResponses(&failures)
         checkCompletion(&failures)
         checkActiveUseTiming(&failures)
         checkMoveLibraryAndComposition(&failures)
@@ -18,7 +39,7 @@ enum SelfCheck {
         checkActivityDetectionAndRecovery(&failures)
 
         if failures.isEmpty {
-            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, standing session composition, body-area selection, first-run and menu-bar configuration, legacy migration, supportive wording, recent-shown persistence, focus balance, voice variants, completion dismissal, progress color, pointer movement, routine activity recovery, and idle-session reset.")
+            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, standing session composition, body-area selection, first-run and menu-bar configuration, legacy migration, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, spoken movement guidance, completion dismissal, progress color, pointer movement, routine activity recovery, and idle-session reset.")
             return true
         }
 
@@ -253,27 +274,61 @@ enum SelfCheck {
         }
     }
 
-    private static func checkVoice(_ failures: inout [String]) {
-        let affirmativePhrases = [
-            "yeah", "yes", "yep", "let's do it", "let’s do it",
-            "LET'S GO!", "let us do it", "okay", "ready", "go ahead"
-        ]
-        for phrase in affirmativePhrases {
-            let command = VoiceCommandParser.parse(phrase)
-            if command != .start || CheckInVoiceAction.resolve(command) != .startRoutine {
-                failures.append("affirmative voice phrase failed: \(phrase)")
+    private static func checkCheckInResponses(_ failures: inout [String]) {
+        MainActor.assumeIsolated {
+            withIsolatedDefaults("check-in-responses") { defaults in
+                var now = Date(timeIntervalSinceReferenceDate: 8_000)
+                let scheduler = SelfCheckDelayedActionScheduler()
+                let store = CompanionStore(
+                    environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+                    defaults: defaults,
+                    speaker: SelfCheckSpeaker(),
+                    nowProvider: { now },
+                    postponementScheduler: scheduler
+                )
+                store.continueWithBalancedDefaults()
+
+                store.offerBreakNow()
+                guard store.mode == .checkIn else {
+                    failures.append("Start should be offered as a visible check-in response")
+                    return
+                }
+                store.startRoutine(
+                    at: now,
+                    activitySignal: LocalActivitySignal(keyboardIdle: 0, pointerIdle: 0)
+                )
+                guard store.mode == .routine else {
+                    failures.append("Start should begin the routine")
+                    return
+                }
+                store.endRoutine()
+                store.dismissCompletion()
+
+                store.offerBreakNow()
+                store.postpone(minutes: 60)
+                guard store.statusText == "I’ll check back in an hour." else {
+                    failures.append("Later should schedule the existing one-hour response")
+                    return
+                }
+                scheduler.runPendingAction()
+                now = now.addingTimeInterval(3_600)
+                store.tickForTesting(at: now, userIsActive: false)
+                store.tickForTesting(at: now, userIsActive: true)
+                guard store.mode == .checkIn else {
+                    failures.append("Later should return to the check-in at its due time")
+                    return
+                }
+
+                store.postponeUntilTomorrow()
+                guard store.statusText == "See you tomorrow." else {
+                    failures.append("Tomorrow should schedule the existing next-day response")
+                    return
+                }
+                scheduler.runPendingAction()
+                if store.mode != .idle {
+                    failures.append("Tomorrow should return to the orb after its confirmation")
+                }
             }
-        }
-        let otherCases: [(String, VoiceCommand)] = [
-            ("maybe in 20 minutes", .later(minutes: 20)),
-            ("maybe in twenty minutes", .later(minutes: 20)),
-            ("yes, later in an hour", .later(minutes: 60)),
-            ("two hours", .later(minutes: 120)),
-            ("tomorrow please", .tomorrow),
-            ("yesterday", .unknown)
-        ]
-        for (phrase, expected) in otherCases where VoiceCommandParser.parse(phrase) != expected {
-            failures.append("voice command precedence failed: \(phrase)")
         }
     }
 
@@ -509,9 +564,6 @@ enum SelfCheck {
                 let fresh = CompanionStore(environment: [:], defaults: defaults)
                 if fresh.mode != .setup || !fresh.selectedAreas.isEmpty {
                     failures.append("a fresh install should open the body-area setup")
-                }
-                if fresh.voice.isListening {
-                    failures.append("setup should never require the microphone")
                 }
                 fresh.saveSelectedAreas([.lowerBack, .handsWrists])
                 if fresh.mode != .idle || fresh.selectedAreas != [.lowerBack, .handsWrists] {

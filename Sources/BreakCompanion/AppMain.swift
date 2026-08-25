@@ -251,6 +251,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
             }
             NSApp.activate(ignoringOtherApps: true)
             panel.makeKeyAndOrderFront(nil)
+        case .checkIn where store.activityRecoveryExplanation == nil:
+            NSApp.activate(ignoringOtherApps: true)
+            panel.makeKeyAndOrderFront(nil)
         default:
             panel.orderFrontRegardless()
             if mode == .idle, let previouslyActiveApplication {

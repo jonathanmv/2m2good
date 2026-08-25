@@ -31,8 +31,7 @@ xcrun swiftc \
     -o "$macos_dir/BreakCompanion" \
     -framework AppKit \
     -framework AVFoundation \
-    -framework CoreGraphics \
-    -framework Speech
+    -framework CoreGraphics
 
 codesign --force --sign - "$app_dir" >/dev/null
 

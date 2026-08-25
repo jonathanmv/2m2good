@@ -119,9 +119,10 @@ preview retains the pilot's local-only behavior for breaks: no account, sync,
 analytics, or usage telemetry. The packaged app's optional GitHub Releases
 updater is a separate, documented behavior; the source installer itself does
 not install, replace, or roll back releases. See [`docs/RELEASES.md`](RELEASES.md)
-for its privacy, verification, and recovery contract. The app still requests
-optional macOS microphone and speech-recognition permissions when voice input
-is used; its buttons remain available without them.
+for its privacy, verification, and recovery contract. The check-in remains
+click-only with visible Start, Later, and Tomorrow buttons, so the app does not
+request audio-input or command-recognition permissions. Spoken movement guidance
+is output alongside the on-screen routine instructions.
 
 This source path provides no Developer ID signature or notarization and is not a
 consumer installer. Source, branch/revision, build output, and launch behavior
