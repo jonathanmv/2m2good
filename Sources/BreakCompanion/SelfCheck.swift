@@ -43,9 +43,13 @@ enum SelfCheck {
             patch: currentVersion.patch,
             prerelease: [.text("self-check")]
         )
-        guard SemanticVersion(tag: "v\(currentVersion)") == currentVersion,
+        guard let largeNumericPrerelease = SemanticVersion(tag: "1.0.0-999999999999999999999"),
+              let smallNumericPrerelease = SemanticVersion(tag: "1.0.0-2"),
+              SemanticVersion(tag: "v\(currentVersion)") == currentVersion,
               nextVersion > currentVersion,
               sameCorePrerelease < sameCoreStable,
+              largeNumericPrerelease > smallNumericPrerelease,
+              SemanticVersion(tag: "1.0.0-é") == nil,
               SemanticVersion(tag: "not-a-version") == nil else {
             failures.append("semantic-version parsing or ordering is not deterministic")
             return

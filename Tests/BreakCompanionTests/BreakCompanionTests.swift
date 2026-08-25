@@ -30,6 +30,16 @@ final class BreakCompanionTests: XCTestCase {
         )
     }
 
+    func testSemanticVersionRejectsNonASCIIIdentifiersAndOrdersLargeNumericIdentifiers() {
+        let large = SemanticVersion(tag: "1.0.0-999999999999999999999")!
+        let small = SemanticVersion(tag: "1.0.0-2")!
+
+        XCTAssertGreaterThan(large, small)
+        XCTAssertEqual(large.description, "1.0.0-999999999999999999999")
+        XCTAssertNil(SemanticVersion(tag: "1.0.0-é"))
+        XCTAssertNil(SemanticVersion(tag: "1.0.0-１２"))
+    }
+
     func testReleaseChecksumMustMatchTheNamedArtifact() {
         let data = Data("update-payload".utf8)
         let checksum = Data("faf613f495c32b8434726bd719da5f8901270370aa14f4259b1d3ec23f998fe1  artifact.zip\n".utf8)

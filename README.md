@@ -13,7 +13,7 @@ A deliberately small, local macOS break companion. After 60 minutes of active ke
 - Every session is exactly 120 seconds, with a gentle standing invitation, spoken guidance, simple motion cues, Pause, Next, End, and safety wording.
 - **Next** immediately composes a new session from 2:00 and avoids every move in the current session. Moves are recorded when shown, so skipped and switched sessions also reduce near-term repetition.
 - The Done screen closes itself after about 10 seconds; Return or Enter closes it immediately.
-- Selection state is bounded to 18 recently shown and 24 recently completed movement identifiers, alongside the selected areas, in local macOS preferences. Older routine history is migrated into conservative move-focus history once, and an existing install keeps its history and continues on the balanced mix instead of being asked to set up again. All processing uses Apple’s on-device/system frameworks; the app has no network integration or analytics.
+- Selection state is bounded to 18 recently shown and 24 recently completed movement identifiers, alongside the selected areas, in local macOS preferences. Older routine history is migrated into conservative move-focus history once, and an existing install keeps its history and continues on the balanced mix instead of being asked to set up again. Break processing and history stay local; the optional updater contacts GitHub Releases only and sends no break data or analytics.
 
 ## Build and run
 

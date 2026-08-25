@@ -8,15 +8,8 @@ struct SemanticVersion: Hashable, Comparable, Codable, CustomStringConvertible, 
     let buildMetadata: [String]
 
     enum Identifier: Hashable, Codable, Sendable {
-        case numeric(Int)
+        case numeric(String)
         case text(String)
-
-        fileprivate var sortKey: (isNumeric: Bool, numeric: Int, text: String) {
-            switch self {
-            case .numeric(let value): return (true, value, "")
-            case .text(let value): return (false, 0, value)
-            }
-        }
     }
 
     init(
@@ -41,8 +34,10 @@ struct SemanticVersion: Hashable, Comparable, Codable, CustomStringConvertible, 
         let buildParts = withoutPrefix.split(separator: "+", maxSplits: 1, omittingEmptySubsequences: false)
         guard buildParts.count <= 2 else { return nil }
         let coreAndPrerelease = String(buildParts[0])
-        let build = buildParts.count == 2 ? String(buildParts[1]).split(separator: ".", omittingEmptySubsequences: false).map(String.init) : []
-        guard build.allSatisfy(Self.isValidIdentifier) else { return nil }
+        let build = buildParts.count == 2
+            ? String(buildParts[1]).split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+            : []
+        guard buildParts.count != 2 || (!build.isEmpty && build.allSatisfy(Self.isValidIdentifier)) else { return nil }
 
         let prereleaseParts = coreAndPrerelease.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
         let core = prereleaseParts[0].split(separator: ".", omittingEmptySubsequences: false)
@@ -55,8 +50,8 @@ struct SemanticVersion: Hashable, Comparable, Codable, CustomStringConvertible, 
         let prerelease = prereleaseParts.count == 2
             ? prereleaseParts[1].split(separator: ".", omittingEmptySubsequences: false).map(String.init)
             : []
-        guard prerelease.allSatisfy(Self.isValidIdentifier),
-              !prerelease.contains(where: { $0.allSatisfy(\.isNumber) && $0.count > 1 && $0.first == "0" }) else {
+        guard prereleaseParts.count != 2 || (!prerelease.isEmpty && prerelease.allSatisfy(Self.isValidIdentifier)),
+              !prerelease.contains(where: { Self.isNumericIdentifier($0) && $0.count > 1 && $0.first == "0" }) else {
             return nil
         }
         self.init(
@@ -88,36 +83,59 @@ struct SemanticVersion: Hashable, Comparable, Codable, CustomStringConvertible, 
         }
         for (left, right) in zip(lhs.prerelease, rhs.prerelease) {
             if left == right { continue }
-            let leftKey = left.sortKey
-            let rightKey = right.sortKey
-            if leftKey.isNumeric != rightKey.isNumeric { return leftKey.isNumeric }
-            if leftKey.isNumeric { return leftKey.numeric < rightKey.numeric }
-            return leftKey.text < rightKey.text
+            switch (left, right) {
+            case (.numeric(let leftValue), .numeric(let rightValue)):
+                return Self.numericIdentifierLessThan(leftValue, rightValue)
+            case (.numeric, .text):
+                return true
+            case (.text, .numeric):
+                return false
+            case (.text(let leftValue), .text(let rightValue)):
+                return leftValue < rightValue
+            }
         }
         return lhs.prerelease.count < rhs.prerelease.count
     }
 
     private static func identifier(_ value: String) -> Identifier {
-        if let number = Int(value), !value.isEmpty, value.allSatisfy(\.isNumber) {
-            return .numeric(number)
+        if isNumericIdentifier(value) {
+            return .numeric(value)
         }
         return .text(value)
     }
 
     private static func identifierDescription(_ identifier: Identifier) -> String {
         switch identifier {
-        case .numeric(let value): return String(value)
+        case .numeric(let value): return value
         case .text(let value): return value
         }
     }
 
+    private static func numericIdentifierLessThan(_ lhs: String, _ rhs: String) -> Bool {
+        let normalizedLHS = lhs.drop(while: { $0 == "0" })
+        let normalizedRHS = rhs.drop(while: { $0 == "0" })
+        let left = normalizedLHS.isEmpty ? "0" : String(normalizedLHS)
+        let right = normalizedRHS.isEmpty ? "0" : String(normalizedRHS)
+        if left.count != right.count { return left.count < right.count }
+        return left < right
+    }
+
     private static func isValidNumericComponent(_ value: Substring) -> Bool {
         let text = String(value)
-        return !text.isEmpty && text.allSatisfy(\.isNumber) && (text == "0" || text.first != "0")
+        return isNumericIdentifier(text) && (text == "0" || text.first != "0")
+    }
+
+    private static func isNumericIdentifier(_ value: String) -> Bool {
+        !value.isEmpty && value.utf8.allSatisfy { $0 >= 48 && $0 <= 57 }
     }
 
     private static func isValidIdentifier(_ value: String) -> Bool {
-        !value.isEmpty && value.allSatisfy { $0.isNumber || $0.isLetter || $0 == "-" }
+        !value.isEmpty && value.utf8.allSatisfy {
+            ($0 >= 48 && $0 <= 57)
+                || ($0 >= 65 && $0 <= 90)
+                || ($0 >= 97 && $0 <= 122)
+                || $0 == 45
+        }
     }
 }
 
