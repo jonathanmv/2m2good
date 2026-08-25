@@ -13,7 +13,7 @@ A deliberately small, local macOS break companion. After 60 minutes of active ke
 - Every session is exactly 120 seconds, with a gentle standing invitation, spoken guidance, simple motion cues, Pause, Next, End, and safety wording.
 - **Next** immediately composes a new session from 2:00 and avoids every move in the current session. Moves are recorded when shown, so skipped and switched sessions also reduce near-term repetition.
 - The Done screen closes itself after about 10 seconds; Return or Enter closes it immediately.
-- Selection state is bounded to 18 recently shown and 24 recently completed movement identifiers, alongside the selected areas, in local macOS preferences. Older routine history is migrated into conservative move-focus history once, and an existing install keeps its history and continues on the balanced mix instead of being asked to set up again. All processing uses Apple’s on-device/system frameworks; the app has no network integration or analytics.
+- Selection state is bounded to 18 recently shown and 24 recently completed movement identifiers, alongside the selected areas, in local macOS preferences. Older routine history is migrated into conservative move-focus history once, and an existing install keeps its history and continues on the balanced mix instead of being asked to set up again. Break processing and history stay local; the optional updater is documented in [`docs/RELEASES.md`](docs/RELEASES.md).
 
 ## Build and run
 
@@ -26,6 +26,8 @@ open ".build/app/2m2better.app"
 ```
 
 The app appears as a small orb near the upper-right of the screen and as a leaf in the menu bar. On a fresh install, a compact setup asks which body areas the standing reset should support; every shipped movement is standing-only, so the reset is presented as a standing one rather than a seated alternative. Click the orb or **Offer a break now** in the menu bar to trigger a break immediately; use **Choose body areas…** there to review or change the selection, which stays available while the orb is idle so an offered or running reset is never discarded.
+
+The menu also includes **About 2m2better…**, which shows the shared release identity, and **Check for Updates…**, which checks GitHub Releases only. See [`docs/RELEASES.md`](docs/RELEASES.md) for the updater behavior, release asset contract, and packaging validation.
 
 This development Mac currently has a newer command-line compiler paired with a slightly mismatched newest SDK. On this machine only, build with its compatible installed SDK:
 
@@ -57,8 +59,7 @@ successfully as if the preview had worked.
 After reviewing the displayed repository, ref, destination, build command,
 output, and launch behavior, rerun without `--dry-run` to confirm and build.
 The installer checks its prerequisites before it creates anything and reports
-the missing one. This path provides no hosted release artifact,
-signing/notarization, automatic updates, rollback, or integrity guarantee.
+the missing one. This source path remains an ad-hoc, non-notarized developer preview and does not install or roll back releases. Packaged app update behavior is documented in [`docs/RELEASES.md`](docs/RELEASES.md).
 
 ## Permissions
 
@@ -119,10 +120,10 @@ Run the packaged logic checks with:
 ".build/app/2m2better.app/Contents/MacOS/BreakCompanion" --self-check
 ```
 
-The Swift package and XCTest target are included for use in a standard Xcode toolchain (`swift test`).
+The Swift package and XCTest target are included for use in a standard Xcode toolchain (`swift test`). See [`docs/RELEASES.md`](docs/RELEASES.md) for release packaging and packaged self-check validation; use the `BREAK_SDK_PATH` override above on this development Mac.
 
 ## Pilot boundaries
 
-This prototype intentionally does not launch at login, collect wellbeing data, sync, coach, score, or expose a browsable routine catalog. “Tomorrow” means 24 hours from the response. For a later iteration, that could become a user-selected quiet-hours-aware morning without changing the core state machine.
+This prototype intentionally does not launch at login, collect wellbeing data, sync, coach, score, or expose a browsable routine catalog. “Tomorrow” means 24 hours from the response. The optional updater is the only runtime network activity; its privacy and trust contract is documented in [`docs/RELEASES.md`](docs/RELEASES.md) and does not change the local-only break experience. For a later iteration, “Tomorrow” could become a user-selected quiet-hours-aware morning without changing the core state machine.
 
 A quiet idle orb shifts from soft green through muted orange to calm red as the next check-in approaches. The same timing is available to VoiceOver as remaining time and interval progress, so color is never the only signal.

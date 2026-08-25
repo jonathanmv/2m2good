@@ -23,13 +23,14 @@ See [`README.md`](README.md) for the command and
 macOS/Apple toolchain/Git requirements, safe dry-run behavior, and shell-level
 tests. The preview remains intentionally limited:
 
-- There are no hosted release artifacts, Developer ID signing, notarization,
-  automatic updates, rollback, or pinned-download/integrity guarantees.
+- The source checkout has no Developer ID signing or notarization and is not a
+  consumer release installer; packaged GitHub Release behavior is documented in
+  [`docs/RELEASES.md`](docs/RELEASES.md).
 - The checkout must be new; the installer refuses an existing destination and
   does not use `sudo`, collect credentials, install globally, or delete files.
 - Installer network access is limited to obtaining the displayed Git source;
-  the built app remains local-only with no account, runtime network integration,
-  sync, or analytics.
+  the packaged app's optional updater is a separate behavior covered by
+  [`docs/RELEASES.md`](docs/RELEASES.md).
 
 ## Pay when a break is not completed
 

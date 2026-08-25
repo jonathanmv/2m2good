@@ -505,8 +505,12 @@ enum SessionComposer {
             } else {
                 candidates = remaining
             }
+            let isMinimumLibraryFallback = candidates.allSatisfy { currentMoveIDs.contains($0.element.id) }
             guard let choice = candidates.min(by: { left, right in
-                score(
+                if isMinimumLibraryFallback {
+                    return left.offset < right.offset
+                }
+                return score(
                     for: left.element,
                     libraryIndex: left.offset,
                     attention: attention,

@@ -4,6 +4,8 @@ enum SelfCheck {
     static func run() -> Bool {
         var failures: [String] = []
 
+        checkReleaseIdentity(&failures)
+        checkUpdateSupport(&failures)
         checkProgress(&failures)
         checkVoice(&failures)
         checkCompletion(&failures)
@@ -15,12 +17,126 @@ enum SelfCheck {
         checkActivityDetectionAndRecovery(&failures)
 
         if failures.isEmpty {
-            print("Self-check passed: \(ProductIdentity.name) standing session composition, body-area selection, first-run and menu-bar configuration, legacy migration, supportive wording, recent-shown persistence, focus balance, voice variants, completion dismissal, progress color, pointer movement, and routine activity recovery.")
+            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, standing session composition, body-area selection, first-run and menu-bar configuration, legacy migration, supportive wording, recent-shown persistence, focus balance, voice variants, completion dismissal, progress color, pointer movement, and routine activity recovery.")
             return true
         }
 
         failures.forEach { print("Self-check failed: \($0)") }
         return false
+    }
+
+    private static func checkReleaseIdentity(_ failures: inout [String]) {
+        let currentVersion = ProductIdentity.currentVersion
+        let nextVersion = SemanticVersion(
+            major: currentVersion.major,
+            minor: currentVersion.minor,
+            patch: currentVersion.patch + 1
+        )
+        let sameCoreStable = SemanticVersion(
+            major: currentVersion.major,
+            minor: currentVersion.minor,
+            patch: currentVersion.patch
+        )
+        let sameCorePrerelease = SemanticVersion(
+            major: currentVersion.major,
+            minor: currentVersion.minor,
+            patch: currentVersion.patch,
+            prerelease: [.text("self-check")]
+        )
+        let outOfRangeCore = String(repeating: "9", count: String(Int.max).count + 1)
+        guard let largeNumericPrerelease = SemanticVersion(tag: "1.0.0-999999999999999999999"),
+              let smallNumericPrerelease = SemanticVersion(tag: "1.0.0-2"),
+              SemanticVersion(tag: "v\(currentVersion)") == currentVersion,
+              nextVersion > currentVersion,
+              sameCorePrerelease < sameCoreStable,
+              largeNumericPrerelease > smallNumericPrerelease,
+              SemanticVersion(tag: "\(Int.max).0.0") == nil,
+              SemanticVersion(tag: "\(outOfRangeCore).0.0") == nil,
+              SemanticVersion(tag: "1.0.0-é") == nil,
+              SemanticVersion(tag: "not-a-version") == nil else {
+            failures.append("semantic-version parsing or ordering is not deterministic")
+            return
+        }
+        if ProductIdentity.diagnosticsIdentity != "\(ProductIdentity.name) \(currentVersion) (\(ProductIdentity.buildDisplay))" {
+            failures.append("diagnostics should use the shared release identity")
+        }
+    }
+
+    private static func checkUpdateSupport(_ failures: inout [String]) {
+        let payload = Data("update-payload".utf8)
+        let checksum = Data("faf613f495c32b8434726bd719da5f8901270370aa14f4259b1d3ec23f998fe1  artifact.zip\n".utf8)
+        if !UpdateArtifactVerifier.verify(data: payload, checksumFile: checksum, expectedFileName: "artifact.zip")
+            || UpdateArtifactVerifier.verify(data: Data("tampered".utf8), checksumFile: checksum, expectedFileName: "artifact.zip") {
+            failures.append("release checksum verification accepted the wrong artifact")
+        }
+
+        let currentVersion = ProductIdentity.currentVersion
+        let fixtureVersion = SemanticVersion(
+            major: currentVersion.major,
+            minor: currentVersion.minor,
+            patch: currentVersion.patch + 1
+        )
+        let fixtureTag = "v\(fixtureVersion)"
+        let artifactName = "\(ProductIdentity.name)-\(fixtureTag)-macos-arm64.zip"
+        let checksumName = "\(artifactName).sha256"
+        let release = GitHubRelease(
+            tagName: fixtureTag,
+            htmlURL: URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/tag/\(fixtureTag)")!,
+            draft: false,
+            prerelease: false,
+            assets: [
+                ReleaseAsset(
+                    name: artifactName,
+                    browserDownloadURL: URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/\(fixtureTag)/arm.zip")!
+                ),
+                ReleaseAsset(
+                    name: checksumName,
+                    browserDownloadURL: URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/\(fixtureTag)/arm.sha256")!
+                )
+            ]
+        )
+        do {
+            guard let candidate = try GitHubReleaseSelector.candidate(
+                from: release,
+                currentVersion: currentVersion,
+                architecture: "arm64"
+            ), candidate.version == fixtureVersion else {
+                failures.append("GitHub Release asset selection did not find the exact architecture contract")
+                return
+            }
+        } catch {
+            failures.append("valid GitHub Release assets were rejected: \(error.localizedDescription)")
+        }
+
+        let unsafe = ReleaseAsset(
+            name: artifactName,
+            browserDownloadURL: URL(string: "http://example.com/update.zip")!
+        )
+        let unsafeChecksum = ReleaseAsset(
+            name: checksumName,
+            browserDownloadURL: URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/\(fixtureTag)/update.sha256")!
+        )
+        let unsafeRelease = GitHubRelease(
+            tagName: fixtureTag,
+            htmlURL: release.htmlURL,
+            draft: false,
+            prerelease: false,
+            assets: [unsafe, unsafeChecksum]
+        )
+        do {
+            _ = try GitHubReleaseSelector.candidate(
+                from: unsafeRelease,
+                currentVersion: currentVersion,
+                architecture: "arm64"
+            )
+            failures.append("an insecure GitHub asset URL was accepted")
+        } catch let failure as UpdateFailure {
+            if failure != .invalidAssetURL("http://example.com/update.zip") {
+                failures.append("an insecure asset failed with the wrong recovery error")
+            }
+        } catch {
+            failures.append("an insecure asset failed with an unexpected error")
+        }
     }
 
     private static func checkProgress(_ failures: inout [String]) {

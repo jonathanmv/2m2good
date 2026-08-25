@@ -2,6 +2,226 @@ import XCTest
 @testable import BreakCompanion
 
 final class BreakCompanionTests: XCTestCase {
+    func testSemanticVersionIsSharedAndOrdersReleaseTags() {
+        let currentVersion = ProductIdentity.currentVersion
+        let nextVersion = SemanticVersion(
+            major: currentVersion.major,
+            minor: currentVersion.minor,
+            patch: currentVersion.patch + 1
+        )
+        let sameCoreStable = SemanticVersion(
+            major: currentVersion.major,
+            minor: currentVersion.minor,
+            patch: currentVersion.patch
+        )
+        let sameCorePrerelease = SemanticVersion(
+            major: currentVersion.major,
+            minor: currentVersion.minor,
+            patch: currentVersion.patch,
+            prerelease: [.text("self-check")]
+        )
+        XCTAssertEqual(SemanticVersion(tag: "v\(currentVersion)"), currentVersion)
+        XCTAssertGreaterThan(nextVersion, currentVersion)
+        XCTAssertLessThan(sameCorePrerelease, sameCoreStable)
+        XCTAssertNil(SemanticVersion(tag: "release-\(currentVersion)"))
+        XCTAssertEqual(
+            ProductIdentity.diagnosticsIdentity,
+            "\(ProductIdentity.name) \(currentVersion) (\(ProductIdentity.buildDisplay))"
+        )
+    }
+
+    func testSemanticVersionRejectsNonASCIIIdentifiersAndOrdersLargeNumericIdentifiers() {
+        let large = SemanticVersion(tag: "1.0.0-999999999999999999999")!
+        let small = SemanticVersion(tag: "1.0.0-2")!
+
+        XCTAssertGreaterThan(large, small)
+        XCTAssertEqual(large.description, "1.0.0-999999999999999999999")
+        XCTAssertNil(SemanticVersion(tag: "1.0.0-é"))
+        XCTAssertNil(SemanticVersion(tag: "1.0.0-１２"))
+    }
+
+    func testSemanticVersionRejectsCoreNumbersOutsideRuntimeRange() {
+        XCTAssertNil(SemanticVersion(tag: "9223372036854775807.0.0"))
+        XCTAssertNil(SemanticVersion(tag: "9223372036854775808.0.0"))
+        XCTAssertNil(SemanticVersion(tag: "999999999999999999999.0.0"))
+        XCTAssertNil(SemanticVersion(tag: "0.999999999999999999999.0"))
+        XCTAssertNil(SemanticVersion(tag: "0.0.999999999999999999999"))
+    }
+
+    func testReleaseChecksumMustMatchTheNamedArtifact() {
+        let data = Data("update-payload".utf8)
+        let checksum = Data("faf613f495c32b8434726bd719da5f8901270370aa14f4259b1d3ec23f998fe1  artifact.zip\n".utf8)
+        XCTAssertTrue(UpdateArtifactVerifier.verify(data: data, checksumFile: checksum, expectedFileName: "artifact.zip"))
+        XCTAssertFalse(UpdateArtifactVerifier.verify(data: Data("tampered".utf8), checksumFile: checksum, expectedFileName: "artifact.zip"))
+        XCTAssertFalse(UpdateArtifactVerifier.verify(data: data, checksumFile: checksum, expectedFileName: "other.zip"))
+    }
+
+    func testGitHubReleaseSelectionRequiresExactHTTPSAssetsForThisMac() throws {
+        let releaseVersion = nextReleaseVersion
+        let releaseTag = "v\(releaseVersion)"
+        let artifactName = "\(ProductIdentity.name)-\(releaseTag)-macos-x86_64.zip"
+        let checksumName = "\(artifactName).sha256"
+        let artifactURL = URL(string: "https://release-assets.githubusercontent.com/github-production-release-asset/\(releaseTag)/app.zip")!
+        let checksumURL = URL(string: "https://release-assets.githubusercontent.com/github-production-release-asset/\(releaseTag)/app.sha256")!
+        let release = GitHubRelease(
+            tagName: releaseTag,
+            htmlURL: URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/tag/\(releaseTag)")!,
+            draft: false,
+            prerelease: false,
+            assets: [
+                ReleaseAsset(name: artifactName, browserDownloadURL: artifactURL),
+                ReleaseAsset(name: checksumName, browserDownloadURL: checksumURL)
+            ]
+        )
+        let candidate = try GitHubReleaseSelector.candidate(
+            from: release,
+            currentVersion: ProductIdentity.currentVersion,
+            architecture: "x86_64"
+        )
+        XCTAssertEqual(candidate?.artifactName, artifactName)
+        XCTAssertEqual(candidate?.checksumName, checksumName)
+        XCTAssertEqual(candidate?.artifactURL, artifactURL)
+
+        let insecure = GitHubRelease(
+            tagName: releaseTag,
+            htmlURL: release.htmlURL,
+            draft: false,
+            prerelease: false,
+            assets: [
+                ReleaseAsset(name: artifactName, browserDownloadURL: URL(string: "http://example.com/app.zip")!),
+                ReleaseAsset(name: checksumName, browserDownloadURL: checksumURL)
+            ]
+        )
+        XCTAssertThrowsError(try GitHubReleaseSelector.candidate(
+            from: insecure,
+            currentVersion: ProductIdentity.currentVersion,
+            architecture: "x86_64"
+        ))
+    }
+
+    @MainActor
+    func testMissingReadyUpdateCanReturnToManualCheck() async throws {
+        let releaseVersion = nextReleaseVersion
+        let releaseTag = "v\(releaseVersion)"
+        let artifactName = "\(ProductIdentity.name)-\(releaseTag)-macos-arm64.zip"
+        let artifactURL = URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/\(releaseTag)/app.zip")!
+        let checksumURL = URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/\(releaseTag)/app.sha256")!
+        let artifact = Data("update-payload".utf8)
+        let checksum = Data("faf613f495c32b8434726bd719da5f8901270370aa14f4259b1d3ec23f998fe1  \(artifactName)\n".utf8)
+        let releaseJSON: [String: Any] = [
+            "tag_name": releaseTag,
+            "html_url": "https://github.com/\(ProductIdentity.releaseRepository)/releases/tag/\(releaseTag)",
+            "draft": false,
+            "prerelease": false,
+            "assets": [
+                ["name": artifactName, "browser_download_url": artifactURL.absoluteString],
+                ["name": "\(artifactName).sha256", "browser_download_url": checksumURL.absoluteString]
+            ]
+        ]
+        let transport = StubUpdateTransport(responses: [
+            ProductIdentity.releaseAPIURL.absoluteString: try JSONSerialization.data(withJSONObject: releaseJSON),
+            artifactURL.absoluteString: artifact,
+            checksumURL.absoluteString: checksum
+        ])
+        let service = GitHubReleasesUpdateService(
+            transport: transport,
+            currentVersion: ProductIdentity.currentVersion,
+            architecture: "arm64"
+        )
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let controller = UpdateController(service: service, defaults: defaults)
+
+        let checkExpectation = expectation(description: "manual update check")
+        controller.onEvent = { event in
+            if case .manualResult = event { checkExpectation.fulfill() }
+        }
+        controller.checkManually(now: Date(timeIntervalSinceReferenceDate: 100_000))
+        await fulfillment(of: [checkExpectation], timeout: 1)
+        guard case .available = controller.state else {
+            XCTFail("the fixture should make an update available")
+            return
+        }
+
+        let downloadExpectation = expectation(description: "verified update download")
+        controller.onEvent = { event in
+            if case .downloaded = event { downloadExpectation.fulfill() }
+        }
+        controller.downloadAvailable()
+        await fulfillment(of: [downloadExpectation], timeout: 1)
+        guard case .ready(let downloaded) = controller.state else {
+            XCTFail("the fixture should produce a ready update")
+            return
+        }
+        let temporaryDirectory = downloaded.artifactURL.deletingLastPathComponent()
+        defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
+        try FileManager.default.removeItem(at: downloaded.artifactURL)
+
+        controller.resetReadyUpdate()
+        XCTAssertEqual(controller.state, .idle)
+
+        let retryExpectation = expectation(description: "retry update check")
+        controller.onEvent = { event in
+            if case .manualResult = event { retryExpectation.fulfill() }
+        }
+        controller.checkManually(now: Date(timeIntervalSinceReferenceDate: 100_001))
+        await fulfillment(of: [retryExpectation], timeout: 1)
+        guard case .available = controller.state else {
+            XCTFail("resetting a missing download should permit another check")
+            return
+        }
+    }
+
+    func testAutomaticUpdateChecksAreBoundedToOnePerDay() {
+        let now = Date(timeIntervalSinceReferenceDate: 100_000)
+        XCTAssertTrue(UpdateSourcePolicy.shouldAutomaticallyCheck(lastCheck: nil, now: now))
+        XCTAssertFalse(UpdateSourcePolicy.shouldAutomaticallyCheck(lastCheck: now.addingTimeInterval(-60), now: now))
+        XCTAssertTrue(UpdateSourcePolicy.shouldAutomaticallyCheck(lastCheck: now.addingTimeInterval(-86_400), now: now))
+    }
+
+    func testUpdateServiceSelectsAndVerifiesReleaseWithoutNetwork() async throws {
+        let releaseVersion = nextReleaseVersion
+        let releaseTag = "v\(releaseVersion)"
+        let artifactName = "\(ProductIdentity.name)-\(releaseTag)-macos-arm64.zip"
+        let apiURL = ProductIdentity.releaseAPIURL
+        let artifactURL = URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/\(releaseTag)/app.zip")!
+        let checksumURL = URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/\(releaseTag)/app.sha256")!
+        let artifact = Data("update-payload".utf8)
+        let checksum = Data("faf613f495c32b8434726bd719da5f8901270370aa14f4259b1d3ec23f998fe1  \(artifactName)\n".utf8)
+        let releaseJSON: [String: Any] = [
+            "tag_name": releaseTag,
+            "html_url": "https://github.com/\(ProductIdentity.releaseRepository)/releases/tag/\(releaseTag)",
+            "draft": false,
+            "prerelease": false,
+            "assets": [
+                ["name": artifactName, "browser_download_url": artifactURL.absoluteString],
+                ["name": "\(artifactName).sha256", "browser_download_url": checksumURL.absoluteString]
+            ]
+        ]
+        let transport = StubUpdateTransport(responses: [
+            apiURL.absoluteString: try JSONSerialization.data(withJSONObject: releaseJSON),
+            artifactURL.absoluteString: artifact,
+            checksumURL.absoluteString: checksum
+        ])
+        let service = GitHubReleasesUpdateService(
+            transport: transport,
+            currentVersion: ProductIdentity.currentVersion,
+            architecture: "arm64"
+        )
+
+        let result = await service.checkForUpdate()
+        guard case .available(let candidate) = result else {
+            XCTFail("the valid release should be available: \(result)")
+            return
+        }
+        let downloaded = try await service.downloadAndVerify(candidate)
+        defer { try? FileManager.default.removeItem(at: downloaded.artifactURL.deletingLastPathComponent()) }
+        XCTAssertEqual(try Data(contentsOf: downloaded.artifactURL), artifact)
+        XCTAssertEqual(downloaded.candidate.artifactName, artifactName)
+    }
+
     func testBreakProgressAtBeginningMidpointNearDueAndDeferralReset() {
         let start = Date(timeIntervalSinceReferenceDate: 1_000)
         let deferral = ScheduledCheckInWindow(
@@ -1336,6 +1556,15 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertEqual(PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 3, y: 4)), .drag)
     }
 
+    private var nextReleaseVersion: SemanticVersion {
+        let currentVersion = ProductIdentity.currentVersion
+        return SemanticVersion(
+            major: currentVersion.major,
+            minor: currentVersion.minor,
+            patch: currentVersion.patch + 1
+        )
+    }
+
     private func activitySignal(
         _ keyboardIdle: TimeInterval,
         _ pointerIdle: TimeInterval,
@@ -1353,7 +1582,6 @@ final class BreakCompanionTests: XCTestCase {
     private func referenceDate(_ secondsSinceReference: TimeInterval) -> Date {
         Date(timeIntervalSinceReferenceDate: secondsSinceReference)
     }
-
     private func makeMove(
         _ id: String,
         _ focuses: Set<BodyFocus>,
@@ -1379,4 +1607,22 @@ private final class RecordingSpeaker: RoutineSpeaking {
     }
 
     func stop() {}
+}
+
+private final class StubUpdateTransport: UpdateTransport {
+    let responses: [String: Data]
+
+    init(responses: [String: Data]) {
+        self.responses = responses
+    }
+
+    func data(for request: URLRequest, maxBytes: Int) async throws -> Data {
+        guard let url = request.url, let response = responses[url.absoluteString] else {
+            throw UpdateFailure.unexpectedResponse
+        }
+        guard response.count <= maxBytes else {
+            throw UpdateFailure.responseTooLarge
+        }
+        return response
+    }
 }

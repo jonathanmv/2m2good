@@ -236,7 +236,7 @@ if [ "$launch" -eq 1 ]; then
 else
     printf '  Launch behavior:   do not open the app after a successful build\n'
 fi
-printf '%s\n' '  Network:            Git source fetch only; the app has no runtime network service, account, or analytics.'
+printf '%s\n' '  Network:            installer fetches Git source only; the app may check GitHub Releases without sending break data.'
 printf '%s\n' '  Safety:             no sudo, credential prompts, global install, update service, or deletion.'
 printf '%s\n\n' 'The requested ref is not an integrity guarantee; review the source and ref yourself.'
 
@@ -333,4 +333,4 @@ else
 fi
 
 printf '%s\n' 'Early developer preview ready.'
-printf '%s\n' 'This checkout is intentionally local and unsigned/ad-hoc signed; it has no automatic updates or rollback.'
+printf '%s\n' 'This checkout is intentionally local and ad-hoc signed; the installer has no update service or rollback. The app updater uses only the documented GitHub checksum contract.'
