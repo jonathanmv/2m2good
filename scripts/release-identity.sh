@@ -29,7 +29,7 @@ validate_core_component() {
     component_digits=${#component}
     [ "$component_digits" -lt "$max_core_digits" ] && return 0
     [ "$component_digits" -gt "$max_core_digits" ] && return 1
-    [ "$component" = "$max_core_value" ] || LC_ALL=C test "$component" \< "$max_core_value"
+    LC_ALL=C test "$component" \< "$max_core_value"
 }
 
 core=${version%%[-+]*}

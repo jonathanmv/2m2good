@@ -50,6 +50,7 @@ enum SelfCheck {
               nextVersion > currentVersion,
               sameCorePrerelease < sameCoreStable,
               largeNumericPrerelease > smallNumericPrerelease,
+              SemanticVersion(tag: "\(Int.max).0.0") == nil,
               SemanticVersion(tag: "\(outOfRangeCore).0.0") == nil,
               SemanticVersion(tag: "1.0.0-é") == nil,
               SemanticVersion(tag: "not-a-version") == nil else {

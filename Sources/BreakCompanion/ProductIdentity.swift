@@ -125,7 +125,7 @@ struct SemanticVersion: Hashable, Comparable, Codable, CustomStringConvertible, 
         let maximum = String(Int.max)
         return isNumericIdentifier(text)
             && (text == "0" || text.first != "0")
-            && (text.count < maximum.count || (text.count == maximum.count && text <= maximum))
+            && (text.count < maximum.count || (text.count == maximum.count && text < maximum))
     }
 
     private static func isNumericIdentifier(_ value: String) -> Bool {

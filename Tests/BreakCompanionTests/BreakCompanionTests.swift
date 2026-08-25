@@ -41,7 +41,7 @@ final class BreakCompanionTests: XCTestCase {
     }
 
     func testSemanticVersionRejectsCoreNumbersOutsideRuntimeRange() {
-        XCTAssertNotNil(SemanticVersion(tag: "9223372036854775807.0.0"))
+        XCTAssertNil(SemanticVersion(tag: "9223372036854775807.0.0"))
         XCTAssertNil(SemanticVersion(tag: "9223372036854775808.0.0"))
         XCTAssertNil(SemanticVersion(tag: "999999999999999999999.0.0"))
         XCTAssertNil(SemanticVersion(tag: "0.999999999999999999999.0"))
