@@ -10,6 +10,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
     private let store = CompanionStore()
     private var panel: NSPanel?
     private var statusItem: NSStatusItem?
+    private var updateMenuItem: NSMenuItem?
+    private var aboutWindow: NSWindow?
+    private let updateController = UpdateController()
     private var keyMonitor: Any?
     private weak var previouslyActiveApplication: NSRunningApplication?
 
@@ -17,6 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         NSApp.setActivationPolicy(.accessory)
         buildPanel()
         buildMenuBarItem()
+        updateController.onEvent = { [weak self] event in
+            self?.handleUpdateEvent(event)
+        }
+        updateController.checkAutomatically()
         store.onSizeChange = { [weak self] mode in
             self?.resizePanel(for: mode)
         }
@@ -64,6 +71,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         menu.addItem(withTitle: "Offer a break now", action: #selector(offerBreak), keyEquivalent: "")
         menu.addItem(withTitle: ProductIdentity.configureAreasMenuTitle, action: #selector(configureAreas), keyEquivalent: "")
         menu.addItem(NSMenuItem.separator())
+        menu.addItem(withTitle: ProductIdentity.aboutMenuTitle, action: #selector(showAbout), keyEquivalent: "")
+        let updateItem = menu.addItem(withTitle: updateController.menuTitle, action: #selector(checkForUpdates), keyEquivalent: "")
+        updateItem.target = self
+        updateMenuItem = updateItem
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(withTitle: "Quit \(ProductIdentity.name)", action: #selector(quit), keyEquivalent: "q")
         menu.items.forEach { $0.target = self }
         menu.delegate = self
@@ -96,8 +108,123 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        guard menuItem.action == #selector(configureAreas) else { return true }
-        return store.canOpenAreaConfiguration
+        if menuItem.action == #selector(configureAreas) {
+            return store.canOpenAreaConfiguration
+        }
+        if menuItem.action == #selector(checkForUpdates) {
+            return !updateController.isBusy
+        }
+        return true
+    }
+
+    @objc private func showAbout() {
+        if let aboutWindow {
+            aboutWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 390, height: 430),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = ProductIdentity.aboutMenuTitle.replacingOccurrences(of: "…", with: "")
+        window.isReleasedWhenClosed = false
+        window.center()
+        window.contentView = NSHostingView(rootView: AboutView(
+            onClose: { [weak self] in self?.aboutWindow?.close() },
+            onOpenReleases: { NSWorkspace.shared.open(ProductIdentity.releasesURL) }
+        ))
+        aboutWindow = window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc private func checkForUpdates() {
+        switch updateController.state {
+        case .available(let candidate):
+            presentUpdate(candidate)
+        case .ready(let downloaded):
+            revealDownloadedUpdate(downloaded)
+        case .checking, .downloading:
+            break
+        default:
+            updateController.checkManually()
+        }
+    }
+
+    private func handleUpdateEvent(_ event: UpdateController.Event) {
+        updateMenuItem?.title = updateController.menuTitle
+        switch event {
+        case .stateChanged:
+            break
+        case .manualResult(let result):
+            switch result {
+            case .current:
+                presentUpdateAlert(
+                    title: "You’re up to date",
+                    message: "\(ProductIdentity.name) \(ProductIdentity.currentVersion) is the newest verified version available from GitHub Releases."
+                )
+            case .available(let candidate):
+                presentUpdate(candidate)
+            case .failed(let failure):
+                presentUpdateAlert(
+                    title: "Update check unavailable",
+                    message: "\(failure.localizedDescription)\n\nNothing was downloaded or changed. You can try again from the menu."
+                )
+            }
+        case .downloaded(let downloaded):
+            presentDownloadedUpdate(downloaded)
+        case .downloadFailed(let failure):
+            presentUpdateAlert(
+                title: "Update was not downloaded",
+                message: "\(failure.localizedDescription)\n\nNothing was opened or installed. The temporary download was removed; you can retry from the menu."
+            )
+        }
+    }
+
+    private func presentUpdate(_ candidate: UpdateCandidate) {
+        let alert = NSAlert()
+        alert.messageText = "A verified update is available"
+        alert.informativeText = "Download \(ProductIdentity.name) \(candidate.version) from GitHub Releases? The ZIP and its SHA-256 checksum will be fetched over HTTPS and checked before anything is shown. Nothing is installed automatically."
+        alert.addButton(withTitle: "Download and Verify")
+        alert.addButton(withTitle: "Later")
+        if alert.runModal() == .alertFirstButtonReturn {
+            updateController.downloadAvailable()
+        }
+    }
+
+    private func presentDownloadedUpdate(_ downloaded: DownloadedUpdate) {
+        let alert = NSAlert()
+        alert.messageText = "Update verified"
+        alert.informativeText = "\(downloaded.candidate.artifactName) passed its SHA-256 check and is ready in a temporary folder. The running app was not replaced. Show it in Finder and open it yourself when ready."
+        alert.addButton(withTitle: "Show in Finder")
+        alert.addButton(withTitle: "Later")
+        if alert.runModal() == .alertFirstButtonReturn {
+            revealDownloadedUpdate(downloaded)
+        }
+    }
+
+    private func revealDownloadedUpdate(_ downloaded: DownloadedUpdate) {
+        guard FileManager.default.fileExists(atPath: downloaded.artifactURL.path) else {
+            presentUpdateAlert(
+                title: "Verified update is no longer available",
+                message: "The temporary download was removed. Check for updates again to retry; the running app was not changed."
+            )
+            return
+        }
+        updateController.markReadyUpdateAsShown()
+        NSWorkspace.shared.activateFileViewerSelecting([downloaded.artifactURL])
+    }
+
+    private func presentUpdateAlert(title: String, message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     @objc private func quit() {

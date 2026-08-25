@@ -9,12 +9,17 @@ macos_dir="$contents_dir/MacOS"
 module_cache="$project_dir/.build/manual-module-cache"
 sdk_path="${BREAK_SDK_PATH:-$(xcrun --show-sdk-path)}"
 architecture="$(uname -m)"
+version="$("$project_dir/scripts/release-identity.sh" --version)"
+build_number="$("$project_dir/scripts/release-identity.sh" --build-number)"
 
 # Rebuild the bundle from scratch: a renamed bundle resolves to this same path on a
 # case-insensitive volume, so leftover contents would otherwise survive the rename.
 rm -rf "$app_dir"
 mkdir -p "$macos_dir" "$module_cache"
-cp "$project_dir/Resources/Info.plist" "$contents_dir/Info.plist"
+sed \
+    -e "s/@VERSION@/$version/g" \
+    -e "s/@BUILD_NUMBER@/$build_number/g" \
+    "$project_dir/Resources/Info.plist" > "$contents_dir/Info.plist"
 
 xcrun swiftc \
     -sdk "$sdk_path" \

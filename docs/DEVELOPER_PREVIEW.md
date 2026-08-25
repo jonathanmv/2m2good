@@ -114,16 +114,20 @@ BREAK_SDK_PATH=/path/to/MacOSX.sdk \
    path. The bundle name is never duplicated in the installer, so renaming it in
    `scripts/build-app.sh` is enough.
 
-The network is used by the installer only to obtain the preview source. The
-built app retains the pilot's local-only behavior: no account, runtime network
-integration, sync, analytics, or remote update service. The app still requests
+The installer uses the network only to obtain the preview source. The built
+preview retains the pilot's local-only behavior for breaks: no account, sync,
+analytics, or usage telemetry. The packaged app may perform its bounded,
+user-controllable GitHub Releases check, which sends only its product/version
+user agent and never sends break activity or preferences. The source installer
+itself does not install, replace, or roll back releases. The app still requests
 optional macOS microphone and speech-recognition permissions when voice input
 is used; its buttons remain available without them.
 
-This path provides no hosted release artifact, Developer ID signature,
-notarization, automatic updates, rollback, pinned-download verification, or
-other integrity guarantee. Source, branch/revision, build output, and launch
-behavior remain visible so the user can inspect them directly.
+This source path provides no Developer ID signature or notarization and is not a
+consumer installer. Packaged release updates use the exact GitHub asset and
+SHA-256 contract in [`docs/RELEASES.md`](RELEASES.md); malformed, untrusted, or
+unverified artifacts are refused. Source, branch/revision, build output, and
+launch behavior remain visible so the user can inspect them directly.
 
 ## Safe installer checks
 

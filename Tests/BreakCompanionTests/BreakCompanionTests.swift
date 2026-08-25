@@ -2,6 +2,111 @@ import XCTest
 @testable import BreakCompanion
 
 final class BreakCompanionTests: XCTestCase {
+    func testSemanticVersionIsSharedAndOrdersReleaseTags() {
+        XCTAssertEqual(ProductIdentity.currentVersion.description, "0.1.0")
+        XCTAssertEqual(SemanticVersion(tag: "v0.1.0"), ProductIdentity.currentVersion)
+        XCTAssertGreaterThan(SemanticVersion(tag: "0.1.1")!, ProductIdentity.currentVersion)
+        XCTAssertLessThan(SemanticVersion(tag: "v0.1.0-beta.1")!, ProductIdentity.currentVersion)
+        XCTAssertNil(SemanticVersion(tag: "release-0.1.0"))
+        XCTAssertEqual(ProductIdentity.diagnosticsIdentity, "2m2better 0.1.0 (Build 1 · Developer Preview)")
+    }
+
+    func testReleaseChecksumMustMatchTheNamedArtifact() {
+        let data = Data("update-payload".utf8)
+        let checksum = Data("faf613f495c32b8434726bd719da5f8901270370aa14f4259b1d3ec23f998fe1  artifact.zip\n".utf8)
+        XCTAssertTrue(UpdateArtifactVerifier.verify(data: data, checksumFile: checksum, expectedFileName: "artifact.zip"))
+        XCTAssertFalse(UpdateArtifactVerifier.verify(data: Data("tampered".utf8), checksumFile: checksum, expectedFileName: "artifact.zip"))
+        XCTAssertFalse(UpdateArtifactVerifier.verify(data: data, checksumFile: checksum, expectedFileName: "other.zip"))
+    }
+
+    func testGitHubReleaseSelectionRequiresExactHTTPSAssetsForThisMac() throws {
+        let release = GitHubRelease(
+            tagName: "v0.2.0",
+            htmlURL: URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/tag/v0.2.0")!,
+            draft: false,
+            prerelease: false,
+            assets: [
+                ReleaseAsset(
+                    name: "2m2better-v0.2.0-macos-x86_64.zip",
+                    browserDownloadURL: URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/v0.2.0/app.zip")!
+                ),
+                ReleaseAsset(
+                    name: "2m2better-v0.2.0-macos-x86_64.zip.sha256",
+                    browserDownloadURL: URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/v0.2.0/app.sha256")!
+                )
+            ]
+        )
+        let candidate = try GitHubReleaseSelector.candidate(
+            from: release,
+            currentVersion: ProductIdentity.currentVersion,
+            architecture: "x86_64"
+        )
+        XCTAssertEqual(candidate?.artifactName, "2m2better-v0.2.0-macos-x86_64.zip")
+        XCTAssertEqual(candidate?.checksumName, "2m2better-v0.2.0-macos-x86_64.zip.sha256")
+
+        let insecure = GitHubRelease(
+            tagName: "v0.2.0",
+            htmlURL: release.htmlURL,
+            draft: false,
+            prerelease: false,
+            assets: [
+                ReleaseAsset(name: "2m2better-v0.2.0-macos-x86_64.zip", browserDownloadURL: URL(string: "http://example.com/app.zip")!),
+                ReleaseAsset(name: "2m2better-v0.2.0-macos-x86_64.zip.sha256", browserDownloadURL: URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/v0.2.0/app.sha256")!)
+            ]
+        )
+        XCTAssertThrowsError(try GitHubReleaseSelector.candidate(
+            from: insecure,
+            currentVersion: ProductIdentity.currentVersion,
+            architecture: "x86_64"
+        ))
+    }
+
+    func testAutomaticUpdateChecksAreBoundedToOnePerDay() {
+        let now = Date(timeIntervalSinceReferenceDate: 100_000)
+        XCTAssertTrue(UpdateSourcePolicy.shouldAutomaticallyCheck(lastCheck: nil, now: now))
+        XCTAssertFalse(UpdateSourcePolicy.shouldAutomaticallyCheck(lastCheck: now.addingTimeInterval(-60), now: now))
+        XCTAssertTrue(UpdateSourcePolicy.shouldAutomaticallyCheck(lastCheck: now.addingTimeInterval(-86_400), now: now))
+    }
+
+    func testUpdateServiceSelectsAndVerifiesReleaseWithoutNetwork() async throws {
+        let artifactName = "2m2better-v0.2.0-macos-arm64.zip"
+        let apiURL = ProductIdentity.releaseAPIURL
+        let artifactURL = URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/v0.2.0/app.zip")!
+        let checksumURL = URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/v0.2.0/app.sha256")!
+        let artifact = Data("update-payload".utf8)
+        let checksum = Data("faf613f495c32b8434726bd719da5f8901270370aa14f4259b1d3ec23f998fe1  \(artifactName)\n".utf8)
+        let releaseJSON: [String: Any] = [
+            "tag_name": "v0.2.0",
+            "html_url": "https://github.com/\(ProductIdentity.releaseRepository)/releases/tag/v0.2.0",
+            "draft": false,
+            "prerelease": false,
+            "assets": [
+                ["name": artifactName, "browser_download_url": artifactURL.absoluteString],
+                ["name": "\(artifactName).sha256", "browser_download_url": checksumURL.absoluteString]
+            ]
+        ]
+        let transport = StubUpdateTransport(responses: [
+            apiURL.absoluteString: try JSONSerialization.data(withJSONObject: releaseJSON),
+            artifactURL.absoluteString: artifact,
+            checksumURL.absoluteString: checksum
+        ])
+        let service = GitHubReleasesUpdateService(
+            transport: transport,
+            currentVersion: ProductIdentity.currentVersion,
+            architecture: "arm64"
+        )
+
+        let result = await service.checkForUpdate()
+        guard case .available(let candidate) = result else {
+            XCTFail("the valid release should be available: \(result)")
+            return
+        }
+        let downloaded = try await service.downloadAndVerify(candidate)
+        defer { try? FileManager.default.removeItem(at: downloaded.artifactURL.deletingLastPathComponent()) }
+        XCTAssertEqual(try Data(contentsOf: downloaded.artifactURL), artifact)
+        XCTAssertEqual(downloaded.candidate.artifactName, artifactName)
+    }
+
     func testBreakProgressAtBeginningMidpointNearDueAndDeferralReset() {
         let start = Date(timeIntervalSinceReferenceDate: 1_000)
         let deferral = ScheduledCheckInWindow(
@@ -1379,4 +1484,22 @@ private final class RecordingSpeaker: RoutineSpeaking {
     }
 
     func stop() {}
+}
+
+private final class StubUpdateTransport: UpdateTransport {
+    let responses: [String: Data]
+
+    init(responses: [String: Data]) {
+        self.responses = responses
+    }
+
+    func data(for request: URLRequest, maxBytes: Int) async throws -> Data {
+        guard let url = request.url, let response = responses[url.absoluteString] else {
+            throw UpdateFailure.unexpectedResponse
+        }
+        guard response.count <= maxBytes else {
+            throw UpdateFailure.responseTooLarge
+        }
+        return response
+    }
 }

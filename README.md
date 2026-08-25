@@ -27,6 +27,8 @@ open ".build/app/2m2better.app"
 
 The app appears as a small orb near the upper-right of the screen and as a leaf in the menu bar. On a fresh install, a compact setup asks which body areas the standing reset should support; every shipped movement is standing-only, so the reset is presented as a standing one rather than a seated alternative. Click the orb or **Offer a break now** in the menu bar to trigger a break immediately; use **Choose body areas…** there to review or change the selection, which stays available while the orb is idle so an offered or running reset is never discarded.
 
+The menu also includes **About 2m2better…**, which shows the shared semantic version and build identity. **Check for Updates…** checks GitHub Releases only; it is bounded and non-blocking, never sends break activity, and never installs an update without an explicit download, checksum verification, and user-controlled Finder handoff. See [`docs/RELEASES.md`](docs/RELEASES.md) for the release asset contract and packaging validation.
+
 This development Mac currently has a newer command-line compiler paired with a slightly mismatched newest SDK. On this machine only, build with its compatible installed SDK:
 
 ```sh
@@ -57,8 +59,7 @@ successfully as if the preview had worked.
 After reviewing the displayed repository, ref, destination, build command,
 output, and launch behavior, rerun without `--dry-run` to confirm and build.
 The installer checks its prerequisites before it creates anything and reports
-the missing one. This path provides no hosted release artifact,
-signing/notarization, automatic updates, rollback, or integrity guarantee.
+the missing one. This source path remains an ad-hoc, non-notarized developer preview and does not install or roll back releases. Packaged app updates, when a correctly named GitHub Release exists, use the separately documented checksum contract in [`docs/RELEASES.md`](docs/RELEASES.md).
 
 ## Permissions
 
@@ -119,10 +120,10 @@ Run the packaged logic checks with:
 ".build/app/2m2better.app/Contents/MacOS/BreakCompanion" --self-check
 ```
 
-The Swift package and XCTest target are included for use in a standard Xcode toolchain (`swift test`).
+The Swift package and XCTest target are included for use in a standard Xcode toolchain (`swift test`). For release packaging and the packaged self-check, run `./scripts/test-release-packaging.sh`; use the `BREAK_SDK_PATH` override above on this development Mac.
 
 ## Pilot boundaries
 
-This prototype intentionally does not launch at login, collect wellbeing data, sync, coach, score, or expose a browsable routine catalog. “Tomorrow” means 24 hours from the response. For a later iteration, that could become a user-selected quiet-hours-aware morning without changing the core state machine.
+This prototype intentionally does not launch at login, collect wellbeing data, sync, coach, score, or expose a browsable routine catalog. “Tomorrow” means 24 hours from the response. The only runtime network activity is the optional GitHub Releases update check; it sends no usage data and does not change the local-only break experience. For a later iteration, “Tomorrow” could become a user-selected quiet-hours-aware morning without changing the core state machine.
 
 A quiet idle orb shifts from soft green through muted orange to calm red as the next check-in approaches. The same timing is available to VoiceOver as remaining time and interval progress, so color is never the only signal.
