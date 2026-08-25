@@ -209,6 +209,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
 
     private func revealDownloadedUpdate(_ downloaded: DownloadedUpdate) {
         guard FileManager.default.fileExists(atPath: downloaded.artifactURL.path) else {
+            updateController.resetReadyUpdate()
             presentUpdateAlert(
                 title: "Verified update is no longer available",
                 message: "The temporary download was removed. Check for updates again to retry; the running app was not changed."

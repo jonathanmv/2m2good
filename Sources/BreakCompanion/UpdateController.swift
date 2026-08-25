@@ -97,6 +97,11 @@ final class UpdateController {
         state = .current
     }
 
+    func resetReadyUpdate() {
+        guard case .ready = state else { return }
+        state = .idle
+    }
+
     private func startCheck(manual: Bool, now: Date) {
         manualCheckPending = manual
         state = .checking

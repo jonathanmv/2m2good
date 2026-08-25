@@ -26,18 +26,21 @@ enum SelfCheck {
     }
 
     private static func checkReleaseIdentity(_ failures: inout [String]) {
-        guard ProductIdentity.currentVersion.description == "0.1.0" else {
-            failures.append("the packaged semantic version should be 0.1.0")
-            return
-        }
-        guard SemanticVersion(tag: "v0.1.1")! > ProductIdentity.currentVersion,
-              SemanticVersion(tag: "0.1.0")! == ProductIdentity.currentVersion,
-              SemanticVersion(tag: "v0.1.0-alpha")! < ProductIdentity.currentVersion,
+        let currentVersion = ProductIdentity.currentVersion
+        let currentCore = "\(currentVersion.major).\(currentVersion.minor).\(currentVersion.patch)"
+        let nextVersion = SemanticVersion(
+            major: currentVersion.major,
+            minor: currentVersion.minor,
+            patch: currentVersion.patch + 1
+        )
+        guard SemanticVersion(tag: "v\(currentVersion)") == currentVersion,
+              nextVersion > currentVersion,
+              SemanticVersion(tag: "\(currentCore)-alpha")! < currentVersion,
               SemanticVersion(tag: "not-a-version") == nil else {
             failures.append("semantic-version parsing or ordering is not deterministic")
             return
         }
-        if ProductIdentity.diagnosticsIdentity != "\(ProductIdentity.name) 0.1.0 (Build 1 · Developer Preview)" {
+        if ProductIdentity.diagnosticsIdentity != "\(ProductIdentity.name) \(currentVersion) (\(ProductIdentity.buildDisplay))" {
             failures.append("diagnostics should use the shared release identity")
         }
     }
@@ -50,28 +53,37 @@ enum SelfCheck {
             failures.append("release checksum verification accepted the wrong artifact")
         }
 
+        let currentVersion = ProductIdentity.currentVersion
+        let fixtureVersion = SemanticVersion(
+            major: currentVersion.major,
+            minor: currentVersion.minor,
+            patch: currentVersion.patch + 1
+        )
+        let fixtureTag = "v\(fixtureVersion)"
+        let artifactName = "\(ProductIdentity.name)-\(fixtureTag)-macos-arm64.zip"
+        let checksumName = "\(artifactName).sha256"
         let release = GitHubRelease(
-            tagName: "v0.2.0",
-            htmlURL: URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/tag/v0.2.0")!,
+            tagName: fixtureTag,
+            htmlURL: URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/tag/\(fixtureTag)")!,
             draft: false,
             prerelease: false,
             assets: [
                 ReleaseAsset(
-                    name: "\(ProductIdentity.name)-v0.2.0-macos-arm64.zip",
-                    browserDownloadURL: URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/v0.2.0/arm.zip")!
+                    name: artifactName,
+                    browserDownloadURL: URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/\(fixtureTag)/arm.zip")!
                 ),
                 ReleaseAsset(
-                    name: "\(ProductIdentity.name)-v0.2.0-macos-arm64.zip.sha256",
-                    browserDownloadURL: URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/v0.2.0/arm.sha256")!
+                    name: checksumName,
+                    browserDownloadURL: URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/\(fixtureTag)/arm.sha256")!
                 )
             ]
         )
         do {
             guard let candidate = try GitHubReleaseSelector.candidate(
                 from: release,
-                currentVersion: ProductIdentity.currentVersion,
+                currentVersion: currentVersion,
                 architecture: "arm64"
-            ), candidate.version.description == "0.2.0" else {
+            ), candidate.version == fixtureVersion else {
                 failures.append("GitHub Release asset selection did not find the exact architecture contract")
                 return
             }
@@ -80,15 +92,15 @@ enum SelfCheck {
         }
 
         let unsafe = ReleaseAsset(
-            name: "\(ProductIdentity.name)-v0.3.0-macos-arm64.zip",
+            name: artifactName,
             browserDownloadURL: URL(string: "http://example.com/update.zip")!
         )
         let unsafeChecksum = ReleaseAsset(
-            name: "\(ProductIdentity.name)-v0.3.0-macos-arm64.zip.sha256",
-            browserDownloadURL: URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/v0.3.0/update.sha256")!
+            name: checksumName,
+            browserDownloadURL: URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/\(fixtureTag)/update.sha256")!
         )
         let unsafeRelease = GitHubRelease(
-            tagName: "v0.3.0",
+            tagName: fixtureTag,
             htmlURL: release.htmlURL,
             draft: false,
             prerelease: false,
@@ -97,7 +109,7 @@ enum SelfCheck {
         do {
             _ = try GitHubReleaseSelector.candidate(
                 from: unsafeRelease,
-                currentVersion: ProductIdentity.currentVersion,
+                currentVersion: currentVersion,
                 architecture: "arm64"
             )
             failures.append("an insecure GitHub asset URL was accepted")

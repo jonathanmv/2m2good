@@ -94,7 +94,8 @@ enum UpdateSourcePolicy {
     static let supportedGitHubHosts = Set([
         "api.github.com",
         "github.com",
-        "objects.githubusercontent.com"
+        "objects.githubusercontent.com",
+        "release-assets.githubusercontent.com"
     ])
 
     static func isApprovedGitHubURL(_ url: URL) -> Bool {
@@ -110,8 +111,11 @@ enum UpdateSourcePolicy {
 
     static func isApprovedAssetURL(_ url: URL) -> Bool {
         guard isApprovedGitHubURL(url) else { return false }
-        if url.host?.lowercased() == "objects.githubusercontent.com" { return true }
-        return url.host?.lowercased() == "github.com"
+        let host = url.host?.lowercased()
+        if host == "objects.githubusercontent.com" || host == "release-assets.githubusercontent.com" {
+            return true
+        }
+        return host == "github.com"
             && url.path.hasPrefix("/\(ProductIdentity.releaseRepository)/releases/download/")
     }
 
