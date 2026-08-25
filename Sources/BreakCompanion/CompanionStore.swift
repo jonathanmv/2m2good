@@ -2,6 +2,27 @@ import CoreGraphics
 import Foundation
 
 @MainActor
+protocol DelayedActionScheduling {
+    func schedule(after delay: TimeInterval, action: @escaping () -> Void)
+}
+
+@MainActor
+struct DelayedActionScheduler: DelayedActionScheduling {
+    nonisolated init() {}
+
+    func schedule(after delay: TimeInterval, action: @escaping () -> Void) {
+        guard delay > 0 else {
+            action()
+            return
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(delay))
+            action()
+        }
+    }
+}
+
+@MainActor
 final class CompanionStore: ObservableObject {
     enum Mode: Equatable {
         case idle
@@ -36,9 +57,10 @@ final class CompanionStore: ObservableObject {
     private let idleThreshold: TimeInterval
     private let sessionSelection: SessionSelectionStore
     private let bodyAreaPreferences: BodyAreaPreferences
-    private var accumulatedActiveTime: TimeInterval = 0
+    private var activeUseTracker: ActiveUseTracker
     private var scheduledCheckIn: ScheduledCheckInWindow?
-    private var lastTick = Date()
+    private let nowProvider: () -> Date
+    private let postponementScheduler: any DelayedActionScheduling
     private var timer: Timer?
     private var completionDismissTask: Task<Void, Never>?
     private var completionDismissalState = CompletionDismissalState()
@@ -49,7 +71,9 @@ final class CompanionStore: ObservableObject {
         environment: [String: String] = ProcessInfo.processInfo.environment,
         defaults: UserDefaults = .standard,
         activitySignalProvider: @escaping () -> LocalActivitySignal = LocalActivitySignal.current,
-        speaker: RoutineSpeaking? = nil
+        speaker: RoutineSpeaking? = nil,
+        nowProvider: @escaping () -> Date = Date.init,
+        postponementScheduler: any DelayedActionScheduling = DelayedActionScheduler()
     ) {
         let configuredInterval = Double(environment["BREAK_INTERVAL_SECONDS"] ?? "")
         workInterval = max(5, configuredInterval ?? 60 * 60)
@@ -59,6 +83,13 @@ final class CompanionStore: ObservableObject {
         bodyAreaPreferences = BodyAreaPreferences(defaults: defaults)
         self.activitySignalProvider = activitySignalProvider
         self.speaker = speaker ?? GuideSpeaker()
+        self.nowProvider = nowProvider
+        self.postponementScheduler = postponementScheduler
+        activeUseTracker = ActiveUseTracker(
+            activeInterval: workInterval,
+            idleThreshold: idleThreshold,
+            startedAt: nowProvider()
+        )
         selectedAreas = bodyAreaPreferences.selectedAreas
         routine = BreakRoutine.fallback
         nextCheckInRemainingSeconds = workInterval
@@ -94,7 +125,7 @@ final class CompanionStore: ObservableObject {
     }
 
     func offerBreakNow() {
-        showCheckIn()
+        showCheckIn(at: nowProvider())
     }
 
     var canOpenAreaConfiguration: Bool { mode == .idle }
@@ -152,12 +183,12 @@ final class CompanionStore: ObservableObject {
 
     func postpone(minutes: Int) {
         voice.stopListening()
-        let now = Date()
+        let now = nowProvider()
         scheduledCheckIn = ScheduledCheckInWindow(
             startedAt: now,
             dueAt: now.addingTimeInterval(TimeInterval(minutes * 60))
         )
-        accumulatedActiveTime = 0
+        activeUseTracker.reset(at: now)
         updateCheckInProgress(at: now)
         statusText = minutes == 60 ? "I’ll check back in an hour." : "I’ll check back in \(minutes) minutes."
         activityRecoveryExplanation = nil
@@ -166,11 +197,11 @@ final class CompanionStore: ObservableObject {
 
     func postponeUntilTomorrow() {
         voice.stopListening()
-        let now = Date()
+        let now = nowProvider()
         let dueAt = Calendar.current.date(byAdding: .day, value: 1, to: now)
             ?? now.addingTimeInterval(24 * 60 * 60)
         scheduledCheckIn = ScheduledCheckInWindow(startedAt: now, dueAt: dueAt)
-        accumulatedActiveTime = 0
+        activeUseTracker.reset(at: now)
         updateCheckInProgress(at: now)
         statusText = "See you tomorrow."
         activityRecoveryExplanation = nil
@@ -255,10 +286,15 @@ final class CompanionStore: ObservableObject {
     }
 
     private func tick() {
-        let now = Date()
-        let delta = min(2, now.timeIntervalSince(lastTick))
-        lastTick = now
+        tick(at: nowProvider(), userIsActive: userIsActive)
+    }
 
+    @MainActor
+    func tickForTesting(at date: Date, userIsActive: Bool) {
+        tick(at: date, userIsActive: userIsActive)
+    }
+
+    private func tick(at now: Date, userIsActive: Bool) {
         if mode == .routine {
             if evaluateRoutineActivity(signal: activitySignalProvider(), at: now) == .resumedWork {
                 return
@@ -270,22 +306,25 @@ final class CompanionStore: ObservableObject {
         }
 
         guard mode == .idle else { return }
+        let activity = activeUseTracker.tick(at: now, userIsActive: userIsActive)
 
         if let scheduledCheckIn {
             updateCheckInProgress(at: now)
             guard userIsActive else { return }
             if now >= scheduledCheckIn.dueAt {
                 self.scheduledCheckIn = nil
-                showCheckIn()
+                showCheckIn(at: now)
             }
             return
         }
 
-        guard userIsActive else { return }
-        accumulatedActiveTime += delta
+        guard userIsActive else {
+            updateCheckInProgress(at: now)
+            return
+        }
         updateCheckInProgress(at: now)
-        if accumulatedActiveTime >= workInterval {
-            showCheckIn()
+        if activity.shouldOfferCheckIn {
+            showCheckIn(at: now)
         }
     }
 
@@ -307,15 +346,15 @@ final class CompanionStore: ObservableObject {
             signal: signal
         )
         if decision == .resumedWork {
-            recoverFromResumedActivity()
+            recoverFromResumedActivity(at: date)
         }
         return decision
     }
 
-    private func showCheckIn(activityRecoveryExplanation: String? = nil) {
+    private func showCheckIn(at date: Date, activityRecoveryExplanation: String? = nil) {
         guard mode == .idle else { return }
         cancelCompletionAutoDismiss()
-        accumulatedActiveTime = 0
+        activeUseTracker.reset(at: date)
         guard let suggestion = sessionSelection.suggestion(
             from: MoveLibrary.all,
             selectedAreas: selectedAreas
@@ -358,13 +397,13 @@ final class CompanionStore: ObservableObject {
         }
     }
 
-    private func recoverFromResumedActivity() {
+    private func recoverFromResumedActivity(at date: Date) {
         guard mode == .routine else { return }
         speaker.stop()
         voice.stopListening()
         routineActivityDetector.reset()
         sessionSelection.clearPendingSession()
-        accumulatedActiveTime = 0
+        activeUseTracker.reset(at: date)
         scheduledCheckIn = nil
         isPaused = false
         stepIndex = 0
@@ -373,6 +412,7 @@ final class CompanionStore: ObservableObject {
         mode = .idle
         notifySizeChange()
         showCheckIn(
+            at: date,
             activityRecoveryExplanation: "No problem — it looks like you’re back at work. Start a fresh reset whenever you’re ready."
         )
     }
@@ -384,10 +424,11 @@ final class CompanionStore: ObservableObject {
         } else {
             sessionSelection.clearPendingSession()
         }
+        let now = nowProvider()
         mode = .complete
-        accumulatedActiveTime = 0
+        activeUseTracker.reset(at: now)
         scheduledCheckIn = nil
-        updateCheckInProgress(at: Date())
+        updateCheckInProgress(at: now)
         statusText = nil
         activityRecoveryExplanation = nil
         speaker.speak("That’s it. Welcome back.")
@@ -417,14 +458,17 @@ final class CompanionStore: ObservableObject {
     }
 
     private func returnToIdle(after seconds: TimeInterval) {
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(seconds))
-            guard self.mode == .checkIn else { return }
-            self.mode = .idle
-            self.statusText = nil
-            self.activityRecoveryExplanation = nil
-            self.notifySizeChange()
+        postponementScheduler.schedule(after: seconds) { [weak self] in
+            self?.transitionToIdle()
         }
+    }
+
+    private func transitionToIdle() {
+        guard mode == .checkIn else { return }
+        mode = .idle
+        statusText = nil
+        activityRecoveryExplanation = nil
+        notifySizeChange()
     }
 
     private func notifySizeChange() {
@@ -433,13 +477,13 @@ final class CompanionStore: ObservableObject {
 
     private func updateCheckInProgress(at now: Date) {
         checkInProgress = BreakProgress.value(
-            activeSeconds: accumulatedActiveTime,
+            activeSeconds: activeUseTracker.accumulatedActiveTime,
             activeInterval: workInterval,
             scheduledWindow: scheduledCheckIn,
             now: now
         )
         nextCheckInRemainingSeconds = BreakProgress.remainingSeconds(
-            activeSeconds: accumulatedActiveTime,
+            activeSeconds: activeUseTracker.accumulatedActiveTime,
             activeInterval: workInterval,
             scheduledWindow: scheduledCheckIn,
             now: now
