@@ -332,19 +332,19 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertFalse(state.isCurrent(first), "A stale task from an earlier completion must not close a future screen")
     }
 
-    func testNearThresholdActiveUseResetsAfterLongIdle() {
+    func testObservedIdleSampleResetsNearThresholdActiveUse() {
         let start = referenceDate(1_000)
         var tracker = makeNearDueTracker(start: start)
         XCTAssertEqual(tracker.accumulatedActiveTime, 3_599)
 
         _ = tracker.tick(at: start.addingTimeInterval(3_600), userIsActive: false)
         let resumed = tracker.tick(
-            at: start.addingTimeInterval(14_400),
+            at: start.addingTimeInterval(3_601),
             userIsActive: true
         )
 
         XCTAssertTrue(resumed.didResetAfterIdle)
-        XCTAssertEqual(resumed.activeSeconds, 2)
+        XCTAssertEqual(resumed.activeSeconds, 1)
         XCTAssertFalse(resumed.shouldOfferCheckIn)
     }
 

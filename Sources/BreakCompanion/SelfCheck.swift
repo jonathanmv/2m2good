@@ -145,11 +145,11 @@ enum SelfCheck {
         var tracker = nearDueTracker(start: start)
         _ = tracker.tick(at: start.addingTimeInterval(3_600), userIsActive: false)
         let resumed = tracker.tick(
-            at: start.addingTimeInterval(14_400),
+            at: start.addingTimeInterval(3_601),
             userIsActive: true
         )
         if !resumed.didResetAfterIdle
-            || resumed.activeSeconds != ActiveUseTracker.maximumTimerDelta
+            || resumed.activeSeconds != 1
             || resumed.shouldOfferCheckIn {
             failures.append("near-due active credit should reset after a long idle")
         }

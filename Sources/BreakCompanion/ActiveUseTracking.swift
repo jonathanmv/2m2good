@@ -17,6 +17,7 @@ struct ActiveUseTracker {
 
     private var lastTickAt: Date
     private var lastActiveSampleAt: Date?
+    private var lastSampleWasIdle = false
 
     init(
         activeInterval: TimeInterval,
@@ -34,15 +35,17 @@ struct ActiveUseTracker {
         lastTickAt = date
 
         guard userIsActive else {
+            lastSampleWasIdle = true
             return result(didResetAfterIdle: false)
         }
 
-        let didResetAfterIdle = lastActiveSampleAt.map {
+        let didResetAfterIdle = lastSampleWasIdle || (lastActiveSampleAt.map {
             date.timeIntervalSince($0) >= idleThreshold
-        } ?? false
+        } ?? false)
         if didResetAfterIdle {
             accumulatedActiveTime = 0
         }
+        lastSampleWasIdle = false
         lastActiveSampleAt = date
         accumulatedActiveTime += delta
 
@@ -53,6 +56,7 @@ struct ActiveUseTracker {
         accumulatedActiveTime = 0
         lastTickAt = date
         lastActiveSampleAt = nil
+        lastSampleWasIdle = false
     }
 
     private func result(didResetAfterIdle: Bool) -> ActiveUseTick {
