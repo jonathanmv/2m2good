@@ -46,7 +46,6 @@ final class CompanionStore: ObservableObject {
     @Published private(set) var nextCheckInRemainingSeconds: TimeInterval = 0
     @Published private(set) var selectedAreas: Set<BodyArea>
 
-    let voice = VoiceService()
     var onSizeChange: ((Mode) -> Void)?
     /// Set by the app so keystrokes aimed at the companion's own panel are read as
     /// intentional interaction instead of resumed work.
@@ -95,9 +94,6 @@ final class CompanionStore: ObservableObject {
         nextCheckInRemainingSeconds = workInterval
         mode = bodyAreaPreferences.shouldPresentFirstRunSetup ? .setup : .idle
 
-        voice.onCommand = { [weak self] command in
-            self?.handle(command)
-        }
         startClock()
     }
 
@@ -169,7 +165,6 @@ final class CompanionStore: ObservableObject {
 
     func startRoutine(at date: Date, activitySignal: LocalActivitySignal) {
         cancelCompletionAutoDismiss()
-        voice.stopListening()
         mode = .routine
         stepIndex = 0
         elapsedInStep = 0
@@ -182,7 +177,6 @@ final class CompanionStore: ObservableObject {
     }
 
     func postpone(minutes: Int) {
-        voice.stopListening()
         let now = nowProvider()
         scheduledCheckIn = ScheduledCheckInWindow(
             startedAt: now,
@@ -196,7 +190,6 @@ final class CompanionStore: ObservableObject {
     }
 
     func postponeUntilTomorrow() {
-        voice.stopListening()
         let now = nowProvider()
         let dueAt = Calendar.current.date(byAdding: .day, value: 1, to: now)
             ?? now.addingTimeInterval(24 * 60 * 60)
@@ -365,26 +358,9 @@ final class CompanionStore: ObservableObject {
         mode = .checkIn
         notifySizeChange()
         // Someone who just went back to work should not be spoken to or have the
-        // microphone and app focus taken from them; the written explanation carries it.
+        // app focus taken from them; the written explanation carries it.
         guard activityRecoveryExplanation == nil else { return }
-        // Keep the spoken prompt free of command words so recognition cannot act on
-        // the companion's own voice as the microphone comes online.
         speaker.speak(Self.checkInPrompt)
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(1_200))
-            guard self.mode == .checkIn else { return }
-            self.voice.requestAndListen()
-        }
-    }
-
-    private func handle(_ command: VoiceCommand) {
-        guard mode == .checkIn else { return }
-        switch CheckInVoiceAction.resolve(command) {
-        case .startRoutine: startRoutine()
-        case .postpone(let minutes): postpone(minutes: minutes)
-        case .tomorrow: postponeUntilTomorrow()
-        case .ignore: break
-        }
     }
 
     private func advanceStep() {
@@ -400,7 +376,6 @@ final class CompanionStore: ObservableObject {
     private func recoverFromResumedActivity(at date: Date) {
         guard mode == .routine else { return }
         speaker.stop()
-        voice.stopListening()
         routineActivityDetector.reset()
         sessionSelection.clearPendingSession()
         activeUseTracker.reset(at: date)

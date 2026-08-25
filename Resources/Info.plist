@@ -26,9 +26,5 @@
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
-    <key>NSMicrophoneUsageDescription</key>
-    <string>2m2better listens only while a break invitation is visible so you can answer by voice.</string>
-    <key>NSSpeechRecognitionUsageDescription</key>
-    <string>2m2better recognizes short local responses such as Start, Later, or Tomorrow.</string>
 </dict>
 </plist>

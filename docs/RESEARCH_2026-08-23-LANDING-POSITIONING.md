@@ -23,6 +23,6 @@ The strongest shared pattern is **one clear promise → a short sequence of conc
 - “breaks that don't break your flow” as a headline or testimonials/quantified outcome proof;
 - a dashboard, streaks, scores, milestone rewards, personalized plans, broad exercise catalog, or feature-heavy settings tour;
 - a short-break/long-break schedule comparison or a page led by exact timing, standing-only language, a six-movement breakdown, or 20-second mechanics;
-- a microphone-led demo, voice permission request, account, analytics, payments, paywall, or signed-consumer-download implication.
+- a permission-heavy demo, account, analytics, payments, paywall, or signed-consumer-download implication.
 
 The resulting wedge is a small, permission-based movement moment: **2 mins to better your [area]**, rotating accessibly through neck, shoulders, hands + wrists, and lower back. The site demonstrates the interaction with buttons, makes the orb's break-proximity color a supporting cue, and labels the installer as an auditable developer preview rather than a finished consumer release.

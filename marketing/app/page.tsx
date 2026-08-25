@@ -379,7 +379,7 @@ export default function Home() {
                   <button type="button">Tomorrow</button>
                 </div>
               </div>
-              <p className="button-note">Buttons always work. No microphone needed for the decision.</p>
+              <p className="button-note">The three responses stay visible for a quiet, click-only decision.</p>
             </div>
           </div>
         </section>
@@ -445,8 +445,8 @@ export default function Home() {
             <h2 id="privacy-title">Your breaks stay close to home.</h2>
             <p>
               The companion runs locally on your Mac once installed. No account,
-              analytics, or in-app network connection. Optional voice support does
-              not replace the quiet buttons.
+              analytics, or in-app network connection. Spoken movement guidance
+              complements the on-screen routine; the check-in stays click-only.
             </p>
             <div className="privacy-notes" aria-label="Privacy commitments">
               <span>no account</span>

@@ -26,8 +26,8 @@ The product is a friendly, expressive companion—not a coach, tracker, therapis
 
 - It notices sustained computer use and makes a gentle check-in.
 - It suggests one safe, simple, exactly two-minute movement reset.
-- It guides the reset primarily by voice, with clear buttons when voice is inconvenient.
-- It accepts "not now," "in an hour," "tomorrow," or a natural spoken postponement without judgement.
+- It guides the reset with clear on-screen instructions and spoken movement guidance.
+- It keeps **Start**, **Later**, and **Tomorrow** as visible, keyboard-accessible check-in choices without asking for command input.
 - It stays small and calm on the desktop, using simple animation and a little personality rather than a full animated character.
 
 The companion should feel observant and quietly confident: it is on the person's side, but it never acts like it knows better than they do.
@@ -50,13 +50,13 @@ Favour simple lower-back, neck, shoulder, hands-and-wrists, eye, and standing re
 
 The user sets the rhythm. Skipping or postponing is normal information, never a failure. The product asks rather than commands.
 
-### Be voice-first, never voice-only
+### Make the response obvious
 
-Voice is warm and low-friction. Visible controls make the experience accessible in quiet, shared, noisy, or speech-inconvenient settings.
+The check-in is click-first and keyboard-accessible. Visible controls keep the decision easy in quiet, shared, noisy, or speech-inconvenient settings, while spoken movement guidance remains an optional complement during the routine.
 
-## Voice
+## Tone and spoken guidance
 
-Warm, present, concise, lightly playful, and direct. The voice should sound like a good companion who notices something useful—not an app delivering a notification.
+Copy is warm, present, concise, lightly playful, and direct. It should sound like a good companion who notices something useful—not an app delivering a notification. Spoken guidance complements the full written routine and never replaces its visible instructions.
 
 Good:
 

@@ -263,30 +263,6 @@ final class BreakCompanionTests: XCTestCase {
         )
     }
 
-    func testAffirmativeVoiceVariantsStartTheOfferedBreak() {
-        let phrases = [
-            "yeah", "yes", "yep", "let's do it", "let’s do it", "LET'S GO!",
-            "let us do it", "okay", "ready", "sure", "go ahead", "sounds good"
-        ]
-        for phrase in phrases {
-            XCTAssertEqual(VoiceCommandParser.parse(phrase), .start, phrase)
-            XCTAssertEqual(
-                CheckInVoiceAction.resolve(VoiceCommandParser.parse(phrase)),
-                .startRoutine,
-                phrase
-            )
-        }
-    }
-
-    func testPostponementVoiceCommandsRemainMoreSpecificThanAffirmatives() {
-        XCTAssertEqual(VoiceCommandParser.parse("maybe in 20 minutes"), .later(minutes: 20))
-        XCTAssertEqual(VoiceCommandParser.parse("maybe in twenty minutes"), .later(minutes: 20))
-        XCTAssertEqual(VoiceCommandParser.parse("yes, later in an hour"), .later(minutes: 60))
-        XCTAssertEqual(VoiceCommandParser.parse("two hours"), .later(minutes: 120))
-        XCTAssertEqual(VoiceCommandParser.parse("tomorrow please"), .tomorrow)
-        XCTAssertEqual(VoiceCommandParser.parse("yesterday"), .unknown)
-    }
-
     func testEnterDismissesOnlyTheVisibleCompletion() {
         XCTAssertTrue(
             CompletionDismissalPolicy.shouldDismiss(
@@ -417,7 +393,7 @@ final class BreakCompanionTests: XCTestCase {
     }
 
     @MainActor
-    func testManualOfferAndLaterTomorrowSchedulesRemainIntact() {
+    func testCheckInButtonsProvideStartLaterAndTomorrowResponses() {
         let suiteName = "BreakCompanionTests.\(#function)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
@@ -436,6 +412,14 @@ final class BreakCompanionTests: XCTestCase {
         store.offerBreakNow()
         XCTAssertEqual(store.mode, .checkIn)
 
+        store.startRoutine(at: start, activitySignal: activitySignal(0, 0))
+        XCTAssertEqual(store.mode, .routine)
+        XCTAssertEqual(store.stepIndex, 0)
+        store.endRoutine()
+        store.dismissCompletion()
+
+        store.offerBreakNow()
+        XCTAssertEqual(store.mode, .checkIn)
         store.postpone(minutes: 60)
         XCTAssertEqual(store.statusText, "I’ll check back in an hour.")
         scheduler.runPendingAction()
