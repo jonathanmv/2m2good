@@ -18,12 +18,11 @@ when a build identity needs to change. Do not update `Info.plist` directly.
 
 ## Build and validate release assets
 
-On the development Mac, use the compatible SDK override documented in
-[`README.md`](../README.md):
+On the development Mac, set the compatible `BREAK_SDK_PATH` documented in
+[`README.md`](../README.md), then run:
 
 ```sh
-BREAK_SDK_PATH=/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk \
-  ./scripts/package-release.sh
+BREAK_SDK_PATH=/path/to/MacOSX.sdk ./scripts/package-release.sh
 ```
 
 The package script checks the generated bundle's version and build identity,

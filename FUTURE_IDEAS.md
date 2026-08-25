@@ -24,13 +24,13 @@ macOS/Apple toolchain/Git requirements, safe dry-run behavior, and shell-level
 tests. The preview remains intentionally limited:
 
 - The source checkout has no Developer ID signing or notarization and is not a
-  consumer release installer. Packaged GitHub Release updates are documented in
-  [`docs/RELEASES.md`](docs/RELEASES.md) and require SHA-256 verification.
+  consumer release installer; packaged GitHub Release behavior is documented in
+  [`docs/RELEASES.md`](docs/RELEASES.md).
 - The checkout must be new; the installer refuses an existing destination and
   does not use `sudo`, collect credentials, install globally, or delete files.
 - Installer network access is limited to obtaining the displayed Git source;
-  the built app's optional updater contacts only GitHub Releases and sends no
-  account, break activity, preferences, sync, or analytics data.
+  the packaged app's optional updater is a separate behavior covered by
+  [`docs/RELEASES.md`](docs/RELEASES.md).
 
 ## Pay when a break is not completed
 
