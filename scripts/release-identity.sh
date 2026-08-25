@@ -13,14 +13,14 @@ fail() {
 }
 
 [ -f "$source_file" ] || fail "missing release identity source: $source_file"
-version_line=$(grep -E '^    static let currentVersion = SemanticVersion\(major:' "$source_file" || true)
+version_line=$(grep -E '^    static let currentVersion = SemanticVersion\(tag: "[^"]+"\)!$' "$source_file" || true)
 [ "$(printf '%s\n' "$version_line" | grep -c .)" -eq 1 ] || \
     fail "expected exactly one ProductIdentity.currentVersion declaration"
 
-version=$(printf '%s\n' "$version_line" | sed -E 's/.*major: ([0-9]+), minor: ([0-9]+), patch: ([0-9]+).*/\1.\2.\3/')
-case "$version" in
-    ''|*[!0-9.]*|.*|*.|*..*) fail "could not parse semantic version from ProductIdentity.swift" ;;
-esac
+version=$(printf '%s\n' "$version_line" | sed -E 's/.*tag: "([^"]+)".*/\1/')
+if ! printf '%s\n' "$version" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*)|([0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(\.((0|[1-9][0-9]*)|([0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?(\+([0-9A-Za-z-]+)(\.[0-9A-Za-z-]+)*)?$'; then
+    fail "could not parse semantic version from ProductIdentity.swift"
+fi
 
 build_line=$(grep -E '^    static let buildNumber = ' "$source_file" || true)
 [ "$(printf '%s\n' "$build_line" | grep -c .)" -eq 1 ] || \

@@ -27,15 +27,25 @@ enum SelfCheck {
 
     private static func checkReleaseIdentity(_ failures: inout [String]) {
         let currentVersion = ProductIdentity.currentVersion
-        let currentCore = "\(currentVersion.major).\(currentVersion.minor).\(currentVersion.patch)"
         let nextVersion = SemanticVersion(
             major: currentVersion.major,
             minor: currentVersion.minor,
             patch: currentVersion.patch + 1
         )
+        let sameCoreStable = SemanticVersion(
+            major: currentVersion.major,
+            minor: currentVersion.minor,
+            patch: currentVersion.patch
+        )
+        let sameCorePrerelease = SemanticVersion(
+            major: currentVersion.major,
+            minor: currentVersion.minor,
+            patch: currentVersion.patch,
+            prerelease: [.text("self-check")]
+        )
         guard SemanticVersion(tag: "v\(currentVersion)") == currentVersion,
               nextVersion > currentVersion,
-              SemanticVersion(tag: "\(currentCore)-alpha")! < currentVersion,
+              sameCorePrerelease < sameCoreStable,
               SemanticVersion(tag: "not-a-version") == nil else {
             failures.append("semantic-version parsing or ordering is not deterministic")
             return

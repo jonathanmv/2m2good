@@ -242,8 +242,7 @@ final class URLSessionUpdateTransport: NSObject, UpdateTransport {
         var request = request
         request.timeoutInterval = UpdateSourcePolicy.requestTimeout
         do {
-            let (data, response) = try await session.data(for: request)
-            guard data.count <= maxBytes else { throw UpdateFailure.responseTooLarge }
+            let (bytes, response) = try await session.bytes(for: request)
             let finalURLIsApproved: (URL) -> Bool = url.host?.lowercased() == "api.github.com"
                 ? { $0.host?.lowercased() == "api.github.com" && UpdateSourcePolicy.isApprovedGitHubURL($0) }
                 : { UpdateSourcePolicy.isApprovedAssetURL($0) }
@@ -252,6 +251,16 @@ final class URLSessionUpdateTransport: NSObject, UpdateTransport {
                   let finalURL = httpResponse.url,
                   finalURLIsApproved(finalURL) else {
                 throw UpdateFailure.unexpectedResponse
+            }
+            if httpResponse.expectedContentLength > Int64(maxBytes) {
+                throw UpdateFailure.responseTooLarge
+            }
+            var data = Data()
+            for try await byte in bytes {
+                data.append(byte)
+                if data.count > maxBytes {
+                    throw UpdateFailure.responseTooLarge
+                }
             }
             return data
         } catch let failure as UpdateFailure {

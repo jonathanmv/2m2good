@@ -4,15 +4,25 @@ import XCTest
 final class BreakCompanionTests: XCTestCase {
     func testSemanticVersionIsSharedAndOrdersReleaseTags() {
         let currentVersion = ProductIdentity.currentVersion
-        let currentCore = "\(currentVersion.major).\(currentVersion.minor).\(currentVersion.patch)"
         let nextVersion = SemanticVersion(
             major: currentVersion.major,
             minor: currentVersion.minor,
             patch: currentVersion.patch + 1
         )
+        let sameCoreStable = SemanticVersion(
+            major: currentVersion.major,
+            minor: currentVersion.minor,
+            patch: currentVersion.patch
+        )
+        let sameCorePrerelease = SemanticVersion(
+            major: currentVersion.major,
+            minor: currentVersion.minor,
+            patch: currentVersion.patch,
+            prerelease: [.text("self-check")]
+        )
         XCTAssertEqual(SemanticVersion(tag: "v\(currentVersion)"), currentVersion)
         XCTAssertGreaterThan(nextVersion, currentVersion)
-        XCTAssertLessThan(SemanticVersion(tag: "v\(currentCore)-beta.1")!, currentVersion)
+        XCTAssertLessThan(sameCorePrerelease, sameCoreStable)
         XCTAssertNil(SemanticVersion(tag: "release-\(currentVersion)"))
         XCTAssertEqual(
             ProductIdentity.diagnosticsIdentity,

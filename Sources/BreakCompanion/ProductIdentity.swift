@@ -127,7 +127,7 @@ enum ProductIdentity {
     // This is the sole semantic-version source of truth. The packaging script
     // reads this declaration when it materializes CFBundleShortVersionString
     // and release asset names; the app and updater use the same value directly.
-    static let currentVersion = SemanticVersion(major: 0, minor: 1, patch: 0)
+    static let currentVersion = SemanticVersion(tag: "0.1.0")!
     static let buildNumber = "1"
     static let buildIdentity = "Developer Preview"
 
