@@ -43,12 +43,14 @@ enum SelfCheck {
             patch: currentVersion.patch,
             prerelease: [.text("self-check")]
         )
+        let outOfRangeCore = String(repeating: "9", count: String(Int.max).count + 1)
         guard let largeNumericPrerelease = SemanticVersion(tag: "1.0.0-999999999999999999999"),
               let smallNumericPrerelease = SemanticVersion(tag: "1.0.0-2"),
               SemanticVersion(tag: "v\(currentVersion)") == currentVersion,
               nextVersion > currentVersion,
               sameCorePrerelease < sameCoreStable,
               largeNumericPrerelease > smallNumericPrerelease,
+              SemanticVersion(tag: "\(outOfRangeCore).0.0") == nil,
               SemanticVersion(tag: "1.0.0-é") == nil,
               SemanticVersion(tag: "not-a-version") == nil else {
             failures.append("semantic-version parsing or ordering is not deterministic")

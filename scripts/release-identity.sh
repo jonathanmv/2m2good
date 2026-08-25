@@ -22,6 +22,25 @@ if ! printf '%s\n' "$version" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|
     fail "could not parse semantic version from ProductIdentity.swift"
 fi
 
+max_core_value=9223372036854775807
+max_core_digits=${#max_core_value}
+validate_core_component() {
+    component=$1
+    component_digits=${#component}
+    [ "$component_digits" -lt "$max_core_digits" ] && return 0
+    [ "$component_digits" -gt "$max_core_digits" ] && return 1
+    [ "$component" = "$max_core_value" ] || LC_ALL=C test "$component" \< "$max_core_value"
+}
+
+core=${version%%[-+]*}
+core_major=${core%%.*}
+core_rest=${core#*.}
+core_minor=${core_rest%%.*}
+core_patch=${core_rest#*.}
+for component in "$core_major" "$core_minor" "$core_patch"; do
+    validate_core_component "$component" || fail "semantic-version core number exceeds supported range"
+done
+
 build_line=$(grep -E '^    static let buildNumber = ' "$source_file" || true)
 [ "$(printf '%s\n' "$build_line" | grep -c .)" -eq 1 ] || \
     fail "expected exactly one ProductIdentity.buildNumber declaration"

@@ -40,6 +40,14 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertNil(SemanticVersion(tag: "1.0.0-１２"))
     }
 
+    func testSemanticVersionRejectsCoreNumbersOutsideRuntimeRange() {
+        XCTAssertNotNil(SemanticVersion(tag: "9223372036854775807.0.0"))
+        XCTAssertNil(SemanticVersion(tag: "9223372036854775808.0.0"))
+        XCTAssertNil(SemanticVersion(tag: "999999999999999999999.0.0"))
+        XCTAssertNil(SemanticVersion(tag: "0.999999999999999999999.0"))
+        XCTAssertNil(SemanticVersion(tag: "0.0.999999999999999999999"))
+    }
+
     func testReleaseChecksumMustMatchTheNamedArtifact() {
         let data = Data("update-payload".utf8)
         let checksum = Data("faf613f495c32b8434726bd719da5f8901270370aa14f4259b1d3ec23f998fe1  artifact.zip\n".utf8)
