@@ -348,22 +348,21 @@ test("rendered developer-preview section gives one auditable download-then-run c
   const installer = section(html, "installer");
 
   assert.match(text, /Early developer preview/);
-  assert.match(text, /unsigned developer preview/);
+  assert.match(text, /developer preview/);
   assert.match(text, /macOS 14\+/);
-  assert.match(text, /Xcode 15\+/);
+  assert.match(text, /GitHub HTTPS access/);
   assert.match(text, /ask your coding agent to install it for you\./);
-  assert.match(text, /The one-liner downloads the script and then runs it\./);
-  assert.match(text, /stays on disk afterward, so you can audit it\./);
+  assert.match(text, /verifies a matching GitHub Release ZIP and checksum/);
+  assert.match(text, /no Developer ID signature or notarization/);
   assert.doesNotMatch(text, /available\s+to inspect/);
   const rawCommand = installer.match(/<pre><code>([\s\S]*?)<\/code><\/pre>/)?.[1] ?? "";
   const command = rawCommand.replace(/&amp;/g, "&").replace(/&quot;/g, '"');
   assert.equal(command.split("\n").length, 1, "the CTA must be one pasteable shell command");
   assert.match(
     command,
-    /^curl -fsSL https:\/\/raw\.githubusercontent\.com\/jonathanmv\/2m2good\/main\/scripts\/install-preview\.sh -o install-preview\.sh && sh install-preview\.sh --ref main --destination \"\$HOME\/2m2good-developer-preview\"$/,
+    /^curl -fsSL https:\/\/raw\.githubusercontent\.com\/jonathanmv\/2m2good\/main\/scripts\/install\.sh \| sh$/,
   );
   assert.doesNotMatch(command, /\b(?:cat|less|more|vi|vim|nano|emacs)\b/);
-  assert.doesNotMatch(command, /curl\s*\|\s*sh/i);
 
   const testRoot = await mkdtemp(join(tmpdir(), "2m2better-installer-command-"));
   try {
@@ -371,28 +370,21 @@ test("rendered developer-preview section gives one auditable download-then-run c
     const home = join(testRoot, "home");
     const curlLog = join(testRoot, "curl.log");
     const shellLog = join(testRoot, "shell.log");
+    const scriptLog = join(testRoot, "script.log");
     await mkdir(fakeBin);
     await mkdir(home);
     await writeFile(
       join(fakeBin, "curl"),
       `#!/bin/sh
 printf '%s\\n' "$*" > "$COMMAND_TEST_CURL_LOG"
-output=
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    -o) output=$2; shift 2 ;;
-    *) shift ;;
-  esac
-done
-[ -n "$output" ] || exit 1
-printf '%s\\n' downloaded > "$output"
+printf '%s\\n' downloaded
 `,
     );
     await writeFile(
       join(fakeBin, "sh"),
       `#!/bin/sh
 printf '%s\\n' "$*" > "$COMMAND_TEST_SHELL_LOG"
-[ -f "$1" ] || exit 1
+cat > "$COMMAND_TEST_SCRIPT_LOG"
 `,
     );
     await chmod(join(fakeBin, "curl"), 0o755);
@@ -406,18 +398,19 @@ printf '%s\\n' "$*" > "$COMMAND_TEST_SHELL_LOG"
         HOME: home,
         COMMAND_TEST_CURL_LOG: curlLog,
         COMMAND_TEST_SHELL_LOG: shellLog,
+        COMMAND_TEST_SCRIPT_LOG: scriptLog,
       },
     });
 
     assert.equal(
       await readFile(curlLog, "utf8"),
-      "-fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install-preview.sh -o install-preview.sh\n",
+      "-fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install.sh\n",
     );
     assert.equal(
       await readFile(shellLog, "utf8"),
-      `install-preview.sh --ref main --destination ${home}/2m2good-developer-preview\n`,
+      "\n",
     );
-    assert.equal(await readFile(join(testRoot, "install-preview.sh"), "utf8"), "downloaded\n");
+    assert.equal(await readFile(scriptLog, "utf8"), "downloaded\n");
   } finally {
     await rm(testRoot, { recursive: true, force: true });
   }

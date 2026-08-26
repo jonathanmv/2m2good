@@ -13,7 +13,7 @@ const BREAK_PROMPT = "Ready for a gentle reset?";
 const PREVIEW_SECONDS = 12;
 const CUE_SECONDS = PREVIEW_SECONDS / AREAS.length;
 const LAST_CUE_INDEX = AREAS.length - 1;
-const INSTALL_COMMAND = `curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install-preview.sh -o install-preview.sh && sh install-preview.sh --ref main --destination "$HOME/2m2good-developer-preview"`;
+const INSTALL_COMMAND = `curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install.sh | sh`;
 
 type OrbState = "resting" | "approaching" | "due";
 type DemoState = "ready" | "active" | "paused" | "done";
@@ -460,22 +460,22 @@ export default function Home() {
           <div className="shell installer-inner">
             <div className="installer-copy">
               <p className="eyebrow">Early developer preview</p>
-              <h2 id="installer-title">See the source. Build the companion.</h2>
+              <h2 id="installer-title">Install the companion. Keep the choice yours.</h2>
               <p>
-                This is an unsigned developer preview, not a consumer download.
-                The public installer checks out the source and builds a local app
-                for macOS 14 or newer.
+                This is a developer preview, not a consumer download. The public
+                installer selects your Mac architecture, verifies a GitHub Release,
+                and installs the local app for macOS 14 or newer.
               </p>
               <ul className="requirements">
                 <li>macOS 14+ on arm64 or x86_64</li>
-                <li>Xcode 15+ or matching Apple Command Line Tools</li>
-                <li>Git 2.20+, curl, codesign, and open</li>
+                <li>GitHub HTTPS access and standard macOS tools</li>
+                <li>ZIP and exact SHA-256 checksum assets in the release</li>
               </ul>
             </div>
             <div className="command-card">
               <div className="command-heading">
                 <span>Public installer</span>
-                <span>auditable · download then run</span>
+                <span>auditable · verified GitHub Release</span>
               </div>
               <pre><code>{INSTALL_COMMAND}</code></pre>
               <button className="copy-button" type="button" onClick={copyInstaller}>
@@ -485,10 +485,10 @@ export default function Home() {
                 Copy this into your terminal, or ask your coding agent to install it for you.
               </p>
               <p className="command-note">
-                The one-liner downloads the script and then runs it. The exact file
-                it ran stays on disk afterward, so you can audit it. This unsigned
-                developer preview has no notarization, hosted artifact, or automatic
-                updates.
+                The one-liner downloads the installer from the public repository,
+                verifies a matching GitHub Release ZIP and checksum, and installs
+                to ~/Applications. This ad-hoc-signed developer preview has no
+                Developer ID signature or notarization; macOS may require approval.
               </p>
             </div>
           </div>

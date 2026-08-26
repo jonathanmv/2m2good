@@ -1,0 +1,89 @@
+name: Build and publish GitHub Release assets
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing v<version> tag to package and publish
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package ${{ matrix.architecture }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: arm64
+            runner: macos-14
+          - architecture: x86_64
+            runner: macos-13
+    steps:
+      - name: Check out the release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+          fetch-depth: 1
+
+      - name: Confirm the tag and shared release identity agree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$RELEASE_TAG" = "v$(./scripts/release-identity.sh --version)"
+          ./scripts/release-identity.sh --check
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+
+      - name: Build, self-check, and package
+        run: |
+          set -euo pipefail
+          ./scripts/package-release.sh --output-dir "$RUNNER_TEMP/release-assets"
+          release_version="${RELEASE_TAG#v}"
+          test -f "$RUNNER_TEMP/release-assets/2m2better-v${release_version}-macos-${RUNNER_ARCH}.zip"
+          test -f "$RUNNER_TEMP/release-assets/2m2better-v${release_version}-macos-${RUNNER_ARCH}.zip.sha256"
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          RUNNER_ARCH: ${{ matrix.architecture }}
+
+      - name: Retain release assets for the publish job
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-${{ matrix.architecture }}
+          path: ${{ runner.temp }}/release-assets/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish both architecture assets
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download architecture assets
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-assets-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create or update the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          test "$RELEASE_TAG" = "v${RELEASE_TAG#v}"
+          test "$(find release-assets -maxdepth 1 -type f -name '*.zip' | wc -l | tr -d ' ')" = 2
+          test "$(find release-assets -maxdepth 1 -type f -name '*.sha256' | wc -l | tr -d ' ')" = 2
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --verify-tag --title "2m2better $RELEASE_TAG" --generate-notes
+          fi
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber
