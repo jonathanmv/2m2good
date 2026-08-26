@@ -128,7 +128,7 @@ existing weak capture; the nil-check and `@MainActor` `tick()` call are
 unchanged, so timer behavior is preserved.
 
 Validation performed on this development Mac with `BREAK_SDK_PATH` (see
-README's Prerequisites section): `scripts/build-app.sh` builds and
+README's "Build and run" section): `scripts/build-app.sh` builds and
 code-signs cleanly with the fix in place, and the existing `swift test`
 suite in `Tests/BreakCompanionTests` passes unchanged. A counterfactual
 check compiled both the pre-fix and post-fix source under
