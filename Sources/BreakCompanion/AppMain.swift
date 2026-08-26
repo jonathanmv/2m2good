@@ -147,8 +147,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         case .available(let candidate):
             presentUpdate(candidate)
         case .ready(let downloaded):
-            revealDownloadedUpdate(downloaded)
-        case .checking, .downloading:
+            presentDownloadedUpdate(downloaded)
+        case .checking, .downloading, .installing:
             break
         default:
             updateController.checkManually()
@@ -182,6 +182,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
                 title: "Update was not downloaded",
                 message: "\(failure.localizedDescription)\n\nNothing was opened or installed. The temporary download was removed; you can retry from the menu."
             )
+        case .installStarted:
+            break
+        case .installFailed(let failure):
+            presentUpdateAlert(
+                title: "Update could not start",
+                message: "\(failure.localizedDescription)\n\nThe current app is still running and was not changed. You can retry from the menu."
+            )
         }
     }
 
@@ -199,11 +206,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
     private func presentDownloadedUpdate(_ downloaded: DownloadedUpdate) {
         let alert = NSAlert()
         alert.messageText = "Update verified"
-        alert.informativeText = "\(downloaded.candidate.artifactName) passed its SHA-256 check and is ready in a temporary folder. The running app was not replaced. Show it in Finder and open it yourself when ready."
+        alert.informativeText = "\(downloaded.candidate.artifactName) passed its SHA-256 check. Install and Relaunch will quit this app, replace only ~/Applications/2m2better.app, keep a rollback copy, and ask macOS to relaunch the new app. Preferences are outside the app bundle and are not changed."
+        alert.addButton(withTitle: "Install and Relaunch")
         alert.addButton(withTitle: "Show in Finder")
         alert.addButton(withTitle: "Later")
-        if alert.runModal() == .alertFirstButtonReturn {
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            if updateController.installReadyUpdate() {
+                NSApp.terminate(nil)
+            }
+        case .alertSecondButtonReturn:
             revealDownloadedUpdate(downloaded)
+        default:
+            break
         }
     }
 
