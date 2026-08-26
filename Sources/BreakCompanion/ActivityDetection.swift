@@ -15,7 +15,7 @@ struct LocalActivitySignal: Equatable {
     }
 
     var workActivityIdle: TimeInterval {
-        min(mouseMovementIdle, keyboardIdle)
+        min(pointerIdle, keyboardIdle)
     }
 
     init(keyboardIdle: TimeInterval, pointerIdle: TimeInterval) {
@@ -64,12 +64,7 @@ struct LocalActivitySignal: Equatable {
     }
 
     static func currentWorkActivity() -> LocalActivitySignal {
-        LocalActivitySignal(
-            keyboardIdle: secondsSinceLastEvent(.keyDown),
-            mouseMovementIdle: secondsSinceLastEvent(.mouseMoved),
-            mouseClickIdle: .infinity,
-            scrollWheelIdle: .infinity
-        )
+        current()
     }
 
     private static func secondsSinceLastEvent(_ eventType: CGEventType) -> TimeInterval {

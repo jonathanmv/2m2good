@@ -282,6 +282,12 @@ final class CompanionStore: ObservableObject {
         tick(at: nowProvider(), userIsActive: userIsActive)
     }
 
+    /// Runs the automatic timer path with the injected aggregate activity signal.
+    @MainActor
+    func tickForTesting(at date: Date) {
+        tick(at: date, userIsActive: userIsActive)
+    }
+
     @MainActor
     func tickForTesting(at date: Date, userIsActive: Bool) {
         tick(at: date, userIsActive: userIsActive)
@@ -322,8 +328,7 @@ final class CompanionStore: ObservableObject {
     }
 
     private var userIsActive: Bool {
-        let signal = LocalActivitySignal.currentWorkActivity()
-        return signal.workActivityIdle < idleThreshold
+        activitySignalProvider().workActivityIdle < idleThreshold
     }
 
     @discardableResult
