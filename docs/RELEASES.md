@@ -59,20 +59,22 @@ or Privacy & Security approval. The installer does not claim otherwise and
 never adds a security bypass. The app remains local-only for break data; its
 optional update check sends only the documented GitHub request.
 
-## v0.1.1 launch release
+## v0.1.2 automatic break-offer fix
 
-The next launch release is **v0.1.1 (build 2)**. It is the first release that
-can be discovered by an installed v0.1.0 app: the updater only offers a
-strictly newer semantic version, so v0.1.0 must not be republished for this
-change. The tag and both architecture asset pairs remain the existing
+The next developer-preview release is **v0.1.2 (build 3)**. It contains the
+already-merged automatic break-offer fix from `c0adf86`. The patch version is
+intentionally newer than v0.1.1 so an installed preview can distinguish and
+offer the fixed binary; the updater only offers a strictly newer semantic
+version. The tag and both architecture asset pairs remain the existing
 `v<version>` and `2m2better-v<version>-macos-{arm64,x86_64}.zip` contract.
 
-The app bundle now includes the maintainable single-file `Resources/2m2better.png`
-icon. `scripts/build-app.sh` copies it into `Contents/Resources` and generates
-both `CFBundleIconFile` and `CFBundleIconFiles` in `Contents/Info.plist`.
-Packaging tests inspect the generated bundle and exercise LaunchServices
-registration so Finder can identify the app. This app icon is separate from
-the unchanged menu-bar `leaf.fill` symbol.
+The app bundle continues to include the maintainable single-file
+`Resources/2m2better.png` icon. `scripts/build-app.sh` copies it into
+`Contents/Resources` and generates both `CFBundleIconFile` and
+`CFBundleIconFiles` in `Contents/Info.plist`. Packaging tests inspect the
+generated bundle and exercise LaunchServices registration so Finder can
+identify the app. This app icon is separate from the unchanged menu-bar
+`leaf.fill` symbol.
 
 ## Release identity and assets
 
@@ -101,7 +103,7 @@ chosen `--output-dir`). Upload both files to the GitHub Release for the same
 `v<version>` tag.
 
 The checked-in [release workflow](../.github/workflows/release.yml) packages
-both architectures on `macos-14` (arm64) and `macos-13` (x86_64), runs the same
+both architectures on `macos-14` (arm64) and `macos-15-intel` (x86_64), runs the same
 packaging and self-check path, and publishes both ZIP/checksum pairs with the
 GitHub CLI. It runs for `v*` tag pushes or manually for an existing `v<version>`
 tag. Maintainers must keep both architecture assets and their exact checksum
