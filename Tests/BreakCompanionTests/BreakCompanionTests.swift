@@ -549,7 +549,7 @@ final class BreakCompanionTests: XCTestCase {
         )
     }
 
-    func testRecoveryPointerSignalsDoNotChangeIdleTiming() {
+    func testQualifyingInputSignalsChangeAutomaticIdleTiming() {
         let click = LocalActivitySignal(
             keyboardIdle: 60,
             mouseMovementIdle: 60,
@@ -557,7 +557,16 @@ final class BreakCompanionTests: XCTestCase {
             scrollWheelIdle: 60
         )
         XCTAssertEqual(click.pointerIdle, 0.2)
-        XCTAssertEqual(click.workActivityIdle, 60)
+        XCTAssertEqual(click.workActivityIdle, 0.2)
+
+        let scroll = LocalActivitySignal(
+            keyboardIdle: 60,
+            mouseMovementIdle: 60,
+            mouseClickIdle: 60,
+            scrollWheelIdle: 0.2
+        )
+        XCTAssertEqual(scroll.pointerIdle, 0.2)
+        XCTAssertEqual(scroll.workActivityIdle, 0.2)
 
         let drag = LocalActivitySignal(
             keyboardIdle: 60,
@@ -567,7 +576,7 @@ final class BreakCompanionTests: XCTestCase {
             mouseDragIdle: 0.2
         )
         XCTAssertEqual(drag.pointerIdle, 0.2)
-        XCTAssertEqual(drag.workActivityIdle, 60)
+        XCTAssertEqual(drag.workActivityIdle, 0.2)
 
         let keyboard = LocalActivitySignal(
             keyboardIdle: 0.2,
@@ -576,6 +585,52 @@ final class BreakCompanionTests: XCTestCase {
             scrollWheelIdle: 60
         )
         XCTAssertEqual(keyboard.workActivityIdle, 0.2)
+
+        let idle = LocalActivitySignal(
+            keyboardIdle: 60,
+            mouseMovementIdle: 60,
+            mouseClickIdle: 60,
+            scrollWheelIdle: 60,
+            mouseDragIdle: 60
+        )
+        XCTAssertEqual(idle.workActivityIdle, 60)
+    }
+
+    @MainActor
+    func testAutomaticActivitySignalsOfferForKeyboardMovementDragClickAndScroll() {
+        let start = referenceDate(5_500)
+        let cases: [(String, LocalActivitySignal)] = [
+            ("keyboard", activitySignal(0.2, 60)),
+            ("movement", activitySignal(60, 0.2)),
+            ("drag", activitySignal(60, 60, mouseDragIdle: 0.2)),
+            ("click", activitySignal(60, 60, mouseClickIdle: 0.2)),
+            ("scroll", activitySignal(60, 60, scrollWheelIdle: 0.2))
+        ]
+
+        for (label, signal) in cases {
+            let suiteName = "BreakCompanionTests.automatic-\(label)"
+            let defaults = UserDefaults(suiteName: suiteName)!
+            defaults.removePersistentDomain(forName: suiteName)
+            defer { defaults.removePersistentDomain(forName: suiteName) }
+
+            var signals = Array(repeating: signal, count: 5)
+            let store = CompanionStore(
+                environment: [
+                    "BREAK_INTERVAL_SECONDS": "5",
+                    "BREAK_IDLE_THRESHOLD_SECONDS": "10"
+                ],
+                defaults: defaults,
+                activitySignalProvider: { signals.removeFirst() },
+                speaker: RecordingSpeaker(),
+                nowProvider: { start }
+            )
+            store.continueWithBalancedDefaults()
+            for second in 1...5 {
+                store.tickForTesting(at: start.addingTimeInterval(TimeInterval(second)))
+            }
+
+            XCTAssertEqual(store.mode, .checkIn, label)
+        }
     }
 
     func testSustainedTypingThroughTheGracePeriodStillQualifiesAfterIt() {
@@ -1753,13 +1808,15 @@ final class BreakCompanionTests: XCTestCase {
         _ keyboardIdle: TimeInterval,
         _ pointerIdle: TimeInterval,
         mouseClickIdle: TimeInterval = .infinity,
-        scrollWheelIdle: TimeInterval = .infinity
+        scrollWheelIdle: TimeInterval = .infinity,
+        mouseDragIdle: TimeInterval = .infinity
     ) -> LocalActivitySignal {
         LocalActivitySignal(
             keyboardIdle: keyboardIdle,
             mouseMovementIdle: pointerIdle,
             mouseClickIdle: mouseClickIdle,
-            scrollWheelIdle: scrollWheelIdle
+            scrollWheelIdle: scrollWheelIdle,
+            mouseDragIdle: mouseDragIdle
         )
     }
 

@@ -31,6 +31,7 @@ enum SelfCheck {
         checkCheckInResponses(&failures)
         checkCompletion(&failures)
         checkActiveUseTiming(&failures)
+        checkAutomaticActivitySignals(&failures)
         checkMoveLibraryAndComposition(&failures)
         checkPersistence(&failures)
         checkConfigurationFlow(&failures)
@@ -39,7 +40,7 @@ enum SelfCheck {
         checkActivityDetectionAndRecovery(&failures)
 
         if failures.isEmpty {
-            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, standing session composition, body-area selection, first-run and menu-bar configuration, legacy migration, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, spoken movement guidance, completion dismissal, progress color, pointer movement, routine activity recovery, and idle-session reset.")
+            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, standing session composition, body-area selection, first-run and menu-bar configuration, legacy migration, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, spoken movement guidance, completion dismissal, progress color, keyboard and mouse activity signals, pointer movement, routine activity recovery, and idle-session reset.")
             return true
         }
 
@@ -242,6 +243,59 @@ enum SelfCheck {
             )
         }
         return tracker
+    }
+
+    private static func checkAutomaticActivitySignals(_ failures: inout [String]) {
+        MainActor.assumeIsolated {
+            let start = Date(timeIntervalSinceReferenceDate: 5_500)
+            let cases: [(String, LocalActivitySignal)] = [
+                ("keyboard", LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 60)),
+                ("movement", LocalActivitySignal(keyboardIdle: 60, pointerIdle: 0.2)),
+                ("drag", LocalActivitySignal(
+                    keyboardIdle: 60,
+                    mouseMovementIdle: 60,
+                    mouseClickIdle: 60,
+                    scrollWheelIdle: 60,
+                    mouseDragIdle: 0.2
+                )),
+                ("click", LocalActivitySignal(
+                    keyboardIdle: 60,
+                    mouseMovementIdle: 60,
+                    mouseClickIdle: 0.2,
+                    scrollWheelIdle: 60
+                )),
+                ("scroll", LocalActivitySignal(
+                    keyboardIdle: 60,
+                    mouseMovementIdle: 60,
+                    mouseClickIdle: 60,
+                    scrollWheelIdle: 0.2
+                ))
+            ]
+
+            for (label, signal) in cases {
+                withIsolatedDefaults("automatic-\(label)") { defaults in
+                    var signals = Array(repeating: signal, count: 5)
+                    let store = CompanionStore(
+                        environment: [
+                            "BREAK_INTERVAL_SECONDS": "5",
+                            "BREAK_IDLE_THRESHOLD_SECONDS": "10"
+                        ],
+                        defaults: defaults,
+                        activitySignalProvider: { signals.removeFirst() },
+                        speaker: SelfCheckSpeaker(),
+                        nowProvider: { start },
+                        postponementScheduler: SelfCheckDelayedActionScheduler()
+                    )
+                    store.continueWithBalancedDefaults()
+                    for second in 1...5 {
+                        store.tickForTesting(at: start.addingTimeInterval(TimeInterval(second)))
+                    }
+                    if store.mode != .checkIn {
+                        failures.append("automatic \(label) activity should offer a check-in")
+                    }
+                }
+            }
+        }
     }
 
     private static func checkProgress(_ failures: inout [String]) {
