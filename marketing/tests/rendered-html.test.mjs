@@ -275,14 +275,14 @@ function cascadeWinner(rules, element, property) {
   return applicable.at(-1).rule.declarations.get(property);
 }
 
-test("server-rendered page exposes the area promise, sequence, and safe product boundary", async () => {
+test("server-rendered page exposes the landing narrative and safe product boundary", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
   const text = renderedText(html);
-  assert.match(html, /<title>2m2better · A little room to move<\/title>/i);
+  assert.match(html, /<title>2m2better · Two minutes for your body<\/title>/i);
   const inlineMarkup = html.replace(/<[^>]*>/g, "");
   const brandSpellings = [
     ...(html.match(/2m2better/gi) ?? []),
@@ -293,19 +293,23 @@ test("server-rendered page exposes the area promise, sequence, and safe product 
     brandSpellings.every((spelling) => spelling === "2m2better"),
     "the product name must be lowercase in rendered output",
   );
-  assert.match(text, /Give your body a little room to move, then come back to your day\./);
+  assert.match(text, /Your agent can keep working\. Give your body two minutes\./);
+  assert.match(text, /A two-minute reset that helps your body keep up with your mind\./);
+  assert.match(text, /Copy and paste in your terminal to install/);
   assert.match(text, /2 mins to better your neck\s*\./);
   for (const area of ["Neck", "Shoulders", "Hands + wrists", "Lower back"]) {
-    assert.ok(text.includes(area), `expected ${area} in rendered output`);
+    assert.ok(text.toLowerCase().includes(area.toLowerCase()), `expected ${area} in rendered output`);
   }
-  assert.match(text, /Meet your body where it is\./);
-  assert.match(text, /One suggestion\. Your call\./);
-  assert.match(text, /Your breaks stay close to home\./);
-  assert.match(text, /No account, analytics, or in-app network connection/);
+  assert.match(text, /Small by design\. Useful by feel\./);
+  assert.match(text, /A quiet nudge\. A clear choice\. Two minutes\./);
+  assert.match(text, /No\. The current developer preview does not detect or coordinate agent activity\./);
+  assert.match(text, /has no account, dashboard, analytics, or in-app network connection/);
+  assert.match(text, /Before you give it two minutes\./);
+  assert.match(text, /Free developer preview for macOS/);
 
   assert.doesNotMatch(
     text,
-    /standing-only|six (?:gentle )?movements|20-second|two minutes, exactly|posture correction|pain relief|prevent RSI|productivity guilt/i,
+    /standing-only|six (?:gentle )?movements|20-second|two minutes, exactly|posture correction|pain relief|prevent RSI|productivity guilt|Mac knowledge workers/i,
   );
   assert.doesNotMatch(text, /<input|<form|pricing|testimonial|subscribe|sign in/i);
   assert.doesNotMatch(text, /2mintogood/);
@@ -316,7 +320,7 @@ test("rendered demo exposes a click-only, bounded, accessible flow", async () =>
   const text = renderedText(html);
   const demo = section(html, "demo-section");
 
-  assert.ok(html.indexOf('id="demo"') > html.indexOf('id="areas"'));
+  assert.ok(html.indexOf('id="preview"') > html.indexOf('id="how-it-works"'));
   assert.match(demo, /aria-labelledby="demo-title"/);
   assert.match(demo, /data-demo-duration="12"/);
   assert.match(demo, /role="progressbar"/);
@@ -331,7 +335,7 @@ test("rendered demo exposes a click-only, bounded, accessible flow", async () =>
 
 test("rendered check-in offers only the three visible keyboard-accessible responses", async () => {
   const html = await (await render()).text();
-  const checkin = section(html, "checkin-section");
+  const checkin = section(html, "flow-section");
   const responseButtons = checkin.match(/<button\b/g) ?? [];
 
   assert.match(checkin, /aria-label="Available responses"/);
@@ -347,15 +351,15 @@ test("rendered developer-preview section gives one auditable download-then-run c
   const text = renderedText(html);
   const installer = section(html, "installer");
 
-  assert.match(text, /Early developer preview/);
+  assert.match(text, /Free developer preview for macOS/);
   assert.match(text, /developer preview/);
   assert.match(text, /macOS 14\+/);
   assert.match(text, /GitHub HTTPS access/);
-  assert.match(text, /ask your coding agent to install it for you\./);
+  assert.match(text, /does not detect or coordinate agent activity/);
   assert.match(text, /verifies a matching GitHub Release ZIP and checksum/);
-  assert.match(text, /no Developer ID signature or notarization/);
+  assert.match(text, /no Developer ID or notarization/);
   assert.doesNotMatch(text, /available\s+to inspect/);
-  const rawCommand = installer.match(/<pre><code>([\s\S]*?)<\/code><\/pre>/)?.[1] ?? "";
+  const rawCommand = installer.match(/<pre\b[^>]*><code>([\s\S]*?)<\/code><\/pre>/)?.[1] ?? "";
   const command = rawCommand.replace(/&amp;/g, "&").replace(/&quot;/g, '"');
   assert.equal(command.split("\n").length, 1, "the CTA must be one pasteable shell command");
   assert.match(
@@ -363,6 +367,8 @@ test("rendered developer-preview section gives one auditable download-then-run c
     /^curl -fsSL https:\/\/raw\.githubusercontent\.com\/jonathanmv\/2m2good\/main\/scripts\/install\.sh \| sh$/,
   );
   assert.doesNotMatch(command, /\b(?:cat|less|more|vi|vim|nano|emacs)\b/);
+  assert.match(installer, /Copy command/);
+  assert.match(installer, /select this text to copy manually/);
 
   const testRoot = await mkdtemp(join(tmpdir(), "2m2better-installer-command-"));
   try {
@@ -428,7 +434,7 @@ test("built landing regions resolve their rendered styles through design tokens"
   )?.declarations;
   assert.ok(root, "expected marketing design tokens in the built CSS");
 
-  for (const className of ["hero", "areas-grid", "area-row", "demo-card", "installer-inner", "command-card"]) {
+  for (const className of ["hero", "problem-grid", "benefits-grid", "flow-grid", "demo-card", "installer-inner", "command-card"]) {
     assert.match(
       html,
       new RegExp(`class="(?:[^"]*\\s)?${className}(?=\\s|")`),
@@ -438,8 +444,8 @@ test("built landing regions resolve their rendered styles through design tokens"
 
   for (const [selector, property] of [
     [".hero h1", "font-size"],
-    [".areas-grid", "padding-block"],
-    [".area-row", "border-bottom"],
+    [".problem-grid", "padding-block"],
+    [".benefit", "border-top"],
     [".demo-card", "box-shadow"],
     [".installer-inner", "padding-block"],
     [".command-card", "border-radius"],
@@ -482,7 +488,6 @@ test("built landing regions resolve their rendered styles through design tokens"
   const compact = /max-width\s*:\s*560px|width\s*<=\s*560px/;
   for (const [selector, property] of [
     [".nav-action", "font-size"],
-    [".area-row", "grid-template-columns"],
     [".checkin-window", "padding"],
     [".command-card", "padding"],
   ]) {
@@ -575,7 +580,8 @@ test("rendered palette roles keep surfaces readable and orb proximity distinct",
       `expected the ${proximity} orb halo to stay soft rather than become a solid fill`,
     );
   }
-  assert.match(html, /teal → clay → quiet plum/);
+  assert.match(html, /break proximity/);
+  assert.match(html, /No agent awareness/);
 });
 
 test("keyboard focus resolves to the ring and contrast halo on every rendered action", async () => {

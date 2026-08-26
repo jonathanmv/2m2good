@@ -317,6 +317,7 @@
   --layout-hero-visual-tablet-min-height: 500px;
   --layout-hero-visual-mobile-min-height: 430px;
   --layout-hero-title-max: 680px;
+  --layout-hero-cta-max: 330px;
   --layout-area-word-min-width: 5ch;
   --layout-hero-column-min: 360px;
   --layout-orb-halo-size: 230px;
@@ -330,6 +331,10 @@
   --layout-floating-eye-height: 10px;
   --layout-areas-min-height: 560px;
   --layout-areas-copy-max: 480px;
+  --layout-problem-aside-max: 245px;
+  --layout-aside-line-width: 3px;
+  --layout-aside-line-height: 96px;
+  --layout-benefit-min-height: 190px;
   --layout-area-row-min-height: 78px;
   --layout-area-index-column: 48px;
   --layout-area-index-column-compact: 34px;
