@@ -273,7 +273,7 @@ final class CompanionStore: ObservableObject {
 
     private func startClock() {
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.tick() }
+            Task { @MainActor [weak self] in self?.tick() }
         }
         RunLoop.main.add(timer!, forMode: .common)
     }

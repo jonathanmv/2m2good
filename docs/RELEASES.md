@@ -116,3 +116,26 @@ must remain compatible with the filenames above.
 source-checkout path for contributors who intentionally want to build from a
 branch or commit. It is not the release installer and does not change GitHub
 Releases as the sole packaged distribution source.
+
+## Hosted arm64 packaging build fix (v0.1.0)
+
+The tag `v0.1.0` arm64 GitHub Actions packaging job failed under the hosted
+Swift compiler at `CompanionStore.swift:276` with "reference to captured var
+'self' in concurrently-executing code" for the timer tick closure
+`Task { @MainActor in self?.tick() }`. The fix adds an explicit `[weak self]`
+capture list to that inner `Task`, matching the outer `startClock()` closure's
+existing weak capture; the nil-check and `@MainActor` `tick()` call are
+unchanged, so timer behavior is preserved.
+
+Validation performed on this development Mac with `BREAK_SDK_PATH` (see
+README's "Build and run" section): `scripts/build-app.sh` builds and
+code-signs cleanly with the fix in place, and the existing `swift test`
+suite in `Tests/BreakCompanionTests` passes unchanged. A counterfactual
+check compiled both the pre-fix and post-fix source under
+`-swift-version 6` (Swift 6 language mode, which enables the same strict
+actor-isolation checking as the hosted failure) on the installed
+MacOSX15.4 SDK; neither variant reproduced the hosted diagnostic. This
+confirms the local toolchain (Swift 6.3.3) accepts the unfixed capture that
+the hosted CI compiler rejects, so the hosted failure could not be
+reproduced locally and is addressed by the capture-list fix itself, which
+is the compiler-recommended resolution for this diagnostic.
