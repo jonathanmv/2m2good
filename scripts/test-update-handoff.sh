@@ -59,6 +59,9 @@ success_home="$success_root/home"
 mkdir -p "$success_home/Applications" "$success_home/Library/Preferences" "$success_root/fake-bin"
 printf '%s\n' 'keep user preference' > "$success_home/Library/Preferences/local.break-companion.pilot.plist"
 success_digest=$(make_fixture "$success_root")
+success_download_dir="$success_root/2m2better-update-test-uuid"
+mkdir "$success_download_dir"
+mv "$success_root/update.zip" "$success_download_dir/update.zip"
 mkdir -p "$success_home/Applications/2m2better.app"
 printf '%s\n' 'old app' > "$success_home/Applications/2m2better.app/marker"
 mkdir "$success_root/handoff-directory"
@@ -69,7 +72,7 @@ make_fake_open "$success_root/fake-bin"
 success_output=$(HOME="$success_home" TMPDIR="$success_root" \
     PATH="$success_root/fake-bin:/usr/bin:/bin" \
     UPDATE_HANDOFF_OPEN_LOG="$success_root/open.log" \
-    "$success_root/handoff-directory/update-handoff.sh" --archive "$success_root/update.zip" \
+    "$success_root/handoff-directory/update-handoff.sh" --archive "$success_download_dir/update.zip" \
     --pid "$old_pid" --sha256 "$success_digest" 2>&1) || \
     fail_test "successful handoff failed: $success_output"
 assert_contains "$success_output" '2m2better update handoff completed.'
@@ -89,6 +92,7 @@ done
 [ "$(cat "$backup_marker")" = 'old app' ] || fail_test 'rollback app contents were not retained'
 [ -z "$(find "$success_home/Applications" -maxdepth 1 -name '.2m2better-update.*' -print)" ] || fail_test 'temporary staging directory remained'
 [ ! -d "$success_root/handoff-directory" ] || fail_test 'temporary handoff directory remained'
+[ ! -d "$success_download_dir" ] || fail_test 'downloaded update temporary directory remained'
 report="$success_home/Library/Logs/2m2better/update.log"
 assert_contains "$(cat "$report")" 'Preferences were not changed'
 

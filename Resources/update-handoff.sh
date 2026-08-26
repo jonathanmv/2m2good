@@ -9,6 +9,7 @@ HANDOFF_DIRECTORY=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 work_dir=
 staging_root=
 archive=
+archive_download_dir=
 pid=
 expected_sha256=
 
@@ -18,6 +19,9 @@ cleanup() {
     fi
     if [ -n "${work_dir:-}" ] && [ -d "$work_dir" ]; then
         rm -rf "$work_dir"
+    fi
+    if [ -n "${archive_download_dir:-}" ] && [ -d "$archive_download_dir" ]; then
+        rm -rf "$archive_download_dir"
     fi
     if [ -d "$HANDOFF_DIRECTORY" ]; then
         rm -rf "$HANDOFF_DIRECTORY"
@@ -82,6 +86,10 @@ done
 case "$archive" in
     /*) ;;
     *) fail_update 'the verified ZIP path must be absolute.' ;;
+esac
+archive_parent=$(dirname -- "$archive")
+case "${archive_parent##*/}" in
+    2m2better-update-*) archive_download_dir=$archive_parent ;;
 esac
 case "$pid" in
     ''|*[!0-9]*) fail_update 'the running app process ID was invalid.' ;;
