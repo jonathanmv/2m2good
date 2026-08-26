@@ -1,9 +1,41 @@
-# Early developer-preview installation
+# Developer-preview installation
 
-The terminal path is an **early developer preview** for technically comfortable
-macOS users. It checks out the source, builds the app with the repository's
-existing script, and optionally opens the resulting app. It is not a consumer
-installer, a general release channel, or a hosted app download.
+The recommended developer-preview installation is the packaged GitHub Release
+path. It is deliberately convenient rather than consumer-polished:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install.sh | sh
+```
+
+The installer selects `arm64` or `x86_64` with `uname -m`, downloads the
+matching ZIP and exact `.sha256` manifest from the latest non-draft,
+non-prerelease release on GitHub, verifies SHA-256 before extraction, and
+installs to the invoking user's `~/Applications/2m2better.app` without `sudo`.
+It refreshes Spotlight indexing and launches the app, or reports the manual
+`open` command. It refuses an existing app unless `--replace` is explicitly
+passed; replacement retains the previous app in a timestamped backup. It never
+deletes user data, asks for credentials, uses a separate feed or update server,
+or follows an installation symlink.
+
+The command requires macOS 14 (Sonoma) or newer on arm64 or Intel x86_64 and
+standard macOS `curl`, `plutil`, `shasum`, `ditto`, and `sw_vers` tools.
+GitHub HTTPS access is required; Xcode and Swift are not needed for this
+packaged path. The release must contain both
+`2m2better-v<version>-macos-<architecture>.zip` and its exact
+`.sha256` asset. See [`RELEASES.md`](RELEASES.md) for the release workflow and
+checksum contract. Maintainers can exercise the installer interface without a
+network or real installation with `./scripts/test-install.sh`.
+
+This package is ad-hoc signed only: it has no Apple Developer ID signature and
+is not notarized. macOS may require Finder **Open** or Privacy & Security
+approval. The installer does not bypass Gatekeeper or pretend that it does.
+Use `--dry-run`, `--no-launch`, or `--help` by downloading the script to a file
+when those options are needed.
+
+## Source-checkout preview
+
+The source-checkout path below is for contributors who intentionally need a
+branch or commit build. It is not the packaged release installer.
 
 ## Inspect and run it
 

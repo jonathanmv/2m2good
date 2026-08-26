@@ -35,31 +35,33 @@ This development Mac currently has a newer command-line compiler paired with a s
 BREAK_SDK_PATH=/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk ./scripts/build-app.sh
 ```
 
-## Early developer-preview terminal installer
+## One-line macOS developer-preview installer
 
-Technically comfortable macOS preview users can inspect and run the source
-bootstrap from the public repository. It is explicitly **not** a signed or
-notarized consumer installer and is not a general release channel. It clones
-into a new user-selected directory, runs `scripts/build-app.sh`, and opens the
-local app; it never uses `sudo` or modifies an existing checkout.
-
-[`docs/DEVELOPER_PREVIEW.md`](docs/DEVELOPER_PREVIEW.md) owns the validated
-prerequisites, options, safety behavior, and limitations of this path. Read the
-installer, then print its plan without cloning or building:
+Install the latest published developer-preview release from GitHub Releases:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install-preview.sh -o install-preview.sh
-sh install-preview.sh --dry-run --ref main --destination "$HOME/2m2good-developer-preview"
+curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install.sh | sh
 ```
 
-Download it to a file rather than piping it into a shell: a failed `curl -fsSL`
-prints nothing, and a piped shell would then run an empty script and exit
-successfully as if the preview had worked.
+The installer selects the current `arm64` or Intel `x86_64` architecture,
+requires matching ZIP and `.sha256` assets in the latest GitHub Release, and
+verifies the exact SHA-256 checksum before extracting anything. It installs
+without `sudo` to the invoking user's `~/Applications/2m2better.app`, refreshes
+Spotlight indexing, and launches the app or prints a manual launch command.
+It refuses an existing installation by default; download the script and pass
+`--replace` only as the explicitly documented choice to retain the old app in a
+`.previous` backup. It does not delete user data, use credentials, or contact a
+separate update server.
 
-After reviewing the displayed repository, ref, destination, build command,
-output, and launch behavior, rerun without `--dry-run` to confirm and build.
-The installer checks its prerequisites before it creates anything and reports
-the missing one. This source path remains an ad-hoc, non-notarized developer preview and does not install or roll back releases. Packaged app update behavior is documented in [`docs/RELEASES.md`](docs/RELEASES.md).
+Prerequisites are macOS 14 (Sonoma) or newer, GitHub HTTPS access, and the
+standard macOS `curl`, `plutil`, `shasum`, `ditto`, and `sw_vers` tools.
+Xcode and Swift are not required for the packaged installer. This is an
+ad-hoc-signed developer preview: it has no Apple Developer ID signature and is
+not notarized, so macOS may require Finder **Open** or Privacy & Security
+approval. The installer does not bypass Gatekeeper. Release packaging,
+checksum requirements, and updater compatibility are documented in
+[`docs/RELEASES.md`](docs/RELEASES.md); the source-build alternative is in
+[`docs/DEVELOPER_PREVIEW.md`](docs/DEVELOPER_PREVIEW.md).
 
 ## Permissions
 
@@ -118,6 +120,13 @@ Run the packaged logic checks with:
 
 ```sh
 ".build/app/2m2better.app/Contents/MacOS/BreakCompanion" --self-check
+```
+
+Exercise the release installer through its command-line interface with its
+network-free macOS command harness:
+
+```sh
+./scripts/test-install.sh
 ```
 
 The Swift package and XCTest target are included for use in a standard Xcode toolchain (`swift test`). See [`docs/RELEASES.md`](docs/RELEASES.md) for release packaging and packaged self-check validation; use the `BREAK_SDK_PATH` override above on this development Mac.
