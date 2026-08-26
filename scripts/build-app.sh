@@ -6,6 +6,7 @@ build_dir="$project_dir/.build/app"
 app_dir="$build_dir/2m2better.app"
 contents_dir="$app_dir/Contents"
 macos_dir="$contents_dir/MacOS"
+resources_dir="$contents_dir/Resources"
 module_cache="$project_dir/.build/manual-module-cache"
 sdk_path="${BREAK_SDK_PATH:-$(xcrun --show-sdk-path)}"
 architecture="$(uname -m)"
@@ -15,7 +16,10 @@ build_number="$("$project_dir/scripts/release-identity.sh" --build-number)"
 # Rebuild the bundle from scratch: a renamed bundle resolves to this same path on a
 # case-insensitive volume, so leftover contents would otherwise survive the rename.
 rm -rf "$app_dir"
-mkdir -p "$macos_dir" "$module_cache"
+mkdir -p "$macos_dir" "$resources_dir" "$module_cache"
+cp "$project_dir/Resources/2m2better.png" "$resources_dir/2m2better.png"
+cp "$project_dir/Resources/update-handoff.sh" "$resources_dir/update-handoff.sh"
+chmod 755 "$resources_dir/update-handoff.sh"
 sed \
     -e "s/@VERSION@/$version/g" \
     -e "s/@BUILD_NUMBER@/$build_number/g" \

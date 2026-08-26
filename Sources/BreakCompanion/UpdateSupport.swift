@@ -39,6 +39,13 @@ struct UpdateCandidate: Equatable {
 struct DownloadedUpdate: Equatable {
     let candidate: UpdateCandidate
     let artifactURL: URL
+    let verifiedSHA256: String
+
+    func removeTemporaryFiles() {
+        let directory = artifactURL.deletingLastPathComponent()
+        guard directory.lastPathComponent.hasPrefix("\(ProductIdentity.name)-update-") else { return }
+        try? FileManager.default.removeItem(at: directory)
+    }
 }
 
 enum UpdateFailure: Error, Equatable, LocalizedError {
@@ -52,6 +59,7 @@ enum UpdateFailure: Error, Equatable, LocalizedError {
     case invalidChecksum
     case checksumMismatch
     case unableToSave
+    case handoffUnavailable(String)
 
     var errorDescription: String? {
         switch self {
@@ -75,6 +83,8 @@ enum UpdateFailure: Error, Equatable, LocalizedError {
             return "The downloaded update failed its SHA-256 checksum. Nothing was opened or installed."
         case .unableToSave:
             return "The verified update could not be saved locally. Nothing was installed."
+        case .handoffUnavailable(let message):
+            return "The verified update could not be handed off for installation: \(message)"
         }
     }
 }
@@ -178,7 +188,11 @@ enum GitHubReleaseSelector {
 
 enum UpdateArtifactVerifier {
     static func verify(data: Data, checksumFile: Data, expectedFileName: String) -> Bool {
-        guard let text = String(data: checksumFile, encoding: .utf8) else { return false }
+        verifiedSHA256(data: data, checksumFile: checksumFile, expectedFileName: expectedFileName) != nil
+    }
+
+    static func verifiedSHA256(data: Data, checksumFile: Data, expectedFileName: String) -> String? {
+        guard let text = String(data: checksumFile, encoding: .utf8) else { return nil }
         let matchingLines = text.split(whereSeparator: \.isNewline).compactMap { line -> String? in
             let fields = line.split(whereSeparator: \.isWhitespace)
             guard fields.count == 2 else { return nil }
@@ -191,10 +205,10 @@ enum UpdateArtifactVerifier {
         guard matchingLines.count == 1,
               matchingLines[0].count == 64,
               matchingLines[0].allSatisfy({ $0.isHexDigit }) else {
-            return false
+            return nil
         }
         let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-        return digest.caseInsensitiveCompare(matchingLines[0]) == .orderedSame
+        return digest.caseInsensitiveCompare(matchingLines[0]) == .orderedSame ? digest : nil
     }
 }
 
@@ -331,7 +345,7 @@ struct GitHubReleasesUpdateService {
             async let artifactData = transport.data(for: artifactRequest, maxBytes: UpdateSourcePolicy.maxArtifactBytes)
             async let checksumData = transport.data(for: checksumRequest, maxBytes: UpdateSourcePolicy.maxChecksumResponseBytes)
             let (artifact, checksum) = try await (artifactData, checksumData)
-            guard UpdateArtifactVerifier.verify(
+            guard let verifiedSHA256 = UpdateArtifactVerifier.verifiedSHA256(
                 data: artifact,
                 checksumFile: checksum,
                 expectedFileName: candidate.artifactName
@@ -340,7 +354,11 @@ struct GitHubReleasesUpdateService {
             }
             let artifactURL = directory.appendingPathComponent(candidate.artifactName)
             try artifact.write(to: artifactURL, options: .atomic)
-            return DownloadedUpdate(candidate: candidate, artifactURL: artifactURL)
+            return DownloadedUpdate(
+                candidate: candidate,
+                artifactURL: artifactURL,
+                verifiedSHA256: verifiedSHA256
+            )
         } catch let failure as UpdateFailure {
             try? FileManager.default.removeItem(at: directory)
             throw failure

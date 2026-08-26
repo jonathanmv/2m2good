@@ -59,6 +59,21 @@ or Privacy & Security approval. The installer does not claim otherwise and
 never adds a security bypass. The app remains local-only for break data; its
 optional update check sends only the documented GitHub request.
 
+## v0.1.1 launch release
+
+The next launch release is **v0.1.1 (build 2)**. It is the first release that
+can be discovered by an installed v0.1.0 app: the updater only offers a
+strictly newer semantic version, so v0.1.0 must not be republished for this
+change. The tag and both architecture asset pairs remain the existing
+`v<version>` and `2m2better-v<version>-macos-{arm64,x86_64}.zip` contract.
+
+The app bundle now includes the maintainable single-file `Resources/2m2better.png`
+icon. `scripts/build-app.sh` copies it into `Contents/Resources` and generates
+both `CFBundleIconFile` and `CFBundleIconFiles` in `Contents/Info.plist`.
+Packaging tests inspect the generated bundle and exercise LaunchServices
+registration so Finder can identify the app. This app icon is separate from
+the unchanged menu-bar `leaf.fill` symbol.
+
 ## Release identity and assets
 
 The authoritative semantic version is `ProductIdentity.currentVersion` in
@@ -74,6 +89,7 @@ Mac, validate and create the two local assets with:
 ```sh
 BREAK_SDK_PATH=/path/to/MacOSX.sdk ./scripts/package-release.sh
 ./scripts/test-release-packaging.sh
+./scripts/test-update-handoff.sh
 ```
 
 `BREAK_SDK_PATH` is needed only on the development Mac when its compiler and
@@ -100,15 +116,34 @@ The in-app updater consumes this same asset contract. It checks
 invalid/draft/prerelease/non-semantic releases and non-GitHub URLs, selects the
 asset for the running architecture, and requires the matching `.sha256` asset.
 It downloads the ZIP and checksum over HTTPS, verifies the exact named file
-with SHA-256, and removes temporary files on failure. A verified update is
-never installed silently: the user is offered the verified ZIP in Finder and
-chooses when and how to open it. The running app and its preferences are never
-replaced.
+with SHA-256, and removes temporary files on failure. After a successful
+verification, **Install and Relaunch** is an explicit confirmation; **Show in
+Finder** and **Later** cancel installation without changing the app. Nothing is
+ever installed silently.
+
+The install action launches the bundled helper outside the running process. The
+helper waits for this process to exit, rechecks the local ZIP digest, validates
+the app bundle and icon, and replaces only `~/Applications/2m2better.app`. It
+moves an existing bundle to a retained
+`~/Applications/.2m2better.app.previous.*.app` rollback path before the final
+rename. If that rename fails, it restores the old app and retains a rollback
+copy for inspection. Preferences live outside the app
+bundle and are not copied or deleted. On success it asks macOS to relaunch the
+new app; failures are written to `~/Library/Logs/2m2better/update.log` and
+opened for review. The helper uses no sudo, credentials, or Gatekeeper bypass.
 
 Automatic checks happen at most once per 24 hours; **Check for Updates…** is an
 explicit retry path. Update requests contain no break activity, preferences,
-identifiers, or telemetry. The updater's URL allowlist and checksum verifier
-must remain compatible with the filenames above.
+identifiers, or telemetry. The updater's HTTPS allowlist, redirect policy,
+response-size limits, architecture selection, semantic-version checks, and
+checksum verifier must remain compatible with the filenames above.
+
+This remains an ad-hoc developer preview: the package is not Developer ID
+signed or notarized. A verified checksum proves that the downloaded bytes match
+GitHub's published manifest; it does not make the package Apple-trusted or
+prove that its contents are benign. macOS may still require Finder **Open** or
+Privacy & Security approval, and the updater deliberately does not bypass that
+security boundary.
 
 ## Source build preview
 

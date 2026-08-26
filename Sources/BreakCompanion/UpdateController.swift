@@ -9,6 +9,7 @@ final class UpdateController {
         case available(UpdateCandidate)
         case downloading(UpdateCandidate)
         case ready(DownloadedUpdate)
+        case installing(UpdateCandidate)
         case failed(UpdateFailure)
     }
 
@@ -17,6 +18,8 @@ final class UpdateController {
         case manualResult(UpdateCheckResult)
         case downloaded(DownloadedUpdate)
         case downloadFailed(UpdateFailure)
+        case installStarted
+        case installFailed(UpdateFailure)
     }
 
     static let lastCheckKey = "update.lastGitHubReleaseCheck"
@@ -27,20 +30,26 @@ final class UpdateController {
     var onEvent: ((Event) -> Void)?
 
     private let service: GitHubReleasesUpdateService
+    private let handoffLauncher: UpdateHandoffLaunching
     private let defaults: UserDefaults
     private var task: Task<Void, Never>?
     private var manualCheckPending = false
 
     init(
         service: GitHubReleasesUpdateService = GitHubReleasesUpdateService(),
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        handoffLauncher: UpdateHandoffLaunching = UpdateInstallHandoffLauncher()
     ) {
         self.service = service
         self.defaults = defaults
+        self.handoffLauncher = handoffLauncher
     }
 
     deinit {
         task?.cancel()
+        if case .ready(let downloaded) = state {
+            downloaded.removeTemporaryFiles()
+        }
     }
 
     var menuTitle: String {
@@ -49,14 +58,15 @@ final class UpdateController {
         case .checking: return "Checking for Updates…"
         case .available(let candidate): return "Update Available: \(candidate.version)…"
         case .downloading: return "Verifying Update…"
-        case .ready: return "Show Verified Update…"
+        case .ready: return "Install Verified Update…"
+        case .installing: return "Installing Update…"
         case .failed: return "Retry Update Check…"
         }
     }
 
     var isBusy: Bool {
         switch state {
-        case .checking, .downloading: return true
+        case .checking, .downloading, .installing: return true
         default: return false
         }
     }
@@ -92,13 +102,33 @@ final class UpdateController {
         }
     }
 
+    @discardableResult
+    func installReadyUpdate() -> Bool {
+        guard task == nil, case .ready(let downloaded) = state else { return false }
+        do {
+            try handoffLauncher.launch(for: downloaded)
+            state = .installing(downloaded.candidate)
+            onEvent?(.installStarted)
+            return true
+        } catch let failure as UpdateFailure {
+            downloaded.removeTemporaryFiles()
+            finishInstall(failure: failure)
+            return false
+        } catch {
+            downloaded.removeTemporaryFiles()
+            finishInstall(failure: .handoffUnavailable(error.localizedDescription))
+            return false
+        }
+    }
+
     func markReadyUpdateAsShown() {
         guard case .ready = state else { return }
         state = .current
     }
 
     func resetReadyUpdate() {
-        guard case .ready = state else { return }
+        guard case .ready(let downloaded) = state else { return }
+        downloaded.removeTemporaryFiles()
         state = .idle
     }
 
@@ -139,5 +169,10 @@ final class UpdateController {
         task = nil
         state = .failed(failure)
         onEvent?(.downloadFailed(failure))
+    }
+
+    private func finishInstall(failure: UpdateFailure) {
+        state = .failed(failure)
+        onEvent?(.installFailed(failure))
     }
 }

@@ -27,7 +27,7 @@ open ".build/app/2m2better.app"
 
 The app appears as a small orb near the upper-right of the screen and as a leaf in the menu bar. On a fresh install, a compact setup asks which body areas the standing reset should support; every shipped movement is standing-only, so the reset is presented as a standing one rather than a seated alternative. Click the orb or **Offer a break now** in the menu bar to trigger a break immediately; use **Choose body areas…** there to review or change the selection, which stays available while the orb is idle so an offered or running reset is never discarded.
 
-The menu also includes **About 2m2better…**, which shows the shared release identity, and **Check for Updates…**, which checks GitHub Releases only. See [`docs/RELEASES.md`](docs/RELEASES.md) for the updater behavior, release asset contract, and packaging validation.
+The menu also includes **About 2m2better…**, which shows the shared release identity, and **Check for Updates…**, which checks GitHub Releases only. After the ZIP and exact SHA-256 manifest pass verification, the update prompt offers **Install and Relaunch**, **Show in Finder**, or **Later**; installation is never silent. The explicit install hands off to a temporary helper, waits for this app to exit, replaces only `~/Applications/2m2better.app`, retains a rollback copy, preserves preferences, and asks macOS to relaunch. See [`docs/RELEASES.md`](docs/RELEASES.md) for the updater behavior, trust limitation, release asset contract, icon packaging, and validation.
 
 This development Mac currently has a newer command-line compiler paired with a slightly mismatched newest SDK. On this machine only, build with its compatible installed SDK:
 
@@ -127,9 +127,10 @@ network-free macOS command harness:
 
 ```sh
 ./scripts/test-install.sh
+./scripts/test-update-handoff.sh
 ```
 
-The Swift package and XCTest target are included for use in a standard Xcode toolchain (`swift test`). See [`docs/RELEASES.md`](docs/RELEASES.md) for release packaging and packaged self-check validation; use the `BREAK_SDK_PATH` override above on this development Mac.
+The Swift package and XCTest target are included for use in a standard Xcode toolchain (`swift test`). See [`docs/RELEASES.md`](docs/RELEASES.md) for release packaging, icon/LaunchServices validation, updater handoff behavior, and packaged self-check validation; use the `BREAK_SDK_PATH` override above on this development Mac.
 
 ## Pilot boundaries
 

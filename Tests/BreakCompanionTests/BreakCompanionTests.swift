@@ -1,3 +1,4 @@
+import CryptoKit
 import XCTest
 @testable import BreakCompanion
 
@@ -35,6 +36,7 @@ final class BreakCompanionTests: XCTestCase {
             patch: currentVersion.patch,
             prerelease: [.text("self-check")]
         )
+        XCTAssertEqual(currentVersion.description, "0.1.1")
         XCTAssertEqual(SemanticVersion(tag: "v\(currentVersion)"), currentVersion)
         XCTAssertGreaterThan(nextVersion, currentVersion)
         XCTAssertLessThan(sameCorePrerelease, sameCoreStable)
@@ -67,6 +69,10 @@ final class BreakCompanionTests: XCTestCase {
         let data = Data("update-payload".utf8)
         let checksum = Data("faf613f495c32b8434726bd719da5f8901270370aa14f4259b1d3ec23f998fe1  artifact.zip\n".utf8)
         XCTAssertTrue(UpdateArtifactVerifier.verify(data: data, checksumFile: checksum, expectedFileName: "artifact.zip"))
+        XCTAssertEqual(
+            UpdateArtifactVerifier.verifiedSHA256(data: data, checksumFile: checksum, expectedFileName: "artifact.zip"),
+            "faf613f495c32b8434726bd719da5f8901270370aa14f4259b1d3ec23f998fe1"
+        )
         XCTAssertFalse(UpdateArtifactVerifier.verify(data: Data("tampered".utf8), checksumFile: checksum, expectedFileName: "artifact.zip"))
         XCTAssertFalse(UpdateArtifactVerifier.verify(data: data, checksumFile: checksum, expectedFileName: "other.zip"))
     }
@@ -147,7 +153,12 @@ final class BreakCompanionTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
-        let controller = UpdateController(service: service, defaults: defaults)
+        let handoffLauncher = RecordingUpdateHandoffLauncher()
+        let controller = UpdateController(
+            service: service,
+            defaults: defaults,
+            handoffLauncher: handoffLauncher
+        )
 
         let checkExpectation = expectation(description: "manual update check")
         controller.onEvent = { event in
@@ -176,6 +187,7 @@ final class BreakCompanionTests: XCTestCase {
 
         controller.resetReadyUpdate()
         XCTAssertEqual(controller.state, .idle)
+        XCTAssertTrue(handoffLauncher.downloadedUpdates.isEmpty, "cancelling the ready update must not launch installation")
 
         let retryExpectation = expectation(description: "retry update check")
         controller.onEvent = { event in
@@ -187,6 +199,58 @@ final class BreakCompanionTests: XCTestCase {
             XCTFail("resetting a missing download should permit another check")
             return
         }
+    }
+
+    func testUpdateHandoffCopiesItsHelperAndPassesTheVerifiedArtifactContract() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("2m2better-handoff-test-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let archive = root.appendingPathComponent("verified.zip")
+        let payload = Data("verified archive".utf8)
+        try payload.write(to: archive)
+        let digest = SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined()
+        let sourceHelper = root.appendingPathComponent("source-helper.sh")
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: sourceHelper)
+
+        let candidate = UpdateCandidate(
+            version: nextReleaseVersion,
+            releaseURL: ProductIdentity.releasesURL,
+            artifactName: "2m2better-v\(nextReleaseVersion)-macos-arm64.zip",
+            artifactURL: archive,
+            checksumName: "verified.zip.sha256",
+            checksumURL: root.appendingPathComponent("verified.zip.sha256")
+        )
+        let downloaded = DownloadedUpdate(
+            candidate: candidate,
+            artifactURL: archive,
+            verifiedSHA256: digest
+        )
+        let processLauncher = RecordingHandoffProcessLauncher()
+        let launcher = UpdateInstallHandoffLauncher(
+            helperURL: sourceHelper,
+            processLauncher: processLauncher,
+            processID: 1234
+        )
+
+        try launcher.launch(for: downloaded)
+
+        XCTAssertEqual(processLauncher.executableURL?.path, "/bin/sh")
+        XCTAssertEqual(Array(processLauncher.arguments.dropFirst().prefix(2)), ["--archive", archive.path])
+        XCTAssertTrue(processLauncher.arguments.contains("--pid"))
+        XCTAssertTrue(processLauncher.arguments.contains("1234"))
+        XCTAssertTrue(processLauncher.arguments.contains("--sha256"))
+        XCTAssertTrue(processLauncher.arguments.contains(digest))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: processLauncher.arguments[0]))
+
+        let missing = DownloadedUpdate(
+            candidate: candidate,
+            artifactURL: root.appendingPathComponent("missing.zip"),
+            verifiedSHA256: digest
+        )
+        XCTAssertThrowsError(try launcher.launch(for: missing))
+        XCTAssertEqual(processLauncher.launchCount, 1, "a missing verified ZIP must not start a handoff")
     }
 
     func testAutomaticUpdateChecksAreBoundedToOnePerDay() {
@@ -1743,6 +1807,26 @@ private final class RecordingSpeaker: RoutineSpeaking {
     }
 
     func stop() {}
+}
+
+private final class RecordingUpdateHandoffLauncher: UpdateHandoffLaunching {
+    private(set) var downloadedUpdates: [DownloadedUpdate] = []
+
+    func launch(for downloadedUpdate: DownloadedUpdate) throws {
+        downloadedUpdates.append(downloadedUpdate)
+    }
+}
+
+private final class RecordingHandoffProcessLauncher: UpdateHandoffProcessLaunching {
+    private(set) var executableURL: URL?
+    private(set) var arguments: [String] = []
+    private(set) var launchCount = 0
+
+    func launch(executableURL: URL, arguments: [String]) throws {
+        self.executableURL = executableURL
+        self.arguments = arguments
+        launchCount += 1
+    }
 }
 
 private final class StubUpdateTransport: UpdateTransport {

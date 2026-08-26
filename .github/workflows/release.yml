@@ -42,10 +42,11 @@ jobs:
         env:
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
-      - name: Build, self-check, and package
+      - name: Build, self-check, package, and exercise contracts
         run: |
           set -euo pipefail
           ./scripts/package-release.sh --output-dir "$RUNNER_TEMP/release-assets"
+          ./scripts/test-update-handoff.sh
           release_version="${RELEASE_TAG#v}"
           test -f "$RUNNER_TEMP/release-assets/2m2better-v${release_version}-macos-${RELEASE_ARCH}.zip"
           test -f "$RUNNER_TEMP/release-assets/2m2better-v${release_version}-macos-${RELEASE_ARCH}.zip.sha256"
