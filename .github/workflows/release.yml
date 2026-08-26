@@ -47,11 +47,11 @@ jobs:
           set -euo pipefail
           ./scripts/package-release.sh --output-dir "$RUNNER_TEMP/release-assets"
           release_version="${RELEASE_TAG#v}"
-          test -f "$RUNNER_TEMP/release-assets/2m2better-v${release_version}-macos-${RUNNER_ARCH}.zip"
-          test -f "$RUNNER_TEMP/release-assets/2m2better-v${release_version}-macos-${RUNNER_ARCH}.zip.sha256"
+          test -f "$RUNNER_TEMP/release-assets/2m2better-v${release_version}-macos-${RELEASE_ARCH}.zip"
+          test -f "$RUNNER_TEMP/release-assets/2m2better-v${release_version}-macos-${RELEASE_ARCH}.zip.sha256"
         env:
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-          RUNNER_ARCH: ${{ matrix.architecture }}
+          RELEASE_ARCH: ${{ matrix.architecture }}
 
       - name: Retain release assets for the publish job
         uses: actions/upload-artifact@v4
