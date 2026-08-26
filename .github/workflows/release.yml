@@ -25,7 +25,7 @@ jobs:
           - architecture: arm64
             runner: macos-14
           - architecture: x86_64
-            runner: macos-13
+            runner: macos-15-intel
     steps:
       - name: Check out the release tag
         uses: actions/checkout@v4
