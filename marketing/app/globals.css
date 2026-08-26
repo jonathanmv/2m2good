@@ -1221,6 +1221,7 @@ h3 {
 
 .closing h2 {
   max-width: var(--layout-closing-copy-max);
+  font-size: var(--type-closing-size);
 }
 
 .button-light {

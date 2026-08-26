@@ -301,7 +301,7 @@ export default function Home() {
     copyState === "success"
       ? "Copied to clipboard"
       : copyState === "fallback"
-        ? "Command selected — copy manually"
+        ? "Command selected - copy manually"
         : "Copy command";
 
   return (
@@ -444,7 +444,7 @@ export default function Home() {
                 </li>
                 <li>
                   <span>02</span>
-                  <div><strong>Choose</strong><p>Start, Later, or Tomorrow — all visible and keyboard accessible.</p></div>
+                  <div><strong>Choose</strong><p>Start, Later, or Tomorrow - all visible and keyboard accessible.</p></div>
                 </li>
                 <li>
                   <span>03</span>
