@@ -152,7 +152,7 @@ enum ProductIdentity {
     static let buildNumber = "3"
     static let buildIdentity = "Developer Preview"
 
-    // Kept for callers that used the pilot's area-only menu title.
+    // Retained for tests that pin the pilot's area-only menu title; no live menu uses it.
     static let configureAreasMenuTitle = "Choose body areas…"
     static let settingsMenuTitle = "Settings…"
     static let diagnosticsMenuTitle = "Copy diagnostics"
