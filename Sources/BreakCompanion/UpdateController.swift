@@ -16,6 +16,7 @@ final class UpdateController {
     enum Event {
         case stateChanged
         case manualResult(UpdateCheckResult)
+        case automaticResult(UpdateCheckResult)
         case downloaded(DownloadedUpdate)
         case downloadFailed(UpdateFailure)
         case installStarted
@@ -57,8 +58,8 @@ final class UpdateController {
         case .idle, .current: return "Check for Updates…"
         case .checking: return "Checking for Updates…"
         case .available(let candidate): return "Update Available: \(candidate.version)…"
-        case .downloading: return "Verifying Update…"
-        case .ready: return "Install Verified Update…"
+        case .downloading: return "Preparing Update…"
+        case .ready: return "Install Update…"
         case .installing: return "Installing Update…"
         case .failed: return "Retry Update Check…"
         }
@@ -84,8 +85,9 @@ final class UpdateController {
         startCheck(manual: true, now: now)
     }
 
-    func downloadAvailable() {
-        guard task == nil, case .available(let candidate) = state else { return }
+    @discardableResult
+    func downloadAvailable() -> Bool {
+        guard task == nil, case .available(let candidate) = state else { return false }
         state = .downloading(candidate)
         task = Task { [weak self, service] in
             do {
@@ -100,6 +102,7 @@ final class UpdateController {
                 self?.finishDownload(failure: .unableToSave)
             }
         }
+        return true
     }
 
     @discardableResult
@@ -132,6 +135,31 @@ final class UpdateController {
         state = .idle
     }
 
+    /// Cancels an in-flight check or download and removes a downloaded artifact.
+    /// Installation is intentionally not cancellable after the helper is launched.
+    func cancel() {
+        task?.cancel()
+        task = nil
+        manualCheckPending = false
+        if case .ready(let downloaded) = state {
+            downloaded.removeTemporaryFiles()
+        }
+        switch state {
+        case .checking, .downloading, .ready:
+            state = .idle
+        default:
+            break
+        }
+    }
+
+    /// Restarts a download for a candidate retained by the user-facing retry path.
+    @discardableResult
+    func retryDownload(_ candidate: UpdateCandidate) -> Bool {
+        guard task == nil, case .failed = state else { return false }
+        state = .available(candidate)
+        return downloadAvailable()
+    }
+
     private func startCheck(manual: Bool, now: Date) {
         manualCheckPending = manual
         state = .checking
@@ -155,6 +183,8 @@ final class UpdateController {
         }
         if manualCheckPending {
             onEvent?(.manualResult(result))
+        } else {
+            onEvent?(.automaticResult(result))
         }
         manualCheckPending = false
     }

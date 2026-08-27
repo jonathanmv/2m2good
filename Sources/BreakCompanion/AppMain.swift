@@ -6,13 +6,15 @@ private final class CompanionPanel: NSPanel {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, NSMenuDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, NSMenuDelegate, NSWindowDelegate {
     private let store = CompanionStore()
     private var panel: NSPanel?
     private var statusItem: NSStatusItem?
     private var updateMenuItem: NSMenuItem?
     private var aboutWindow: NSWindow?
     private let updateController = UpdateController()
+    private lazy var updateFlow = UpdateFlowCoordinator(controller: updateController)
+    private var updateDialogWindow: NSWindow?
     private var keyMonitor: Any?
     private weak var previouslyActiveApplication: NSRunningApplication?
 
@@ -20,10 +22,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         NSApp.setActivationPolicy(.accessory)
         buildPanel()
         buildMenuBarItem()
-        updateController.onEvent = { [weak self] event in
-            self?.handleUpdateEvent(event)
+        updateFlow.onStateChange = { [weak self] _ in
+            self?.updateFlowDidChange()
         }
-        updateController.checkAutomatically()
+        updateFlow.checkAutomatically()
         store.onSizeChange = { [weak self] mode in
             self?.resizePanel(for: mode)
         }
@@ -151,104 +153,98 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
     }
 
     @objc private func checkForUpdates() {
-        switch updateController.state {
-        case .available(let candidate):
-            presentUpdate(candidate)
-        case .ready(let downloaded):
-            presentDownloadedUpdate(downloaded)
+        switch updateFlow.state {
+        case .available:
+            showUpdateDialog()
+        case .downloaded:
+            showUpdateDialog()
         case .checking, .downloading, .installing:
             break
         default:
-            updateController.checkManually()
+            updateFlow.checkManually()
         }
     }
 
-    private func handleUpdateEvent(_ event: UpdateController.Event) {
+    private func updateFlowDidChange() {
         updateMenuItem?.title = updateController.menuTitle
-        switch event {
-        case .stateChanged:
-            break
-        case .manualResult(let result):
-            switch result {
-            case .current:
-                presentUpdateAlert(
-                    title: "You’re up to date",
-                    message: "\(ProductIdentity.name) \(ProductIdentity.currentVersion) is the newest verified version available from GitHub Releases."
-                )
-            case .available(let candidate):
-                presentUpdate(candidate)
-            case .failed(let failure):
-                presentUpdateAlert(
-                    title: "Update check unavailable",
-                    message: "\(failure.localizedDescription)\n\nNothing was downloaded or changed. You can try again from the menu."
-                )
-            }
-        case .downloaded(let downloaded):
-            presentDownloadedUpdate(downloaded)
-        case .downloadFailed(let failure):
-            presentUpdateAlert(
-                title: "Update was not downloaded",
-                message: "\(failure.localizedDescription)\n\nNothing was opened or installed. The temporary download was removed; you can retry from the menu."
-            )
-        case .installStarted:
-            break
-        case .installFailed(let failure):
-            presentUpdateAlert(
-                title: "Update could not start",
-                message: "\(failure.localizedDescription)\n\nThe current app is still running and was not changed. You can retry from the menu."
-            )
-        }
-    }
-
-    private func presentUpdate(_ candidate: UpdateCandidate) {
-        let alert = NSAlert()
-        alert.messageText = "A verified update is available"
-        alert.informativeText = "Download \(ProductIdentity.name) \(candidate.version) from GitHub Releases? The ZIP and its SHA-256 checksum will be fetched over HTTPS and checked before anything is shown. Nothing is installed automatically."
-        alert.addButton(withTitle: "Download and Verify")
-        alert.addButton(withTitle: "Later")
-        if alert.runModal() == .alertFirstButtonReturn {
-            updateController.downloadAvailable()
-        }
-    }
-
-    private func presentDownloadedUpdate(_ downloaded: DownloadedUpdate) {
-        let alert = NSAlert()
-        alert.messageText = "Update verified"
-        alert.informativeText = "\(downloaded.candidate.artifactName) passed its SHA-256 check. Install and Relaunch will quit this app, replace only ~/Applications/2m2better.app, keep a rollback copy, and ask macOS to relaunch the new app. Preferences are outside the app bundle and are not changed."
-        alert.addButton(withTitle: "Install and Relaunch")
-        alert.addButton(withTitle: "Show in Finder")
-        alert.addButton(withTitle: "Later")
-        switch alert.runModal() {
-        case .alertFirstButtonReturn:
-            if updateController.installReadyUpdate() {
-                NSApp.terminate(nil)
-            }
-        case .alertSecondButtonReturn:
-            revealDownloadedUpdate(downloaded)
-        default:
-            break
-        }
-    }
-
-    private func revealDownloadedUpdate(_ downloaded: DownloadedUpdate) {
-        guard FileManager.default.fileExists(atPath: downloaded.artifactURL.path) else {
-            updateController.resetReadyUpdate()
-            presentUpdateAlert(
-                title: "Verified update is no longer available",
-                message: "The temporary download was removed. Check for updates again to retry; the running app was not changed."
-            )
+        guard updateFlow.shouldPresentDialog else {
+            dismissUpdateDialog()
             return
         }
-        updateController.markReadyUpdateAsShown()
-        NSWorkspace.shared.activateFileViewerSelecting([downloaded.artifactURL])
+        showUpdateDialog()
+        if case .installing = updateFlow.state {
+            updateDialogWindow?.standardWindowButton(.closeButton)?.isHidden = true
+            NSApp.terminate(nil)
+        }
     }
 
-    private func presentUpdateAlert(title: String, message: String) {
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
+    private func showUpdateDialog() {
+        guard let model = updateFlow.dialogModel else { return }
+        if let window = updateDialogWindow {
+            window.contentView = NSHostingView(rootView: UpdateDialogView(
+                model: model,
+                onPrimaryAction: { [weak self] in self?.handleUpdatePrimaryAction() },
+                onSecondaryAction: { [weak self] in self?.handleUpdateSecondaryAction() }
+            ))
+            window.setContentSize(NSSize(width: 370, height: model.showsProgress ? 210 : 190))
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 370, height: model.showsProgress ? 210 : 190),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = ProductIdentity.name
+        window.isReleasedWhenClosed = false
+        window.delegate = self
+        window.contentView = NSHostingView(rootView: UpdateDialogView(
+            model: model,
+            onPrimaryAction: { [weak self] in self?.handleUpdatePrimaryAction() },
+            onSecondaryAction: { [weak self] in self?.handleUpdateSecondaryAction() }
+        ))
+        window.center()
+        updateDialogWindow = window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func handleUpdatePrimaryAction() {
+        guard let model = updateFlow.dialogModel else { return }
+        switch model.phase {
+        case .available, .downloaded:
+            updateFlow.installAvailableUpdate()
+        case .failed:
+            updateFlow.retry()
+        case .current, .success:
+            updateFlow.cancelOrDismiss()
+        case .checking, .downloading, .installing:
+            break
+        }
+    }
+
+    private func handleUpdateSecondaryAction() {
+        updateFlow.cancelOrDismiss()
+    }
+
+    private func dismissUpdateDialog() {
+        updateDialogWindow?.orderOut(nil)
+        updateDialogWindow = nil
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard sender === updateDialogWindow else { return true }
+        updateFlow.cancelOrDismiss()
+        return true
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow,
+              window === updateDialogWindow else { return }
+        updateFlow.cancelOrDismiss()
+        updateDialogWindow = nil
     }
 
     @objc private func quit() {

@@ -27,6 +27,7 @@ enum SelfCheck {
 
         checkReleaseIdentity(&failures)
         checkUpdateSupport(&failures)
+        checkUpdatePresentation(&failures)
         checkProgress(&failures)
         checkCheckInResponses(&failures)
         checkCompletion(&failures)
@@ -41,7 +42,7 @@ enum SelfCheck {
         checkActivityDetectionAndRecovery(&failures)
 
         if failures.isEmpty {
-            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, standing session composition, cadence settings, body-area selection, first-run and menu-bar configuration, legacy migration, privacy-safe diagnostics, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, spoken movement guidance, completion dismissal, progress color, keyboard and mouse activity signals, pointer movement, routine activity recovery, and idle-session reset.")
+            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, concise update prompt states and recovery actions, standing session composition, cadence settings, body-area selection, first-run and menu-bar configuration, legacy migration, privacy-safe diagnostics, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, spoken movement guidance, completion dismissal, progress color, keyboard and mouse activity signals, pointer movement, routine activity recovery, and idle-session reset.")
             return true
         }
 
@@ -160,6 +161,40 @@ enum SelfCheck {
             }
         } catch {
             failures.append("an insecure asset failed with an unexpected error")
+        }
+    }
+
+    private static func checkUpdatePresentation(_ failures: inout [String]) {
+        let available = UpdateDialogModel(phase: .available(ProductIdentity.currentVersion))
+        if available.primaryButtonTitle != "Install and Relaunch"
+            || available.secondaryButtonTitle != "Later"
+            || available.message.lowercased().contains("github")
+            || available.message.lowercased().contains("checksum")
+            || available.message.lowercased().contains("zip") {
+            failures.append("the available-update prompt should be concise and actionable")
+        }
+
+        let preparing = UpdateDialogModel(phase: .downloading)
+        if !preparing.showsProgress
+            || preparing.primaryButtonTitle != nil
+            || preparing.secondaryButtonTitle != "Cancel" {
+            failures.append("update preparation should show short progress with Cancel")
+        }
+
+        let installing = UpdateDialogModel(phase: .installing)
+        if installing.primaryButtonTitle != nil || installing.secondaryButtonTitle != nil {
+            failures.append("installation should not ask for a second confirmation")
+        }
+
+        let failure = UpdateDialogModel(phase: .failed(.install))
+        if failure.primaryButtonTitle != "Try Again"
+            || failure.secondaryButtonTitle != "Cancel"
+            || !failure.message.contains("unchanged") {
+            failures.append("update failure should provide a recoverable retry path")
+        }
+
+        if UpdateDialogModel(phase: .success).primaryButtonTitle != "Done" {
+            failures.append("successful update state should be dismissible")
         }
     }
 

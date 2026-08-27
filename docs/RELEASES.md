@@ -118,10 +118,16 @@ The in-app updater consumes this same asset contract. It checks
 invalid/draft/prerelease/non-semantic releases and non-GitHub URLs, selects the
 asset for the running architecture, and requires the matching `.sha256` asset.
 It downloads the ZIP and checksum over HTTPS, verifies the exact named file
-with SHA-256, and removes temporary files on failure. After a successful
-verification, **Install and Relaunch** is an explicit confirmation; **Show in
-Finder** and **Later** cancel installation without changing the app. Nothing is
-ever installed silently.
+with SHA-256, and removes temporary files on failure. When a newer release is
+found, the normal path is a concise prompt with one primary action, **Install
+and Relaunch**, and a **Later** choice. The user's explicit install choice
+starts the download and exact verification, which is shown only as brief
+progress; a successful verification continues directly to the install handoff
+without another technical confirmation. The prompt never asks users to review
+ZIP names, checksums, GitHub URLs, installation paths, or a Finder step. If a
+check or install cannot finish, it shows short recovery copy with **Try Again**
+and **Cancel**; technical details go to
+`~/Library/Logs/2m2better/update.log` instead.
 
 The install action launches the bundled helper outside the running process. The
 helper waits for this process to exit, rechecks the local ZIP digest, validates
@@ -131,14 +137,16 @@ moves an existing bundle to a retained
 rename. If that rename fails, it restores the old app and retains a rollback
 copy for inspection. Preferences live outside the app
 bundle and are not copied or deleted. On success it asks macOS to relaunch the
-new app; failures are written to `~/Library/Logs/2m2better/update.log` and
-opened for review. The helper uses no sudo, credentials, or Gatekeeper bypass.
+new app and records the result in the same update log. The helper uses no sudo,
+credentials, or Gatekeeper bypass.
 
-Automatic checks happen at most once per 24 hours; **Check for Updates…** is an
-explicit retry path. Update requests contain no break activity, preferences,
-identifiers, or telemetry. The updater's HTTPS allowlist, redirect policy,
-response-size limits, architecture selection, semantic-version checks, and
-checksum verifier must remain compatible with the filenames above.
+Automatic checks happen at most once per 24 hours. A found update uses the same
+concise prompt as **Check for Updates…**; automatic checks stay quiet when the
+service is unavailable, while the menu remains an explicit retry path. Update
+requests contain no break activity, preferences, identifiers, or telemetry.
+The updater's HTTPS allowlist, redirect policy, response-size limits,
+architecture selection, semantic-version checks, and checksum verifier must
+remain compatible with the filenames above.
 
 This remains an ad-hoc developer preview: the package is not Developer ID
 signed or notarized. A verified checksum proves that the downloaded bytes match
