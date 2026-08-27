@@ -152,7 +152,10 @@ enum ProductIdentity {
     static let buildNumber = "3"
     static let buildIdentity = "Developer Preview"
 
+    // Kept for callers that used the pilot's area-only menu title.
     static let configureAreasMenuTitle = "Choose body areas…"
+    static let settingsMenuTitle = "Settings…"
+    static let diagnosticsMenuTitle = "Copy diagnostics"
     static let aboutMenuTitle = "About \(name)…"
     static let releaseRepository = "jonathanmv/2m2good"
     static let releaseAPIURL = URL(string: "https://api.github.com/repos/\(releaseRepository)/releases/latest")!

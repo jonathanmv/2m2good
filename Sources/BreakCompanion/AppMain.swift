@@ -69,7 +69,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
 
         let menu = NSMenu()
         menu.addItem(withTitle: "Offer a break now", action: #selector(offerBreak), keyEquivalent: "")
-        menu.addItem(withTitle: ProductIdentity.configureAreasMenuTitle, action: #selector(configureAreas), keyEquivalent: "")
+        menu.addItem(withTitle: ProductIdentity.settingsMenuTitle, action: #selector(configureAreas), keyEquivalent: "")
+        menu.addItem(withTitle: ProductIdentity.diagnosticsMenuTitle, action: #selector(copyDiagnostics), keyEquivalent: "")
         menu.addItem(NSMenuItem.separator())
         menu.addItem(withTitle: ProductIdentity.aboutMenuTitle, action: #selector(showAbout), keyEquivalent: "")
         let updateItem = menu.addItem(withTitle: updateController.menuTitle, action: #selector(checkForUpdates), keyEquivalent: "")
@@ -93,6 +94,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         store.noteCompanionInteraction()
         panel?.orderFrontRegardless()
         store.openAreaConfiguration()
+    }
+
+    @objc private func copyDiagnostics() {
+        store.noteCompanionInteraction()
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(store.diagnosticReport(), forType: .string)
     }
 
     func menuWillOpen(_ menu: NSMenu) {
@@ -308,6 +316,13 @@ enum BreakCompanionApp {
     static func main() {
         if CommandLine.arguments.contains("--self-check") {
             exit(SelfCheck.run() ? EXIT_SUCCESS : EXIT_FAILURE)
+        }
+        if CommandLine.arguments.contains("--diagnostics") {
+            let report = MainActor.assumeIsolated {
+                CompanionStore().diagnosticReport(activityIsActive: LocalActivitySignal.current().workActivityIdle < 60)
+            }
+            print(report)
+            exit(EXIT_SUCCESS)
         }
         let app = NSApplication.shared
         let delegate = AppDelegate()

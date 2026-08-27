@@ -4,6 +4,7 @@ struct CompanionView: View {
     @ObservedObject var store: CompanionStore
     @State private var hovered = false
     @State private var draftAreas: Set<BodyArea> = []
+    @State private var draftCadence: Cadence = .defaultCadence
 
     var body: some View {
         ZStack {
@@ -56,21 +57,24 @@ struct CompanionView: View {
 
     private var areaConfigurationView: some View {
         ScrollView {
-            areaConfigurationContent
+            settingsContent
                 .padding(23)
         }
-        .onAppear { draftAreas = store.selectedAreas }
+        .onAppear {
+            draftAreas = store.selectedAreas
+            draftCadence = store.selectedCadence
+        }
     }
 
-    private var areaConfigurationContent: some View {
+    private var settingsContent: some View {
         VStack(spacing: 14) {
             HStack(spacing: 12) {
                 CompanionOrb(motion: .breathe, warmth: 0.72, active: true)
                     .frame(width: 48, height: 48)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(store.mode == .setup ? "A small setup first" : "Body areas")
+                    Text(store.mode == .setup ? "A small setup first" : "Settings")
                         .font(.system(size: 19, weight: .semibold, design: .rounded))
-                    Text("Choose one or more areas for your standing reset. You can change this from the menu bar.")
+                    Text("Choose a pause rhythm and one or more areas for your standing reset. You can change these whenever you like.")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -78,7 +82,32 @@ struct CompanionView: View {
                 Spacer(minLength: 0)
             }
 
-            VStack(spacing: 7) {
+            VStack(alignment: .leading, spacing: 7) {
+                Text("Pause rhythm")
+                    .font(.system(size: 13, weight: .semibold))
+                ForEach(Cadence.allCases, id: \.self) { cadence in
+                    Button {
+                        draftCadence = cadence
+                    } label: {
+                        HStack(spacing: 10) {
+                            Text(cadence.label)
+                                .font(.system(size: 14, weight: .medium))
+                            Spacer()
+                            Image(systemName: draftCadence == cadence ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(draftCadence == cadence ? Color(red: 0.27, green: 0.55, blue: 0.49) : .secondary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(SettingsOptionButtonStyle(selected: draftCadence == cadence))
+                    .accessibilityLabel(cadence.label)
+                    .accessibilityValue(draftCadence == cadence ? "Selected" : "Not selected")
+                    .accessibilityAddTraits(draftCadence == cadence ? .isSelected : [])
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 7) {
+                Text("Body areas")
+                    .font(.system(size: 13, weight: .semibold))
                 ForEach(Array(BodyArea.allCases.enumerated()), id: \.element) { index, area in
                     Button {
                         toggle(area)
@@ -110,8 +139,8 @@ struct CompanionView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            Button("Save areas") {
-                store.saveSelectedAreas(draftAreas)
+            Button("Save settings") {
+                store.saveSettings(cadence: draftCadence, areas: draftAreas)
             }
             .buttonStyle(PrimaryButtonStyle())
             .keyboardShortcut(.defaultAction)
@@ -356,6 +385,24 @@ private struct PrimaryButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(Color(red: 0.27, green: 0.55, blue: 0.49).opacity(configuration.isPressed ? 0.75 : 1))
             )
+    }
+}
+
+private struct SettingsOptionButtonStyle: ButtonStyle {
+    let selected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.primary.opacity(configuration.isPressed ? 0.10 : selected ? 0.08 : 0.045))
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(selected ? 0.16 : 0.06), lineWidth: 0.7)
+            }
     }
 }
 

@@ -9,7 +9,7 @@ A deliberately small, local macOS break companion. After 60 minutes of active ke
 - Warm check-ins with **Start**, **Later** (one hour), and **Tomorrow**.
 - Click-only check-in responses: **Start**, **Later** (one hour), and **Tomorrow**, with keyboard-accessible buttons.
 - A library of gentle, standing-compatible desk-break movements. Each offered session combines six different 20-second movements into a fresh two-minute reset.
-- On first launch, choose one or more areas to support: **Lower back**, **Neck**, **Shoulders**, or **Hands + wrists**, or keep the balanced mix. The choice can be reviewed from the menu bar and biases the next reset without becoming a dashboard or body-data profile.
+- On first launch, choose a pause rhythm (**Every 20 minutes**, **Every hour**, or **Every 3 hours**) and one or more areas to support: **Lower back**, **Neck**, **Shoulders**, or **Hands + wrists**, or keep the balanced mix. Settings stay local and can be reviewed from the menu bar without becoming a dashboard or body-data profile.
 - Every session is exactly 120 seconds, with a gentle standing invitation, on-screen and spoken movement guidance, simple motion cues, Pause, Next, End, and safety wording.
 - **Next** immediately composes a new session from 2:00 and avoids every move in the current session. Moves are recorded when shown, so skipped and switched sessions also reduce near-term repetition.
 - The Done screen closes itself after about 10 seconds; Return or Enter closes it immediately.
@@ -25,9 +25,9 @@ newer or the matching Apple Command Line Tools.
 open ".build/app/2m2better.app"
 ```
 
-The app appears as a small orb near the upper-right of the screen and as a leaf in the menu bar. On a fresh install, a compact setup asks which body areas the standing reset should support; every shipped movement is standing-only, so the reset is presented as a standing one rather than a seated alternative. Click the orb or **Offer a break now** in the menu bar to trigger a break immediately; use **Choose body areas…** there to review or change the selection, which stays available while the orb is idle so an offered or running reset is never discarded.
+The app appears as a small orb near the upper-right of the screen and as a leaf in the menu bar. On a fresh install, a compact setup asks for a pause rhythm and which body areas the standing reset should support; every shipped movement is standing-only, so the reset is presented as a standing one rather than a seated alternative. Click the orb or **Offer a break now** in the menu bar to trigger a break immediately; use **Settings…** there to review or change the selection, which stays available while the orb is idle so an offered or running reset is never discarded.
 
-The menu also includes **About 2m2better…**, which shows the shared release identity, and **Check for Updates…**, which checks GitHub Releases only. After the ZIP and exact SHA-256 manifest pass verification, the update prompt offers **Install and Relaunch**, **Show in Finder**, or **Later**; installation is never silent. The explicit install hands off to a temporary helper, waits for this app to exit, replaces only `~/Applications/2m2better.app`, retains a rollback copy, preserves preferences, and asks macOS to relaunch. See [`docs/RELEASES.md`](docs/RELEASES.md) for the updater behavior, trust limitation, release asset contract, icon packaging, and validation.
+The menu also includes **Settings…**, which changes the pause rhythm and body areas, and **Copy diagnostics**, which places a coarse local status report on the clipboard. **About 2m2better…** shows the shared release identity, and **Check for Updates…** checks GitHub Releases only. After the ZIP and exact SHA-256 manifest pass verification, the update prompt offers **Install and Relaunch**, **Show in Finder**, or **Later**; installation is never silent. The explicit install hands off to a temporary helper, waits for this app to exit, replaces only `~/Applications/2m2better.app`, retains a rollback copy, preserves preferences, and asks macOS to relaunch. See [`docs/RELEASES.md`](docs/RELEASES.md) for the updater behavior, trust limitation, release asset contract, icon packaging, and validation.
 
 This development Mac currently has a newer command-line compiler paired with a slightly mismatched newest SDK. On this machine only, build with its compatible installed SDK:
 
@@ -108,7 +108,7 @@ the conservative boundary for keeping its buttons and menu usable.
 
 ## Fast testing
 
-The normal active-work interval is 3,600 seconds. Override it when launching the executable:
+The default active-work interval is one hour. Choose **Every 20 minutes**, **Every hour**, or **Every 3 hours** in **Settings…**; the selection is stored in local macOS preferences. For a short development loop, override it when launching the executable:
 
 ```sh
 BREAK_INTERVAL_SECONDS=5 ".build/app/2m2better.app/Contents/MacOS/BreakCompanion"
@@ -121,6 +121,14 @@ Run the packaged logic checks with:
 ```sh
 ".build/app/2m2better.app/Contents/MacOS/BreakCompanion" --self-check
 ```
+
+Inspect the deterministic, privacy-safe startup diagnostic with:
+
+```sh
+".build/app/2m2better.app/Contents/MacOS/BreakCompanion" --diagnostics
+```
+
+For the live app, choose **Copy diagnostics** from the menu bar and inspect the clipboard with `pbpaste`. Both reports contain only the effective cadence, selected body areas, coarse mode, and one active-use status (`accumulating`, `waiting for activity`, `scheduled`, or `otherwise paused`). They never include key values, pointer coordinates, app content, agent data, analytics, or network state.
 
 Exercise the release installer through its command-line interface with its
 network-free macOS command harness:

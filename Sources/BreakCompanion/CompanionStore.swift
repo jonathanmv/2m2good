@@ -45,6 +45,7 @@ final class CompanionStore: ObservableObject {
     @Published private(set) var checkInProgress: Double = 0
     @Published private(set) var nextCheckInRemainingSeconds: TimeInterval = 0
     @Published private(set) var selectedAreas: Set<BodyArea>
+    @Published private(set) var selectedCadence: Cadence
 
     var onSizeChange: ((Mode) -> Void)?
     /// Set by the app so keystrokes aimed at the companion's own panel are read as
@@ -52,10 +53,12 @@ final class CompanionStore: ObservableObject {
     var companionHasKeyboardFocus: () -> Bool = { false }
 
     private let speaker: RoutineSpeaking
-    private let workInterval: TimeInterval
+    private var workInterval: TimeInterval
     private let idleThreshold: TimeInterval
     private let sessionSelection: SessionSelectionStore
     private let bodyAreaPreferences: BodyAreaPreferences
+    private let cadencePreferences: CadencePreferences
+    private let testingIntervalOverride: TimeInterval?
     private var activeUseTracker: ActiveUseTracker
     private var scheduledCheckIn: ScheduledCheckInWindow?
     private let nowProvider: () -> Date
@@ -75,11 +78,16 @@ final class CompanionStore: ObservableObject {
         postponementScheduler: any DelayedActionScheduling = DelayedActionScheduler()
     ) {
         let configuredInterval = Double(environment["BREAK_INTERVAL_SECONDS"] ?? "")
-        workInterval = max(5, configuredInterval ?? 60 * 60)
+        let cadencePreferences = CadencePreferences(defaults: defaults)
+        let initialCadence = cadencePreferences.selectedCadence
+        let testingIntervalOverride = configuredInterval.map { max(5, $0) }
         let configuredIdle = Double(environment["BREAK_IDLE_THRESHOLD_SECONDS"] ?? "")
+        workInterval = testingIntervalOverride ?? initialCadence.interval
         idleThreshold = max(10, configuredIdle ?? 60)
         sessionSelection = SessionSelectionStore(defaults: defaults)
         bodyAreaPreferences = BodyAreaPreferences(defaults: defaults)
+        self.cadencePreferences = cadencePreferences
+        self.testingIntervalOverride = testingIntervalOverride
         self.activitySignalProvider = activitySignalProvider
         self.speaker = speaker ?? GuideSpeaker()
         self.nowProvider = nowProvider
@@ -90,6 +98,7 @@ final class CompanionStore: ObservableObject {
             startedAt: nowProvider()
         )
         selectedAreas = bodyAreaPreferences.selectedAreas
+        selectedCadence = initialCadence
         routine = BreakRoutine.fallback
         nextCheckInRemainingSeconds = workInterval
         mode = bodyAreaPreferences.shouldPresentFirstRunSetup ? .setup : .idle
@@ -134,23 +143,67 @@ final class CompanionStore: ObservableObject {
         notifySizeChange()
     }
 
-    func saveSelectedAreas(_ areas: Set<BodyArea>) {
+    func saveSettings(cadence: Cadence, areas: Set<BodyArea>) {
         guard !areas.isEmpty else { return }
+        let cadenceChanged = selectedCadence != cadence
+        cadencePreferences.save(cadence: cadence)
         bodyAreaPreferences.save(selectedAreas: areas)
+        selectedCadence = cadence
         selectedAreas = bodyAreaPreferences.selectedAreas
         sessionSelection.clearPendingSession()
+
+        if cadenceChanged {
+            workInterval = testingIntervalOverride ?? cadence.interval
+            activeUseTracker = ActiveUseTracker(
+                activeInterval: workInterval,
+                idleThreshold: idleThreshold,
+                startedAt: nowProvider()
+            )
+            updateCheckInProgress(at: nowProvider())
+        }
+
         guard offersBalancedChoice else { return }
         mode = .idle
         notifySizeChange()
     }
 
+    // Kept as a small compatibility shim for the existing menu/setup path.
+    func saveSelectedAreas(_ areas: Set<BodyArea>) {
+        saveSettings(cadence: selectedCadence, areas: areas)
+    }
+
     func continueWithBalancedDefaults() {
+        cadencePreferences.save(cadence: selectedCadence)
         bodyAreaPreferences.continueWithBalancedDefaults()
         selectedAreas = []
         sessionSelection.clearPendingSession()
         guard offersBalancedChoice else { return }
         mode = .idle
         notifySizeChange()
+    }
+
+    func diagnosticSnapshot(activityIsActive: Bool? = nil) -> CompanionDiagnosticSnapshot {
+        let path: ActiveUsePath
+        switch mode {
+        case .idle where scheduledCheckIn != nil:
+            path = .scheduled
+        case .idle where activityIsActive ?? userIsActive:
+            path = .accumulating
+        case .idle:
+            path = .waitingForActivity
+        default:
+            path = .otherwisePaused
+        }
+        return CompanionDiagnosticSnapshot(
+            cadence: selectedCadence,
+            selectedAreas: BodyArea.allCases.filter { selectedAreas.contains($0) },
+            mode: mode.diagnosticLabel,
+            activeUsePath: path
+        )
+    }
+
+    func diagnosticReport(activityIsActive: Bool? = nil) -> String {
+        diagnosticSnapshot(activityIsActive: activityIsActive).report
     }
 
     func cancelAreaConfiguration() {
