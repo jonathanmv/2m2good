@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="2m2better is a small local macOS companion for a two-minute movement reset between screen-heavy stretches.">
+  <meta name="theme-color" content="#102f39">
+  <title>2m2better — make room for two minutes</title>
+  <style>
+    :root {
+      --ink: #102f39;
+      --ink-deep: #0a232b;
+      --ink-soft: #537078;
+      --paper: #f5f1e8;
+      --chalk: #fffdf8;
+      --mineral: #dce9e7;
+      --tide: #2d7b79;
+      --tide-bright: #9bd3c2;
+      --clay: #c26943;
+      --clay-soft: #f0c29e;
+      --plum: #80546e;
+      --line: rgba(16, 47, 57, .16);
+      --line-light: rgba(255, 253, 248, .24);
+      --focus: #a8e7d0;
+      --focus-dark: #0b696b;
+      --shadow: 0 24px 70px rgba(16, 47, 57, .14);
+      --shadow-small: 0 12px 26px rgba(16, 47, 57, .12);
+      --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      --serif: Georgia, "Times New Roman", serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --max: 1180px;
+      --gutter: clamp(20px, 4vw, 56px);
+      --ease: cubic-bezier(.22, .7, .2, 1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      text-rendering: optimizeLegibility;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { color: inherit; font: inherit; }
+    button, a, summary { -webkit-tap-highlight-color: transparent; }
+    :focus-visible {
+      outline: 3px solid var(--focus-dark);
+      outline-offset: 5px;
+      box-shadow: 0 0 0 8px var(--paper);
+    }
+    .on-dark :focus-visible,
+    .install-panel :focus-visible,
+    .footer :focus-visible {
+      outline-color: var(--focus);
+      box-shadow: 0 0 0 8px var(--ink);
+    }
+    .skip-link {
+      position: fixed;
+      z-index: 20;
+      top: 12px;
+      left: 12px;
+      padding: 12px 16px;
+      border-radius: 999px;
+      background: var(--chalk);
+      color: var(--ink);
+      font-weight: 700;
+      transform: translateY(-160%);
+      transition: transform 180ms var(--ease);
+    }
+    .skip-link:focus { transform: none; }
+    .shell {
+      width: min(var(--max), calc(100% - (var(--gutter) * 2)));
+      margin-inline: auto;
+    }
+    .eyebrow {
+      margin: 0 0 22px;
+      color: var(--clay);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .16em;
+      line-height: 1.3;
+      text-transform: uppercase;
+    }
+    .eyebrow-light { color: var(--tide-bright); }
+    h1, h2, h3, p { text-wrap: pretty; }
+    h1, h2, h3 { margin: 0; font-family: var(--serif); font-weight: 400; letter-spacing: -.045em; }
+    p { line-height: 1.65; }
+
+    .topbar {
+      position: relative;
+      z-index: 5;
+      background: var(--ink);
+      color: var(--chalk);
+    }
+    .topbar-inner {
+      min-height: 82px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 28px;
+    }
+    .wordmark {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      flex: 0 0 auto;
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -.04em;
+    }
+    .wordmark-mark {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: var(--clay-soft);
+      box-shadow: inset -3px -3px 0 rgba(16, 47, 57, .28);
+    }
+    .wordmark em { color: var(--clay-soft); font-style: normal; font-weight: 600; }
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: clamp(16px, 3vw, 34px);
+      color: rgba(255, 253, 248, .74);
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .nav a { position: relative; }
+    .nav a::after {
+      position: absolute;
+      right: 100%;
+      bottom: -7px;
+      left: 0;
+      height: 1px;
+      background: currentColor;
+      content: "";
+      transition: right 180ms ease;
+    }
+    .nav a:hover::after { right: 0; }
+    .nav-cta {
+      padding: 11px 16px;
+      border: 1px solid rgba(255, 253, 248, .38);
+      border-radius: 999px;
+      color: var(--chalk);
+    }
+    .nav-cta::after { display: none; }
+    .nav-cta:hover { border-color: var(--tide-bright); color: var(--tide-bright); }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      background: var(--ink);
+      color: var(--chalk);
+    }
+    .hero::before {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 48%;
+      background-image: linear-gradient(rgba(155, 211, 194, .08) 1px, transparent 1px), linear-gradient(90deg, rgba(155, 211, 194, .08) 1px, transparent 1px);
+      background-size: 42px 42px;
+      content: "";
+      mask-image: linear-gradient(90deg, transparent, black 35%, black);
+      pointer-events: none;
+    }
+    .hero-inner {
+      position: relative;
+      z-index: 1;
+      min-height: 680px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr);
+      align-items: center;
+      gap: clamp(48px, 8vw, 120px);
+      padding-block: 78px 96px;
+    }
+    .hero-copy { max-width: 690px; }
+    .hero-copy .eyebrow { color: var(--clay-soft); }
+    .hero h1 {
+      max-width: 680px;
+      font-size: clamp(54px, 7.3vw, 100px);
+      line-height: .91;
+    }
+    .hero-lede {
+      max-width: 540px;
+      margin: 32px 0 0;
+      color: rgba(255, 253, 248, .76);
+      font-size: clamp(17px, 1.7vw, 20px);
+      line-height: 1.55;
+    }
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 18px 26px;
+      margin-top: 36px;
+    }
+    .button {
+      min-height: 52px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 11px;
+      padding: 0 20px;
+      border: 0;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 800;
+      text-align: center;
+      transition: transform 180ms var(--ease), background 180ms ease, color 180ms ease;
+    }
+    .button:hover { transform: translateY(-2px); }
+    .button-primary { background: var(--clay-soft); color: var(--ink); }
+    .button-primary:hover { background: var(--chalk); }
+    .arrow { font-size: 19px; line-height: 0; }
+    .hero-link {
+      color: var(--tide-bright);
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .hero-link:hover { color: var(--chalk); }
+    .hero-note {
+      margin: 20px 0 0;
+      color: rgba(255, 253, 248, .52);
+      font-size: 12px;
+      letter-spacing: .03em;
+    }
+
+    .hero-visual {
+      position: relative;
+      min-height: 500px;
+      display: grid;
+      place-items: center;
+    }
+    .hero-visual::before,
+    .hero-visual::after {
+      position: absolute;
+      border: 1px solid rgba(155, 211, 194, .26);
+      border-radius: 50%;
+      content: "";
+    }
+    .hero-visual::before { width: min(42vw, 440px); aspect-ratio: 1; }
+    .hero-visual::after { width: min(31vw, 320px); aspect-ratio: 1; border-color: rgba(240, 194, 158, .35); }
+    .orb-label {
+      position: absolute;
+      top: 8%;
+      right: 1%;
+      max-width: 150px;
+      color: rgba(255, 253, 248, .62);
+      font-size: 11px;
+      line-height: 1.45;
+      text-align: right;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+    }
+    .orb-label strong { display: block; margin-top: 6px; color: var(--clay-soft); font-size: 13px; letter-spacing: 0; text-transform: none; }
+    .orb {
+      position: relative;
+      z-index: 1;
+      width: clamp(150px, 18vw, 205px);
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 23px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 28% 23%, rgba(255, 253, 248, .54), transparent 28%), linear-gradient(145deg, #8bc8b7, #226f73 72%);
+      box-shadow: inset -19px -23px 35px rgba(10, 35, 43, .32), 0 30px 80px rgba(0, 0, 0, .28);
+      animation: orb-breathe 5s ease-in-out infinite;
+    }
+    .orb::after {
+      position: absolute;
+      inset: -17px;
+      border: 1px solid rgba(155, 211, 194, .45);
+      border-radius: 50%;
+      content: "";
+    }
+    .orb-eye {
+      width: 11px;
+      height: 28px;
+      border-radius: 999px;
+      background: var(--chalk);
+    }
+    .orbit-tag {
+      position: absolute;
+      bottom: 12%;
+      left: 0;
+      max-width: 150px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 253, 248, .35);
+      color: rgba(255, 253, 248, .66);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .orbit-tag strong { display: block; color: var(--chalk); font-size: 15px; }
+    .hero-counter {
+      position: absolute;
+      right: 5%;
+      bottom: 17%;
+      display: flex;
+      align-items: baseline;
+      gap: 9px;
+      color: var(--clay-soft);
+      font-family: var(--serif);
+      font-size: 42px;
+      letter-spacing: -.06em;
+    }
+    .hero-counter small { color: rgba(255, 253, 248, .56); font-family: var(--sans); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+
+    .intro-strip {
+      border-bottom: 1px solid var(--line);
+      background: var(--chalk);
+    }
+    .intro-strip-inner {
+      min-height: 174px;
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      align-items: center;
+      gap: 32px;
+    }
+    .strip-mark {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      color: var(--tide);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+    .strip-mark span { color: var(--clay); font-family: var(--serif); font-size: 44px; font-weight: 400; letter-spacing: -.07em; }
+    .intro-strip p { max-width: 700px; margin: 0; font-family: var(--serif); font-size: clamp(24px, 3.2vw, 42px); line-height: 1.08; letter-spacing: -.04em; }
+
+    .body-section { background: var(--paper); }
+    .body-inner {
+      display: grid;
+      grid-template-columns: minmax(260px, .72fr) minmax(0, 1.28fr);
+      gap: clamp(48px, 10vw, 150px);
+      padding-block: 126px;
+    }
+    .section-title { max-width: 500px; font-size: clamp(46px, 5.8vw, 76px); line-height: .96; }
+    .section-copy { max-width: 490px; margin: 28px 0 0; color: var(--ink-soft); font-size: 17px; }
+    .body-detail { align-self: end; }
+    .area-list { margin: 0; padding: 0; border-top: 1px solid var(--line); list-style: none; }
+    .area-item { border-bottom: 1px solid var(--line); }
+    .area-button {
+      width: 100%;
+      min-height: 84px;
+      display: grid;
+      grid-template-columns: 54px 1fr auto;
+      align-items: center;
+      gap: 16px;
+      padding: 0 4px;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      text-align: left;
+    }
+    .area-number { color: var(--clay); font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+    .area-name { font-family: var(--serif); font-size: clamp(24px, 3vw, 35px); letter-spacing: -.04em; }
+    .area-caret { color: var(--tide); font-size: 24px; transition: transform 180ms var(--ease); }
+    .area-button:hover .area-caret, .area-button[aria-pressed="true"] .area-caret { transform: translateX(5px); }
+    .area-button[aria-pressed="true"] .area-name { color: var(--tide); }
+    .area-note { min-height: 0; margin: -4px 54px 22px 70px; color: var(--ink-soft); font-size: 14px; line-height: 1.5; }
+    .area-note[hidden] { display: none; }
+
+    .sequence-section { background: var(--mineral); border-block: 1px solid var(--line); }
+    .sequence-inner {
+      display: grid;
+      grid-template-columns: minmax(240px, .8fr) minmax(0, 1.2fr);
+      gap: clamp(48px, 9vw, 130px);
+      padding-block: 126px;
+    }
+    .sequence-heading { max-width: 420px; }
+    .sequence-heading .section-title { color: var(--ink); }
+    .sequence-heading p:last-child { max-width: 380px; margin: 28px 0 0; color: var(--ink-soft); }
+    .steps { margin: 0; padding: 0; border-top: 1px solid rgba(16, 47, 57, .3); list-style: none; }
+    .step {
+      display: grid;
+      grid-template-columns: 54px 1fr;
+      gap: 16px;
+      padding: 24px 0;
+      border-bottom: 1px solid rgba(16, 47, 57, .3);
+    }
+    .step-number { color: var(--clay); font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+    .step h3 { font-size: 30px; letter-spacing: -.035em; }
+    .step p { max-width: 520px; margin: 8px 0 0; color: var(--ink-soft); font-size: 15px; line-height: 1.5; }
+    .checkin {
+      grid-column: 2;
+      max-width: 560px;
+      margin-top: 24px;
+      padding: 26px;
+      border: 1px solid rgba(16, 47, 57, .22);
+      border-radius: 22px;
+      background: rgba(255, 253, 248, .68);
+      box-shadow: var(--shadow-small);
+    }
+    .checkin-top { display: flex; align-items: center; gap: 14px; }
+    .checkin-orb { width: 46px; height: 46px; flex: 0 0 auto; border-radius: 50%; background: linear-gradient(145deg, #efc18e, #ae603d); box-shadow: inset -6px -7px 12px rgba(71, 39, 26, .28); }
+    .checkin-kicker { margin: 0; color: var(--ink-soft); font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .checkin h3 { margin-top: 3px; font-size: 25px; }
+    .checkin-actions { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 8px; margin-top: 22px; }
+    .choice {
+      min-height: 45px;
+      padding: 0 10px;
+      border: 1px solid rgba(16, 47, 57, .24);
+      border-radius: 12px;
+      background: transparent;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 750;
+    }
+    .choice:hover, .choice[aria-pressed="true"] { border-color: var(--tide); background: var(--tide); color: var(--chalk); }
+    .checkin-status { min-height: 24px; margin: 14px 0 0; color: var(--ink-soft); font-size: 13px; }
+
+    .small-section { background: var(--chalk); }
+    .small-inner {
+      display: grid;
+      grid-template-columns: minmax(260px, .9fr) minmax(0, 1.1fr);
+      gap: clamp(48px, 10vw, 150px);
+      padding-block: 120px;
+    }
+    .small-copy .section-title { max-width: 430px; }
+    .small-copy p:last-child { max-width: 440px; margin: 28px 0 0; color: var(--ink-soft); font-size: 17px; }
+    .facts { margin: 0; padding: 0; border-top: 1px solid var(--line); list-style: none; }
+    .fact { display: grid; grid-template-columns: 54px 1fr; gap: 16px; padding: 24px 0; border-bottom: 1px solid var(--line); }
+    .fact-index { color: var(--clay); font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+    .fact h3 { font-size: 27px; }
+    .fact p { margin: 7px 0 0; color: var(--ink-soft); font-size: 14px; line-height: 1.55; }
+
+    .install-panel {
+      background: var(--ink-deep);
+      color: var(--chalk);
+      border-top: 1px solid rgba(255, 253, 248, .14);
+    }
+    .install-inner {
+      display: grid;
+      grid-template-columns: minmax(260px, .76fr) minmax(0, 1.24fr);
+      align-items: center;
+      gap: clamp(48px, 9vw, 130px);
+      padding-block: 120px;
+    }
+    .install-copy .section-title { color: var(--chalk); max-width: 510px; }
+    .install-copy > p:not(.eyebrow) { max-width: 470px; margin: 28px 0 0; color: rgba(255, 253, 248, .72); font-size: 16px; }
+    .requirements { display: flex; flex-wrap: wrap; gap: 9px; margin: 27px 0 0; padding: 0; list-style: none; }
+    .requirements li { padding: 8px 11px; border: 1px solid rgba(255, 253, 248, .24); border-radius: 999px; color: rgba(255, 253, 248, .72); font-size: 11px; }
+    .command-box { padding: clamp(22px, 3vw, 34px); border: 1px solid rgba(155, 211, 194, .38); border-radius: 24px; background: rgba(255, 253, 248, .07); }
+    .command-label { display: flex; justify-content: space-between; gap: 16px; color: var(--tide-bright); font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .command {
+      display: block;
+      margin: 24px 0 0;
+      padding: 18px;
+      overflow-x: auto;
+      border: 1px solid rgba(255, 253, 248, .18);
+      border-radius: 12px;
+      background: rgba(0, 0, 0, .23);
+      color: var(--chalk);
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.6;
+      user-select: all;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      cursor: text;
+    }
+    .copy-button {
+      min-height: 45px;
+      margin-top: 16px;
+      padding: 0 17px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--tide-bright);
+      color: var(--ink);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .copy-button:hover { background: var(--chalk); }
+    .copy-status { min-height: 22px; margin: 14px 0 0; color: rgba(255, 253, 248, .76); font-size: 13px; line-height: 1.5; }
+    .command-note { margin: 20px 0 0; color: rgba(255, 253, 248, .52); font-size: 12px; line-height: 1.55; }
+
+    .closing { background: var(--clay); color: var(--ink); }
+    .closing-inner { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 30px; padding-block: 78px; }
+    .closing-orb { width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; gap: 7px; border-radius: 50%; background: linear-gradient(145deg, #f5d3a7, #9e4e35); box-shadow: inset -7px -9px 15px rgba(71, 39, 26, .25); }
+    .closing-orb .orb-eye { width: 5px; height: 13px; background: var(--ink); }
+    .closing p { margin: 0; color: rgba(16, 47, 57, .74); font-size: 12px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
+    .closing h2 { font-size: clamp(32px, 4vw, 54px); line-height: .98; }
+    .button-dark { background: var(--ink); color: var(--chalk); white-space: nowrap; }
+    .button-dark:hover { background: var(--ink-deep); }
+
+    .footer { background: var(--paper); }
+    .footer-inner { min-height: 116px; display: flex; align-items: center; justify-content: space-between; gap: 20px; color: var(--ink-soft); font-size: 12px; }
+    .footer-note { margin: 0; }
+    .footer-note strong { color: var(--ink); }
+
+    @keyframes orb-breathe {
+      0%, 100% { transform: scale(.97) translateY(3px); }
+      50% { transform: scale(1.035) translateY(-4px); }
+    }
+
+    @media (max-width: 900px) {
+      .hero-inner { grid-template-columns: 1fr; min-height: auto; padding-block: 72px 60px; }
+      .hero-visual { min-height: 410px; }
+      .hero-visual::before { width: min(70vw, 420px); }
+      .hero-visual::after { width: min(51vw, 315px); }
+      .intro-strip-inner { grid-template-columns: 1fr; gap: 6px; padding-block: 32px; }
+      .body-inner, .sequence-inner, .small-inner, .install-inner { grid-template-columns: 1fr; gap: 58px; padding-block: 88px; }
+      .checkin { grid-column: auto; }
+      .closing-inner { grid-template-columns: auto 1fr; }
+      .closing .button { grid-column: 2; justify-self: start; }
+    }
+    @media (max-width: 620px) {
+      :root { --gutter: 17px; }
+      html { scroll-behavior: auto; }
+      .topbar-inner { min-height: 70px; flex-wrap: wrap; padding-block: 12px; }
+      .nav { width: 100%; justify-content: space-between; gap: 10px; font-size: 11px; }
+      .nav-cta { padding: 9px 12px; }
+      .hero-inner { padding-block: 57px 48px; }
+      .hero h1 { font-size: clamp(48px, 15vw, 69px); }
+      .hero-lede { margin-top: 25px; font-size: 17px; }
+      .hero-actions { align-items: stretch; flex-direction: column; gap: 14px; }
+      .button-primary { width: 100%; }
+      .hero-visual { min-height: 330px; }
+      .orb-label { top: 4%; right: 0; font-size: 9px; }
+      .orbit-tag { bottom: 4%; left: 0; font-size: 11px; }
+      .hero-counter { right: 0; bottom: 10%; font-size: 31px; }
+      .section-title { font-size: clamp(43px, 13vw, 60px); }
+      .body-inner, .sequence-inner, .small-inner, .install-inner { padding-block: 74px; }
+      .area-button { min-height: 74px; grid-template-columns: 38px 1fr auto; }
+      .area-note { margin-left: 54px; }
+      .checkin { padding: 20px; }
+      .checkin-actions { grid-template-columns: 1fr 1fr; }
+      .checkin-actions .choice:first-child { grid-column: 1 / -1; }
+      .command-label { flex-direction: column; gap: 7px; }
+      .command { font-size: 11px; }
+      .closing-inner { grid-template-columns: 1fr; gap: 18px; padding-block: 59px; }
+      .closing .button { grid-column: auto; width: 100%; margin-top: 8px; }
+      .footer-inner { min-height: 140px; align-items: flex-start; flex-direction: column; justify-content: center; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .001ms !important; }
+      .button:hover { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <a class="wordmark" href="#top" aria-label="2m2better home"><span class="wordmark-mark" aria-hidden="true"></span>2m<em>2</em>better</a>
+      <nav class="nav" aria-label="Primary navigation">
+        <a href="#idea">The idea</a>
+        <a href="#reset">The reset</a>
+        <a href="#privacy">Privacy</a>
+        <a class="nav-cta" href="#install">Install preview <span aria-hidden="true">↘</span></a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <div class="shell hero-inner">
+        <div class="hero-copy">
+          <p class="eyebrow">A small reset for screen-heavy days</p>
+          <h1 id="hero-title">Let the agent keep going. You go easy for two minutes.</h1>
+          <p class="hero-lede">Coding agents can leave useful in-between moments. 2m2better is a quiet local companion that makes it easier to notice your body, move a little, and come back when you are ready.</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#install">Copy and paste in your terminal to install <span class="arrow" aria-hidden="true">↘</span></a>
+            <a class="hero-link" href="#reset">See the shape of the pause</a>
+          </div>
+          <p class="hero-note">Free developer preview · macOS 14+ · no account</p>
+        </div>
+        <div class="hero-visual" aria-label="Illustration of the 2m2better companion orb">
+          <p class="orb-label">while the work keeps moving<strong>a little room for you</strong></p>
+          <div class="orb" aria-hidden="true"><span class="orb-eye"></span><span class="orb-eye"></span></div>
+          <p class="orbit-tag"><strong>one gentle invitation</strong>Never a command. The choice stays yours.</p>
+          <div class="hero-counter" aria-label="two minute reset"><span>02:00</span><small>your reset</small></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="intro-strip" id="idea" aria-labelledby="intro-title">
+      <div class="shell intro-strip-inner">
+        <div class="strip-mark"><span>01</span> make room</div>
+        <p id="intro-title">Your screen has the thread. Your body is still in the room.</p>
+      </div>
+    </section>
+
+    <section class="body-section" aria-labelledby="body-title">
+      <div class="shell body-inner">
+        <div class="body-copy">
+          <p class="eyebrow">The part we forget</p>
+          <h2 class="section-title" id="body-title">A long stretch at the computer can feel like a long stretch in one shape.</h2>
+          <p class="section-copy">Not a diagnosis. Not a performance test. Just a useful moment to change position and let your neck, shoulders, hands + wrists, or lower back have a turn.</p>
+        </div>
+        <div class="body-detail">
+          <ul class="area-list" aria-label="Areas a reset can support">
+            <li class="area-item">
+              <button class="area-button" type="button" aria-pressed="true" aria-controls="area-note-1">
+                <span class="area-number">01</span><span class="area-name">Neck</span><span class="area-caret" aria-hidden="true">↗</span>
+              </button>
+              <p class="area-note" id="area-note-1">Turn a little. Stay comfortably within your range.</p>
+            </li>
+            <li class="area-item">
+              <button class="area-button" type="button" aria-pressed="false" aria-controls="area-note-2">
+                <span class="area-number">02</span><span class="area-name">Shoulders</span><span class="area-caret" aria-hidden="true">↗</span>
+              </button>
+              <p class="area-note" id="area-note-2" hidden>Let them move a little, without making a project of it.</p>
+            </li>
+            <li class="area-item">
+              <button class="area-button" type="button" aria-pressed="false" aria-controls="area-note-3">
+                <span class="area-number">03</span><span class="area-name">Hands + wrists</span><span class="area-caret" aria-hidden="true">↗</span>
+              </button>
+              <p class="area-note" id="area-note-3" hidden>Open and soften your hands. A small change is enough.</p>
+            </li>
+            <li class="area-item">
+              <button class="area-button" type="button" aria-pressed="false" aria-controls="area-note-4">
+                <span class="area-number">04</span><span class="area-name">Lower back</span><span class="area-caret" aria-hidden="true">↗</span>
+              </button>
+              <p class="area-note" id="area-note-4" hidden>Shift gently. A different position can be the whole point.</p>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="sequence-section" id="reset" aria-labelledby="reset-title">
+      <div class="shell sequence-inner">
+        <div class="sequence-heading">
+          <p class="eyebrow">02 / keep it easy</p>
+          <h2 class="section-title" id="reset-title">A pause with a beginning and an end.</h2>
+          <p>2m2better notices a long stretch of active keyboard or mouse use, then offers one clear check-in. No maze of settings. No disappearing decision.</p>
+        </div>
+        <div class="sequence-detail">
+          <ol class="steps">
+            <li class="step"><span class="step-number">01</span><div><h3>Notice</h3><p>A small check-in arrives after you have been at the computer for a while.</p></div></li>
+            <li class="step"><span class="step-number">02</span><div><h3>Choose</h3><p>Start, Later, and Tomorrow stay visible. There is no wrong answer.</p></div></li>
+            <li class="step"><span class="step-number">03</span><div><h3>Move</h3><p>Follow one gentle, visible two-minute reset. Spoken guidance is optional.</p></div></li>
+            <li class="step"><span class="step-number">04</span><div><h3>Return</h3><p>Finish, stop, or skip whenever you need. Then carry on with your day.</p></div></li>
+          </ol>
+          <div class="checkin" aria-labelledby="checkin-title">
+            <div class="checkin-top"><span class="checkin-orb" aria-hidden="true"></span><div><p class="checkin-kicker">a small pause?</p><h3 id="checkin-title">Ready for a gentle reset?</h3></div></div>
+            <div class="checkin-actions" aria-label="Available responses">
+              <button class="choice" type="button" aria-pressed="false" data-choice="Start">Start</button>
+              <button class="choice" type="button" aria-pressed="false" data-choice="Later">Later</button>
+              <button class="choice" type="button" aria-pressed="false" data-choice="Tomorrow">Tomorrow</button>
+            </div>
+            <p class="checkin-status" aria-live="polite">The choice stays yours.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="small-section" id="privacy" aria-labelledby="small-title">
+      <div class="shell small-inner">
+        <div class="small-copy">
+          <p class="eyebrow">03 / small on purpose</p>
+          <h2 class="section-title" id="small-title">Helpful, not hungry for your attention.</h2>
+          <p>There is no account to make, feed to maintain, or wellness score to chase. The companion should give a little room back, not ask for more of it.</p>
+        </div>
+        <ul class="facts" aria-label="Product and privacy details">
+          <li class="fact"><span class="fact-index">01</span><div><h3>Local by default</h3><p>The break experience processes locally on your Mac. It stores only the small amount of preference and movement-history state needed for the companion.</p></div></li>
+          <li class="fact"><span class="fact-index">02</span><div><h3>Coarse activity, never content</h3><p>It reads aggregate time since keyboard or pointer activity. It does not read key values, pointer coordinates, app content, or which app you are using.</p></div></li>
+          <li class="fact"><span class="fact-index">03</span><div><h3>No agent connection</h3><p>2m2better does not detect, watch, or coordinate coding agents. An in-between moment is simply a nice time to choose a pause.</p></div></li>
+          <li class="fact"><span class="fact-index">04</span><div><h3>Updates are explicit</h3><p>The optional updater checks GitHub Releases only when you ask it to. The developer preview is ad-hoc signed and not notarized.</p></div></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="install-panel on-dark" id="install" aria-labelledby="install-title">
+      <div class="shell install-inner">
+        <div class="install-copy">
+          <p class="eyebrow eyebrow-light">Free developer preview for macOS</p>
+          <h2 class="section-title" id="install-title">Give your body two minutes. Keep your work moving.</h2>
+          <p>Install the small local companion with one auditable command. It selects your Mac architecture, verifies the matching release ZIP and checksum, and installs without sudo.</p>
+          <ul class="requirements" aria-label="Preview requirements">
+            <li>macOS 14+</li>
+            <li>arm64 or x86_64</li>
+            <li>GitHub HTTPS access</li>
+          </ul>
+        </div>
+        <div class="command-box">
+          <div class="command-label"><span>Copy and paste in your terminal to install</span><span>one line · verified release</span></div>
+          <code class="command" id="install-command" tabindex="0" aria-label="Installer command; select this text to copy manually">curl -fsSL https://raw.githubusercontent.com/jonathanmv/2m2good/main/scripts/install.sh | sh</code>
+          <button class="copy-button" type="button" id="copy-command" aria-describedby="copy-status">Copy command</button>
+          <p class="copy-status" id="copy-status" aria-live="polite">Copy the one-liner, paste it into Terminal, and review the preview as it installs.</p>
+          <p class="command-note">The installer does not use credentials or a separate update server. macOS may ask you to approve this ad-hoc signed preview in Finder or Privacy &amp; Security.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="closing" aria-labelledby="closing-title">
+      <div class="shell closing-inner">
+        <div class="closing-orb" aria-hidden="true"><span class="orb-eye"></span><span class="orb-eye"></span></div>
+        <div><p>Two minutes for your body.</p><h2 id="closing-title">Then back to what you were making.</h2></div>
+        <a class="button button-dark" href="#install">Copy and paste in your terminal to install <span class="arrow" aria-hidden="true">↘</span></a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="shell footer-inner">
+      <a class="wordmark" href="#top" aria-label="2m2better home"><span class="wordmark-mark" aria-hidden="true"></span>2m<em>2</em>better</a>
+      <p class="footer-note"><strong>Local. Private. Yours.</strong> · gentle by design</p>
+    </div>
+  </footer>
+
+  <script>
+    (() => {
+      const command = document.getElementById("install-command");
+      const copyButton = document.getElementById("copy-command");
+      const copyStatus = document.getElementById("copy-status");
+      const installerCommand = command.textContent.trim();
+
+      const showCopied = () => {
+        copyButton.textContent = "Copied to clipboard";
+        copyStatus.textContent = "The installer command is on your clipboard.";
+      };
+
+      const selectCommand = () => {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(command);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      };
+
+      const showFallback = () => {
+        selectCommand();
+        copyButton.textContent = "Command selected — copy manually";
+        copyStatus.textContent = "Clipboard access was unavailable, so the command is selected. Press ⌘C or Ctrl+C to copy it.";
+      };
+
+      const copyInstaller = async () => {
+        copyButton.disabled = true;
+        try {
+          if (!navigator.clipboard || !window.isSecureContext) throw new Error("Clipboard unavailable");
+          await navigator.clipboard.writeText(installerCommand);
+          showCopied();
+        } catch (error) {
+          let copied = false;
+          try {
+            selectCommand();
+            copied = document.execCommand("copy");
+          } catch (fallbackError) {
+            copied = false;
+          }
+          if (copied) showCopied();
+          else showFallback();
+        } finally {
+          copyButton.disabled = false;
+        }
+      };
+
+      copyButton.addEventListener("click", copyInstaller);
+      command.addEventListener("click", selectCommand);
+
+      const areaButtons = [...document.querySelectorAll(".area-button")];
+      areaButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          areaButtons.forEach((otherButton) => {
+            const selected = otherButton === button;
+            otherButton.setAttribute("aria-pressed", String(selected));
+            const note = document.getElementById(otherButton.getAttribute("aria-controls"));
+            if (note) note.hidden = !selected;
+          });
+        });
+      });
+
+      const choices = [...document.querySelectorAll(".choice")];
+      const choiceStatus = document.querySelector(".checkin-status");
+      const responses = {
+        Start: "Your two minutes start here.",
+        Later: "No problem. Later works.",
+        Tomorrow: "No problem. Tomorrow works."
+      };
+      choices.forEach((choice) => {
+        choice.addEventListener("click", () => {
+          choices.forEach((otherChoice) => otherChoice.setAttribute("aria-pressed", String(otherChoice === choice)));
+          choiceStatus.textContent = responses[choice.dataset.choice] || "The choice stays yours.";
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
