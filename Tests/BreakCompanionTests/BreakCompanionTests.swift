@@ -302,6 +302,155 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertEqual(downloaded.candidate.artifactName, artifactName)
     }
 
+    func testUpdateDialogModelKeepsTheNormalFlowConciseAndActionable() {
+        let version = nextReleaseVersion
+        let available = UpdateDialogModel(phase: .available(version))
+        let copy = "\(available.title) \(available.message) \(available.primaryButtonTitle ?? "") \(available.secondaryButtonTitle ?? "")"
+            .lowercased()
+
+        XCTAssertEqual(available.primaryButtonTitle, "Install and Relaunch")
+        XCTAssertEqual(available.secondaryButtonTitle, "Later")
+        for implementationDetail in ["github", "zip", "sha", "checksum", "finder", "path"] {
+            XCTAssertFalse(copy.contains(implementationDetail), implementationDetail)
+        }
+
+        let preparing = UpdateDialogModel(phase: .downloading)
+        XCTAssertTrue(preparing.showsProgress)
+        XCTAssertNil(preparing.primaryButtonTitle)
+        XCTAssertEqual(preparing.secondaryButtonTitle, "Cancel")
+        XCTAssertEqual(
+            UpdateDialogModel(phase: .failed(.install)).message,
+            "Your current version is unchanged. Try again."
+        )
+        XCTAssertEqual(UpdateDialogModel(phase: .current).primaryButtonTitle, "Done")
+    }
+
+    func testUpdateFailureDiagnosticsUseTheExistingPrivacySafeLogPath() throws {
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("2m2better-update-log-test-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+
+        UpdateDiagnostics.record(.checksumMismatch, phase: "download", homeDirectory: home)
+
+        let log = try String(contentsOf: UpdateDiagnostics.logURL(homeDirectory: home), encoding: .utf8)
+        XCTAssertTrue(log.contains("2m2better update download failed."))
+        XCTAssertTrue(log.contains("SHA-256 checksum"))
+        XCTAssertFalse(log.lowercased().contains("keyboard"))
+        XCTAssertFalse(log.lowercased().contains("pointer"))
+    }
+
+    @MainActor
+    func testUpdateFlowUsesOneConsentThenVerifiesAndHandsOffWithoutAnotherDialog() async throws {
+        let releaseVersion = nextReleaseVersion
+        let releaseTag = "v\(releaseVersion)"
+        let artifactName = "\(ProductIdentity.name)-\(releaseTag)-macos-arm64.zip"
+        let artifactURL = URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/\(releaseTag)/app.zip")!
+        let checksumURL = URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/\(releaseTag)/app.sha256")!
+        let artifact = Data("update-payload".utf8)
+        let checksum = Data("faf613f495c32b8434726bd719da5f8901270370aa14f4259b1d3ec23f998fe1  \(artifactName)\n".utf8)
+        let releaseJSON: [String: Any] = [
+            "tag_name": releaseTag,
+            "html_url": "https://github.com/\(ProductIdentity.releaseRepository)/releases/tag/\(releaseTag)",
+            "draft": false,
+            "prerelease": false,
+            "assets": [
+                ["name": artifactName, "browser_download_url": artifactURL.absoluteString],
+                ["name": "\(artifactName).sha256", "browser_download_url": checksumURL.absoluteString]
+            ]
+        ]
+        let transport = StubUpdateTransport(responses: [
+            ProductIdentity.releaseAPIURL.absoluteString: try JSONSerialization.data(withJSONObject: releaseJSON),
+            artifactURL.absoluteString: artifact,
+            checksumURL.absoluteString: checksum
+        ])
+        let service = GitHubReleasesUpdateService(
+            transport: transport,
+            currentVersion: ProductIdentity.currentVersion,
+            architecture: "arm64"
+        )
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let handoffLauncher = RecordingUpdateHandoffLauncher()
+        let controller = UpdateController(
+            service: service,
+            defaults: defaults,
+            handoffLauncher: handoffLauncher
+        )
+        let flow = UpdateFlowCoordinator(controller: controller)
+        var phases: [UpdateDialogPhase] = []
+        let checkExpectation = expectation(description: "manual update check")
+        flow.onStateChange = { state in
+            if let phase = flow.dialogModel?.phase {
+                phases.append(phase)
+            }
+            if case .available = state {
+                checkExpectation.fulfill()
+            }
+        }
+        flow.checkManually(now: Date(timeIntervalSinceReferenceDate: 100_000))
+        await fulfillment(of: [checkExpectation], timeout: 1)
+        XCTAssertEqual(flow.dialogModel?.phase, .available(releaseVersion))
+
+        let installExpectation = expectation(description: "update handoff started")
+        flow.onStateChange = { state in
+            if let phase = flow.dialogModel?.phase {
+                phases.append(phase)
+            }
+            if case .installing = state {
+                installExpectation.fulfill()
+            }
+        }
+        flow.installAvailableUpdate()
+        await fulfillment(of: [installExpectation], timeout: 1)
+
+        XCTAssertEqual(flow.state, .installing(UpdateCandidate(
+            version: releaseVersion,
+            releaseURL: URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/tag/\(releaseTag)")!,
+            artifactName: artifactName,
+            artifactURL: artifactURL,
+            checksumName: "\(artifactName).sha256",
+            checksumURL: checksumURL
+        )))
+        XCTAssertEqual(handoffLauncher.downloadedUpdates.count, 1)
+        XCTAssertTrue(
+            phases.contains { phase in
+                if case .downloaded = phase { return true }
+                return false
+            },
+            "verification should pass through the downloaded controller state"
+        )
+        XCTAssertNil(flow.dialogModel?.primaryButtonTitle, "installation must not ask for a second confirmation")
+        XCTAssertNil(flow.dialogModel?.secondaryButtonTitle)
+        XCTAssertEqual(flow.dialogModel?.phase, .installing)
+    }
+
+    @MainActor
+    func testAutomaticUpdateAvailabilityOpensTheSameConcisePrompt() async throws {
+        let fixture = try makeUpdateFixture()
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let controller = UpdateController(
+            service: fixture,
+            defaults: defaults,
+            handoffLauncher: RecordingUpdateHandoffLauncher()
+        )
+        let flow = UpdateFlowCoordinator(controller: controller)
+        let expectation = expectation(description: "automatic update availability")
+        flow.onStateChange = { (state: UpdateFlowCoordinator.State) in
+            if case .available = state { expectation.fulfill() }
+        }
+
+        flow.checkAutomatically(now: Date(timeIntervalSinceReferenceDate: 200_000))
+        await fulfillment(of: [expectation], timeout: 1)
+        XCTAssertTrue(flow.shouldPresentDialog)
+        XCTAssertEqual(flow.dialogModel?.primaryButtonTitle, "Install and Relaunch")
+        XCTAssertEqual(flow.dialogModel?.secondaryButtonTitle, "Later")
+    }
+
     func testBreakProgressAtBeginningMidpointNearDueAndDeferralReset() {
         let start = Date(timeIntervalSinceReferenceDate: 1_000)
         let deferral = ScheduledCheckInWindow(
@@ -1926,6 +2075,36 @@ final class BreakCompanionTests: XCTestCase {
             major: currentVersion.major,
             minor: currentVersion.minor,
             patch: currentVersion.patch + 1
+        )
+    }
+
+    private func makeUpdateFixture() throws -> GitHubReleasesUpdateService {
+        let releaseVersion = nextReleaseVersion
+        let releaseTag = "v\(releaseVersion)"
+        let artifactName = "\(ProductIdentity.name)-\(releaseTag)-macos-arm64.zip"
+        let artifactURL = URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/\(releaseTag)/app.zip")!
+        let checksumURL = URL(string: "https://github.com/\(ProductIdentity.releaseRepository)/releases/download/\(releaseTag)/app.sha256")!
+        let artifact = Data("update-payload".utf8)
+        let checksum = Data("faf613f495c32b8434726bd719da5f8901270370aa14f4259b1d3ec23f998fe1  \(artifactName)\n".utf8)
+        let releaseJSON: [String: Any] = [
+            "tag_name": releaseTag,
+            "html_url": "https://github.com/\(ProductIdentity.releaseRepository)/releases/tag/\(releaseTag)",
+            "draft": false,
+            "prerelease": false,
+            "assets": [
+                ["name": artifactName, "browser_download_url": artifactURL.absoluteString],
+                ["name": "\(artifactName).sha256", "browser_download_url": checksumURL.absoluteString]
+            ]
+        ]
+        let transport = StubUpdateTransport(responses: [
+            ProductIdentity.releaseAPIURL.absoluteString: try JSONSerialization.data(withJSONObject: releaseJSON),
+            artifactURL.absoluteString: artifact,
+            checksumURL.absoluteString: checksum
+        ])
+        return GitHubReleasesUpdateService(
+            transport: transport,
+            currentVersion: ProductIdentity.currentVersion,
+            architecture: "arm64"
         )
     }
 
