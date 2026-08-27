@@ -35,12 +35,13 @@ enum SelfCheck {
         checkMoveLibraryAndComposition(&failures)
         checkPersistence(&failures)
         checkConfigurationFlow(&failures)
+        checkSettingsAndDiagnostics(&failures)
         checkSupportiveCopy(&failures)
         checkPointer(&failures)
         checkActivityDetectionAndRecovery(&failures)
 
         if failures.isEmpty {
-            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, standing session composition, body-area selection, first-run and menu-bar configuration, legacy migration, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, spoken movement guidance, completion dismissal, progress color, keyboard and mouse activity signals, pointer movement, routine activity recovery, and idle-session reset.")
+            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, standing session composition, cadence settings, body-area selection, first-run and menu-bar configuration, legacy migration, privacy-safe diagnostics, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, spoken movement guidance, completion dismissal, progress color, keyboard and mouse activity signals, pointer movement, routine activity recovery, and idle-session reset.")
             return true
         }
 
@@ -669,6 +670,79 @@ enum SelfCheck {
                 }
                 if defaults.string(forKey: BodyAreaPreferences.legacyPreferredAreaKey) != "upperBack" {
                     failures.append("an unrecognized legacy preference should not be silently rewritten")
+                }
+            }
+        }
+    }
+
+    private static func checkSettingsAndDiagnostics(_ failures: inout [String]) {
+        MainActor.assumeIsolated {
+            withIsolatedDefaults("settings-default") { defaults in
+                let preferences = CadencePreferences(defaults: defaults)
+                if preferences.selectedCadence != .oneHour
+                    || defaults.string(forKey: CadencePreferences.selectedCadenceKey) != Cadence.oneHour.rawValue {
+                    failures.append("a new cadence preference should default and migrate to one hour")
+                }
+            }
+
+            withIsolatedDefaults("settings-legacy") { defaults in
+                defaults.set(Cadence.threeHours.interval, forKey: CadencePreferences.legacyIntervalKey)
+                if CadencePreferences(defaults: defaults).selectedCadence != .threeHours {
+                    failures.append("a legacy cadence interval should migrate to three hours")
+                }
+            }
+
+            withIsolatedDefaults("cadence-timer") { defaults in
+                let start = Date(timeIntervalSinceReferenceDate: 12_000)
+                let store = CompanionStore(
+                    environment: [:],
+                    defaults: defaults,
+                    speaker: SelfCheckSpeaker(),
+                    nowProvider: { start }
+                )
+                store.saveSettings(cadence: .twentyMinutes, areas: [.neck])
+                for second in 1..<Int(Cadence.twentyMinutes.interval) {
+                    store.tickForTesting(at: start.addingTimeInterval(TimeInterval(second)), userIsActive: true)
+                }
+                if store.mode != .idle {
+                    failures.append("the twenty-minute cadence should not offer early")
+                }
+                store.tickForTesting(
+                    at: start.addingTimeInterval(Cadence.twentyMinutes.interval),
+                    userIsActive: true
+                )
+                if store.mode != .checkIn {
+                    failures.append("the selected cadence should control the active-use timer")
+                }
+            }
+
+            withIsolatedDefaults("diagnostics") { defaults in
+                let scheduler = SelfCheckDelayedActionScheduler()
+                let store = CompanionStore(
+                    environment: [:],
+                    defaults: defaults,
+                    speaker: SelfCheckSpeaker(),
+                    nowProvider: { Date(timeIntervalSinceReferenceDate: 13_000) },
+                    postponementScheduler: scheduler
+                )
+                store.continueWithBalancedDefaults()
+                if store.diagnosticSnapshot(activityIsActive: false).activeUsePath != .waitingForActivity
+                    || store.diagnosticSnapshot(activityIsActive: true).activeUsePath != .accumulating {
+                    failures.append("diagnostics should distinguish waiting from accumulating")
+                }
+                store.offerBreakNow()
+                if store.diagnosticSnapshot(activityIsActive: true).activeUsePath != .otherwisePaused {
+                    failures.append("diagnostics should identify a visible check-in as paused")
+                }
+                store.postpone(minutes: 60)
+                scheduler.runPendingAction()
+                let report = store.diagnosticReport(activityIsActive: true)
+                if !report.contains("cadence: Every hour")
+                    || !report.contains("body areas: balanced mix")
+                    || !report.contains("active-use path: scheduled")
+                    || report.lowercased().contains("coordinate")
+                    || report.lowercased().contains("content") {
+                    failures.append("diagnostics should be coarse and report the scheduled path")
                 }
             }
         }

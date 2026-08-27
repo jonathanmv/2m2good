@@ -1670,6 +1670,130 @@ final class BreakCompanionTests: XCTestCase {
         )
     }
 
+    func testCadenceDefaultsPersistAndMigrateSafely() {
+        XCTAssertEqual(Cadence.allCases, [.twentyMinutes, .oneHour, .threeHours])
+        XCTAssertEqual(
+            Cadence.allCases.map(\.label),
+            ["Every 20 minutes", "Every hour", "Every 3 hours"]
+        )
+        XCTAssertEqual(
+            Cadence.allCases.map(\.interval),
+            [1_200, 3_600, 10_800]
+        )
+
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let fresh = CadencePreferences(defaults: defaults)
+        XCTAssertEqual(fresh.selectedCadence, .oneHour)
+        XCTAssertEqual(defaults.string(forKey: CadencePreferences.selectedCadenceKey), Cadence.oneHour.rawValue)
+
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set(Cadence.threeHours.interval, forKey: CadencePreferences.legacyIntervalKey)
+        XCTAssertEqual(CadencePreferences(defaults: defaults).selectedCadence, .threeHours)
+
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set("not-a-cadence", forKey: CadencePreferences.selectedCadenceKey)
+        XCTAssertEqual(CadencePreferences(defaults: defaults).selectedCadence, .oneHour)
+        XCTAssertEqual(defaults.string(forKey: CadencePreferences.selectedCadenceKey), Cadence.oneHour.rawValue)
+    }
+
+    @MainActor
+    func testSettingsPersistCadenceAndAreasAndCadenceControlsTheTimer() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let start = referenceDate(20_000)
+        let store = CompanionStore(
+            environment: [:],
+            defaults: defaults,
+            speaker: RecordingSpeaker(),
+            nowProvider: { start }
+        )
+        XCTAssertEqual(store.selectedCadence, .oneHour)
+        XCTAssertEqual(store.nextCheckInRemainingSeconds, Cadence.oneHour.interval)
+
+        store.saveSettings(cadence: .twentyMinutes, areas: [.neck, .handsWrists])
+        XCTAssertEqual(store.mode, .idle)
+        XCTAssertEqual(store.selectedCadence, .twentyMinutes)
+        XCTAssertEqual(store.selectedAreas, [.neck, .handsWrists])
+        XCTAssertEqual(store.nextCheckInRemainingSeconds, Cadence.twentyMinutes.interval)
+        XCTAssertEqual(
+            defaults.string(forKey: CadencePreferences.selectedCadenceKey),
+            Cadence.twentyMinutes.rawValue
+        )
+
+        for second in 1..<Int(Cadence.twentyMinutes.interval) {
+            store.tickForTesting(at: start.addingTimeInterval(TimeInterval(second)), userIsActive: true)
+        }
+        XCTAssertEqual(store.mode, .idle)
+        store.tickForTesting(
+            at: start.addingTimeInterval(Cadence.twentyMinutes.interval),
+            userIsActive: true
+        )
+        XCTAssertEqual(store.mode, .checkIn)
+
+        let restarted = CompanionStore(
+            environment: [:],
+            defaults: defaults,
+            speaker: RecordingSpeaker(),
+            nowProvider: { start }
+        )
+        XCTAssertEqual(restarted.selectedCadence, .twentyMinutes)
+        XCTAssertEqual(restarted.selectedAreas, [.neck, .handsWrists])
+    }
+
+    @MainActor
+    func testDiagnosticsReportOnlyCoarseLocalCadenceAreaModeAndPath() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let scheduler = ManualDelayedActionScheduler()
+        let store = CompanionStore(
+            environment: [:],
+            defaults: defaults,
+            speaker: RecordingSpeaker(),
+            nowProvider: { self.referenceDate(30_000) },
+            postponementScheduler: scheduler
+        )
+        store.continueWithBalancedDefaults()
+
+        XCTAssertEqual(
+            store.diagnosticSnapshot(activityIsActive: false),
+            CompanionDiagnosticSnapshot(
+                cadence: .oneHour,
+                selectedAreas: [],
+                mode: "idle",
+                activeUsePath: .waitingForActivity
+            )
+        )
+        XCTAssertEqual(
+            store.diagnosticSnapshot(activityIsActive: true).activeUsePath,
+            .accumulating
+        )
+
+        store.offerBreakNow()
+        XCTAssertEqual(store.diagnosticSnapshot(activityIsActive: true).activeUsePath, .otherwisePaused)
+        store.postpone(minutes: 60)
+        scheduler.runPendingAction()
+        XCTAssertEqual(store.diagnosticSnapshot(activityIsActive: true).activeUsePath, .scheduled)
+
+        let report = store.diagnosticReport(activityIsActive: true)
+        XCTAssertTrue(report.contains("cadence: Every hour"))
+        XCTAssertTrue(report.contains("body areas: balanced mix"))
+        XCTAssertTrue(report.contains("mode: idle"))
+        XCTAssertTrue(report.contains("active-use path: scheduled"))
+        for forbidden in ["keyboardIdle", "pointer", "coordinates", "content", "analytics", "network"] {
+            XCTAssertFalse(report.lowercased().contains(forbidden.lowercased()), forbidden)
+        }
+    }
+
     func testBodyAreaPreferencesDefaultPersistAndMigrateSafely() {
         let suiteName = "BreakCompanionTests.\(#function)"
         let defaults = UserDefaults(suiteName: suiteName)!
