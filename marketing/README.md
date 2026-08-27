@@ -1,6 +1,12 @@
 # 2m2better marketing page
 
-The self-contained local landing page for 2m2better. Its visual and copy
+The directly openable, dependency-free landing artifact is [`landing.html`](landing.html). Open it from Finder or a browser with `file://`—it contains all HTML, CSS, and JavaScript inline and makes no network requests. The standalone page is the primary delivery for sharing or reviewing the landing design; it does not require Node.js, a framework, or a preview server.
+
+```bash
+open landing.html
+```
+
+The repository also retains the framework-backed local preview below for existing product behavior and development workflows. Its visual and copy
 direction comes from [`../docs/BRAND_DIRECTION.md`](../docs/BRAND_DIRECTION.md),
 its reusable visual contract is documented in
 [`../docs/DESIGN_TOKENS.md`](../docs/DESIGN_TOKENS.md), and the dated
@@ -32,7 +38,7 @@ npm run build
 npm test
 ```
 
-`npm test` creates a production build and asserts against the rendered HTML and
+`npm test` creates a production build, validates the standalone `landing.html` contract, and asserts against the framework-rendered HTML and
 the built CSS: the rotating hero area word and its static fallback, the
 click-only bounded preview and its controls, the single copy-to-clipboard
 `curl | sh` installer command (which it also runs against stubbed
