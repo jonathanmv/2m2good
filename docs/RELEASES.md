@@ -62,22 +62,33 @@ timer/session checkpoints and pause history stay in the invoking user's
 Application Support/preferences data, outside the replaceable bundle. Its
 optional update check sends only the documented GitHub request.
 
-## v0.1.2 automatic break-offer fix
+## v0.1.3 pause context and seamless updates
 
-The next developer-preview release is **v0.1.2 (build 3)**. It contains the
-already-merged automatic break-offer fix from `c0adf86`. The patch version is
-intentionally newer than v0.1.1 so an installed preview can distinguish and
-offer the fixed binary; the updater only offers a strictly newer semantic
-version. The tag and both architecture asset pairs remain the existing
-`v<version>` and `2m2better-v<version>-macos-{arm64,x86_64}.zip` contract.
+The next developer-preview release is **v0.1.3 (build 4)**. It brings the
+already-merged pause-screen and update improvements to installed users:
 
-The app bundle continues to include the maintainable single-file
-`Resources/2m2better.png` icon. `scripts/build-app.sh` copies it into
-`Contents/Resources` and generates both `CFBundleIconFile` and
-`CFBundleIconFiles` in `Contents/Info.plist`. Packaging tests inspect the
-generated bundle and exercise LaunchServices registration so Finder can
-identify the app. This app icon is separate from the unchanged menu-bar
-`leaf.fill` symbol.
+- A pause prompt can show brief context about a recently completed pause,
+  without adding a browsable history.
+- **Hide pause screen** collapses the prompt without changing the pending
+  choice or its timing; clicking the orb or choosing **Offer a break now**
+  restores the pause choices. The pause window can also be dragged from its
+  non-control background.
+- Timer progress and an active pause session are retained in local user data,
+  outside the replaceable app bundle, so a normal relaunch or update handoff
+  can resume safely without discarding the current session.
+- The one-line installer now updates an existing installation through the same
+  verified replacement flow: it asks a running app to quit gracefully, retains
+  the previous bundle for rollback, replaces the app, and relaunches it while
+  preserving user data. `--replace` remains accepted for older scripts.
+
+The tag and both architecture asset pairs remain the existing `v<version>` and
+`2m2better-v<version>-macos-{arm64,x86_64}.zip` contract. The app bundle
+continues to include the maintainable single-file `Resources/2m2better.png`
+icon. `scripts/build-app.sh` copies it into `Contents/Resources` and generates
+both `CFBundleIconFile` and `CFBundleIconFiles` in `Contents/Info.plist`.
+Packaging tests inspect the generated bundle and exercise LaunchServices
+registration so Finder can identify the app. This app icon is separate from
+the unchanged menu-bar `leaf.fill` symbol.
 
 ## Release identity and assets
 
