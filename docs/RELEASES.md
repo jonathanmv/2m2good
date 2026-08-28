@@ -36,10 +36,11 @@ The app is installed without `sudo` into the invoking user's:
 ```
 
 After installation it requests a Spotlight refresh with `mdimport -f` and asks
-macOS to open the app (or clearly prints the manual `open` command). An existing
-app is refused by default. `--replace` is the explicit, documented choice to
-replace one; the previous app bundle is moved to a timestamped
-`.2m2better.app.previous.*.app` backup and is not deleted. The installer never
+macOS to open the app (or clearly prints the manual `open` command). If an
+existing app is running, the installer asks only 2m2better to quit gracefully
+before replacement. The previous app bundle is moved to a timestamped
+`.2m2better.app.previous.*.app` backup and is not deleted; `--replace` remains
+accepted for compatibility but is no longer required. The installer never
 removes user data, follows an installation symlink, uses credentials, or
 bypasses Gatekeeper. `--no-launch`, `--dry-run`, and `--help` are available for
 review and automation.
@@ -47,8 +48,8 @@ review and automation.
 ### Prerequisites and limitation
 
 The command is for macOS 14 (Sonoma) or newer on arm64 or Intel x86_64. Standard
-macOS tools `curl`, `plutil`, `shasum`, `ditto`, and `sw_vers` are
-required; `mdimport` and `open` are normally present. Internet access to
+macOS tools `curl`, `plutil`, `shasum`, `ditto`, `sw_vers`, and `osascript`
+are required; `mdimport` and `open` are normally present. Internet access to
 GitHub's API, release, and asset hosts is required. No Xcode or Swift compiler
 is needed because the installer consumes a published app ZIP.
 
@@ -56,7 +57,9 @@ This is deliberately a developer preview. The package uses the repository's
 existing ad-hoc signing path; it has **no Apple Developer ID signature and is
 not notarized**. macOS may show a Gatekeeper warning or require Finder **Open**
 or Privacy & Security approval. The installer does not claim otherwise and
-never adds a security bypass. The app remains local-only for break data; its
+never adds a security bypass. The app remains local-only for break data; live
+timer/session checkpoints and pause history stay in the invoking user's
+Application Support/preferences data, outside the replaceable bundle. Its
 optional update check sends only the documented GitHub request.
 
 ## v0.1.2 automatic break-offer fix
@@ -131,8 +134,9 @@ and **Cancel**; technical details go to
 
 The install action launches the bundled helper outside the running process. The
 helper waits for this process to exit, rechecks the local ZIP digest, validates
-the app bundle and icon, and replaces only `~/Applications/2m2better.app`. It
-moves an existing bundle to a retained
+the app bundle and icon, and replaces only `~/Applications/2m2better.app`. Live
+timer/session checkpoints remain in per-user Application Support outside the
+bundle. It moves an existing bundle to a retained
 `~/Applications/.2m2better.app.previous.*.app` rollback path before the final
 rename. If that rename fails, it restores the old app and retains a rollback
 copy for inspection. Preferences live outside the app

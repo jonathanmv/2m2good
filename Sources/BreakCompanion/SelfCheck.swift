@@ -30,6 +30,7 @@ enum SelfCheck {
         checkUpdatePresentation(&failures)
         checkProgress(&failures)
         checkCheckInResponses(&failures)
+        checkPauseHistoryAndPresentation(&failures)
         checkCompletion(&failures)
         checkActiveUseTiming(&failures)
         checkAutomaticActivitySignals(&failures)
@@ -42,7 +43,7 @@ enum SelfCheck {
         checkActivityDetectionAndRecovery(&failures)
 
         if failures.isEmpty {
-            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, concise update prompt states and recovery actions, standing session composition, cadence settings, body-area selection, first-run and menu-bar configuration, legacy migration, privacy-safe diagnostics, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, spoken movement guidance, completion dismissal, progress color, keyboard and mouse activity signals, pointer movement, routine activity recovery, and idle-session reset.")
+            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, concise update prompt states and recovery actions, standing session composition, cadence settings, body-area selection, first-run and menu-bar configuration, legacy migration, privacy-safe diagnostics, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, durable pause history and relative context, timer/session relaunch checkpoints, collapse-and-restore behavior, spoken movement guidance, completion dismissal, progress color, keyboard and mouse activity signals, pointer movement, routine activity recovery, and idle-session reset.")
             return true
         }
 
@@ -417,6 +418,86 @@ enum SelfCheck {
                 scheduler.runPendingAction()
                 if store.mode != .idle {
                     failures.append("Tomorrow should return to the orb after its confirmation")
+                }
+            }
+        }
+    }
+
+    private static func checkPauseHistoryAndPresentation(_ failures: inout [String]) {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        let noon = calendar.date(from: DateComponents(year: 2026, month: 1, day: 10, hour: 12))!
+        let yesterday = calendar.date(from: DateComponents(year: 2026, month: 1, day: 9, hour: 23, minute: 59))!
+        if PauseRelativeTimeFormatter.string(
+            for: noon.addingTimeInterval(-23 * 60),
+            relativeTo: noon,
+            calendar: calendar
+        ) != "23m ago"
+            || PauseRelativeTimeFormatter.string(for: yesterday, relativeTo: noon, calendar: calendar) != "yesterday"
+            || PauseRelativeTimeFormatter.string(for: noon.addingTimeInterval(60), relativeTo: noon, calendar: calendar) != nil {
+            failures.append("pause context should use deterministic local relative time and omit future values")
+        }
+
+        MainActor.assumeIsolated {
+            withIsolatedDefaults("pause-history-and-collapse") { defaults in
+                var now = Date(timeIntervalSinceReferenceDate: 10_000)
+                let stateURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("2m2better-self-check-state-\(ProcessInfo.processInfo.processIdentifier).json")
+                let stateStore = CompanionStateStore(fileURL: stateURL)
+                defer { try? FileManager.default.removeItem(at: stateURL) }
+                let scheduler = SelfCheckDelayedActionScheduler()
+                let signal = LocalActivitySignal(keyboardIdle: 10_000, pointerIdle: 10_000)
+                let store = CompanionStore(
+                    environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+                    defaults: defaults,
+                    activitySignalProvider: { signal },
+                    speaker: SelfCheckSpeaker(),
+                    nowProvider: { now },
+                    postponementScheduler: scheduler,
+                    stateStore: stateStore
+                )
+                store.continueWithBalancedDefaults()
+                store.offerBreakNow()
+                let remaining = store.nextCheckInRemainingSeconds
+                store.collapseCheckIn()
+                if store.mode != .checkIn
+                    || !store.isCheckInCollapsed
+                    || store.nextCheckInRemainingSeconds != remaining {
+                    failures.append("hiding a check-in should preserve its decision and timer")
+                }
+                store.restoreCheckIn()
+                store.startRoutine(at: now, activitySignal: signal)
+                for second in 1...119 {
+                    store.tickForTesting(at: now.addingTimeInterval(TimeInterval(second)), userIsActive: false)
+                }
+                now = now.addingTimeInterval(120)
+                store.tickForTesting(at: now, userIsActive: false)
+                if store.mode != .complete
+                    || PauseHistoryStore(defaults: defaults).completedPauseDates.count != 1 {
+                    failures.append("only a completed routine should add durable pause history")
+                }
+                store.dismissCompletion()
+
+                now = now.addingTimeInterval(23 * 60)
+                let restarted = CompanionStore(
+                    environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+                    defaults: defaults,
+                    activitySignalProvider: { signal },
+                    speaker: SelfCheckSpeaker(),
+                    nowProvider: { now },
+                    postponementScheduler: scheduler,
+                    stateStore: stateStore
+                )
+                restarted.continueWithBalancedDefaults()
+                restarted.offerBreakNow()
+                if restarted.lastCompletedPauseContext != "23m ago" {
+                    failures.append("completed pause context should survive a relaunch")
+                }
+                restarted.collapseCheckIn()
+                restarted.restoreCheckIn()
+                restarted.postpone(minutes: 60)
+                if restarted.statusText != "I’ll check back in an hour." {
+                    failures.append("a restored check-in should retain its existing Later response")
                 }
             }
         }

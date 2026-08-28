@@ -163,6 +163,27 @@ cat > "$fake_bin/open" <<'EOF'
 printf '%s\n' "${1:-}" >> "$INSTALL_TEST_OPEN_LOG"
 exit 0
 EOF
+
+cat > "$fake_bin/osascript" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >> "$INSTALL_TEST_OSASCRIPT_LOG"
+case "$*" in
+    *'get running'*)
+        if [ "${INSTALL_TEST_RUNNING_APP:-0}" = 1 ] && [ ! -e "${INSTALL_TEST_QUIT_MARKER:-}" ]; then
+            printf '%s\n' true
+        else
+            printf '%s\n' false
+        fi
+        ;;
+    *)
+        if [ -n "${INSTALL_TEST_QUIT_MARKER:-}" ]; then
+            : > "$INSTALL_TEST_QUIT_MARKER"
+        fi
+        ;;
+esac
+exit 0
+EOF
+
 chmod +x "$fake_bin"/*
 
 artifact_fixture="$test_root/fixtures/release.zip"
@@ -200,29 +221,26 @@ assert_contains "$output" 'does not bypass Gatekeeper'
 [ "$(cat "$test_root/open.log")" = "$installed" ] || fail_test 'installed app was not launched'
 [ "$(cat "$test_root/mdimport.log")" = "-f $installed" ] || fail_test 'Spotlight was not refreshed for the installed app'
 
-# Existing destinations are protected by default and their contents remain
-# untouched. The API must not be contacted for this refusal.
+# Existing installations are updated by the same public command. The API,
+# checksum, backup, and replacement protections still apply without requiring
+# a special flag; --replace remains accepted for compatibility.
 existing="$test_root/existing.app"
 mkdir -p "$existing"
 printf '%s\n' 'do not overwrite' > "$existing/marker"
 existing_home="$test_root/existing-home"
-mkdir -p "$existing_home/Applications/2m2better.app"
+mkdir -p "$existing_home/Applications/2m2better.app" "$existing_home/Library/Application Support/2m2better"
 printf '%s\n' 'keep this app' > "$existing_home/Applications/2m2better.app/marker"
-if output=$(HOME="$existing_home" INSTALL_TEST_API_LOG="$test_root/existing-api.log" \
+printf '%s\n' 'keep timer and session state' > "$existing_home/Library/Application Support/2m2better/companion-state.json"
+quit_marker="$test_root/2m2better-quit.marker"
+update_output=$(HOME="$existing_home" INSTALL_TEST_MODE=success \
+    INSTALL_TEST_RUNNING_APP=1 INSTALL_TEST_QUIT_MARKER="$quit_marker" \
+    INSTALL_TEST_OSASCRIPT_LOG="$test_root/osascript.log" \
     PATH="$fake_bin:/usr/bin:/bin" INSTALL_TEST_MDMIMPORT_LOG="$test_root/mdimport-existing.log" \
-    INSTALL_TEST_OPEN_LOG="$test_root/open-existing.log" "$installer" --no-launch 2>&1); then
-    fail_test 'existing destination unexpectedly succeeded without --replace'
-fi
-assert_contains "$output" 'installation already exists'
-[ "$(cat "$existing_home/Applications/2m2better.app/marker")" = 'keep this app' ] || fail_test 'existing app changed during refusal'
-
-# The documented explicit choice replaces only the app bundle and leaves a
-# timestamped previous bundle rather than deleting it.
-replace_output=$(HOME="$existing_home" INSTALL_TEST_MODE=success \
-    PATH="$fake_bin:/usr/bin:/bin" INSTALL_TEST_MDMIMPORT_LOG="$test_root/mdimport-replace.log" \
-    INSTALL_TEST_OPEN_LOG="$test_root/open-replace.log" "$installer" --replace --no-launch 2>&1) || \
-    fail_test "explicit replacement failed: $replace_output"
-assert_contains "$replace_output" 'Previous app retained:'
+    INSTALL_TEST_OPEN_LOG="$test_root/open-existing.log" "$installer" --no-launch 2>&1) || \
+    fail_test "existing installation update failed: $update_output"
+assert_contains "$update_output" 'Previous app retained:'
+assert_contains "$(cat "$test_root/osascript.log")" 'local.break-companion'
+[ -e "$quit_marker" ] || fail_test 'running 2m2better was not asked to quit before replacement'
 [ -x "$existing_home/Applications/2m2better.app/Contents/MacOS/BreakCompanion" ] || fail_test 'replacement app was not installed'
 previous_count=0
 previous_marker=
@@ -234,6 +252,8 @@ for previous in "$existing_home/Applications"/.2m2better.app.previous.*.app; do
 done
 [ "$previous_count" -eq 1 ] || fail_test 'previous app backup was not retained'
 [ "$(cat "$previous_marker")" = 'keep this app' ] || fail_test 'previous app backup lost its contents'
+[ "$(cat "$existing_home/Library/Application Support/2m2better/companion-state.json")" = 'keep timer and session state' ] || fail_test 'timer/session state outside the app bundle changed'
+unset INSTALL_TEST_RUNNING_APP INSTALL_TEST_QUIT_MARKER INSTALL_TEST_OSASCRIPT_LOG
 
 # A checksum mismatch is rejected before extraction or installation.
 mismatch_home="$test_root/mismatch-home"

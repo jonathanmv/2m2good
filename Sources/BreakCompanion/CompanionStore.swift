@@ -46,6 +46,8 @@ final class CompanionStore: ObservableObject {
     @Published private(set) var nextCheckInRemainingSeconds: TimeInterval = 0
     @Published private(set) var selectedAreas: Set<BodyArea>
     @Published private(set) var selectedCadence: Cadence
+    @Published private(set) var isCheckInCollapsed = false
+    @Published private(set) var lastCompletedPauseContext: String?
 
     var onSizeChange: ((Mode) -> Void)?
     /// Set by the app so keystrokes aimed at the companion's own panel are read as
@@ -58,6 +60,8 @@ final class CompanionStore: ObservableObject {
     private let sessionSelection: SessionSelectionStore
     private let bodyAreaPreferences: BodyAreaPreferences
     private let cadencePreferences: CadencePreferences
+    private let pauseHistory: PauseHistoryStore
+    private let stateStore: CompanionStateStore?
     private let testingIntervalOverride: TimeInterval?
     private var activeUseTracker: ActiveUseTracker
     private var scheduledCheckIn: ScheduledCheckInWindow?
@@ -75,7 +79,8 @@ final class CompanionStore: ObservableObject {
         activitySignalProvider: @escaping () -> LocalActivitySignal = LocalActivitySignal.current,
         speaker: RoutineSpeaking? = nil,
         nowProvider: @escaping () -> Date = Date.init,
-        postponementScheduler: any DelayedActionScheduling = DelayedActionScheduler()
+        postponementScheduler: any DelayedActionScheduling = DelayedActionScheduler(),
+        stateStore: CompanionStateStore? = nil
     ) {
         let configuredInterval = Double(environment["BREAK_INTERVAL_SECONDS"] ?? "")
         let cadencePreferences = CadencePreferences(defaults: defaults)
@@ -87,21 +92,25 @@ final class CompanionStore: ObservableObject {
         sessionSelection = SessionSelectionStore(defaults: defaults)
         bodyAreaPreferences = BodyAreaPreferences(defaults: defaults)
         self.cadencePreferences = cadencePreferences
+        pauseHistory = PauseHistoryStore(defaults: defaults)
+        self.stateStore = stateStore
         self.testingIntervalOverride = testingIntervalOverride
         self.activitySignalProvider = activitySignalProvider
         self.speaker = speaker ?? GuideSpeaker()
         self.nowProvider = nowProvider
         self.postponementScheduler = postponementScheduler
+        let initialNow = nowProvider()
         activeUseTracker = ActiveUseTracker(
             activeInterval: workInterval,
             idleThreshold: idleThreshold,
-            startedAt: nowProvider()
+            startedAt: initialNow
         )
         selectedAreas = bodyAreaPreferences.selectedAreas
         selectedCadence = initialCadence
         routine = BreakRoutine.fallback
         nextCheckInRemainingSeconds = workInterval
         mode = bodyAreaPreferences.shouldPresentFirstRunSetup ? .setup : .idle
+        restorePersistedState(at: initialNow)
 
         startClock()
     }
@@ -130,10 +139,50 @@ final class CompanionStore: ObservableObject {
     }
 
     func offerBreakNow() {
+        if mode == .checkIn, isCheckInCollapsed {
+            restoreCheckIn()
+            return
+        }
         showCheckIn(at: nowProvider())
     }
 
+    /// Checkpoints live timer/session state outside the replaceable app bundle so a
+    /// graceful quit for an update can resume the same user session.
+    func persistState() {
+        guard let stateStore else { return }
+        let persistedMode: PersistedCompanionMode
+        switch mode {
+        case .idle, .setup, .configuration: persistedMode = .idle
+        case .checkIn: persistedMode = .checkIn
+        case .routine: persistedMode = .routine
+        case .complete: persistedMode = .complete
+        }
+        stateStore.save(PersistedCompanionState(
+            mode: persistedMode,
+            activeUse: activeUseTracker.persistenceState,
+            scheduledCheckInStartedAt: scheduledCheckIn?.startedAt,
+            scheduledCheckInDueAt: scheduledCheckIn?.dueAt,
+            routineMoveIDs: routine.moveIDs,
+            stepIndex: stepIndex,
+            elapsedInStep: elapsedInStep,
+            isPaused: isPaused,
+            isCheckInCollapsed: isCheckInCollapsed
+        ))
+    }
+
     var canOpenAreaConfiguration: Bool { mode == .idle }
+
+    func collapseCheckIn() {
+        guard mode == .checkIn, statusText == nil else { return }
+        isCheckInCollapsed = true
+        notifySizeChange()
+    }
+
+    func restoreCheckIn() {
+        guard mode == .checkIn, isCheckInCollapsed else { return }
+        isCheckInCollapsed = false
+        notifySizeChange()
+    }
 
     var offersBalancedChoice: Bool { mode == .setup || mode == .configuration }
 
@@ -218,6 +267,7 @@ final class CompanionStore: ObservableObject {
 
     func startRoutine(at date: Date, activitySignal: LocalActivitySignal) {
         cancelCompletionAutoDismiss()
+        isCheckInCollapsed = false
         mode = .routine
         stepIndex = 0
         elapsedInStep = 0
@@ -231,6 +281,7 @@ final class CompanionStore: ObservableObject {
 
     func postpone(minutes: Int) {
         let now = nowProvider()
+        isCheckInCollapsed = false
         scheduledCheckIn = ScheduledCheckInWindow(
             startedAt: now,
             dueAt: now.addingTimeInterval(TimeInterval(minutes * 60))
@@ -239,11 +290,13 @@ final class CompanionStore: ObservableObject {
         updateCheckInProgress(at: now)
         statusText = minutes == 60 ? "I’ll check back in an hour." : "I’ll check back in \(minutes) minutes."
         activityRecoveryExplanation = nil
+        persistState()
         returnToIdle(after: 1.5)
     }
 
     func postponeUntilTomorrow() {
         let now = nowProvider()
+        isCheckInCollapsed = false
         let dueAt = Calendar.current.date(byAdding: .day, value: 1, to: now)
             ?? now.addingTimeInterval(24 * 60 * 60)
         scheduledCheckIn = ScheduledCheckInWindow(startedAt: now, dueAt: dueAt)
@@ -251,6 +304,7 @@ final class CompanionStore: ObservableObject {
         updateCheckInProgress(at: now)
         statusText = "See you tomorrow."
         activityRecoveryExplanation = nil
+        persistState()
         returnToIdle(after: 1.5)
     }
 
@@ -269,6 +323,7 @@ final class CompanionStore: ObservableObject {
         guard mode == .routine else { return }
         noteCompanionInteraction()
         isPaused.toggle()
+        persistState()
         if isPaused { speaker.stop() } else { speaker.speak(currentStep.spokenInstruction) }
     }
 
@@ -347,6 +402,13 @@ final class CompanionStore: ObservableObject {
     }
 
     private func tick(at now: Date, userIsActive: Bool) {
+        defer { persistState() }
+
+        if mode == .checkIn {
+            updateLastCompletedPauseContext(at: now)
+            return
+        }
+
         if mode == .routine {
             if evaluateRoutineActivity(signal: activitySignalProvider(), at: now) == .resumedWork {
                 return
@@ -413,6 +475,8 @@ final class CompanionStore: ObservableObject {
         routine = suggestion
         statusText = nil
         self.activityRecoveryExplanation = activityRecoveryExplanation
+        isCheckInCollapsed = false
+        updateLastCompletedPauseContext(at: date)
         mode = .checkIn
         notifySizeChange()
         // Someone who just went back to work should not be spoken to or have the
@@ -439,6 +503,7 @@ final class CompanionStore: ObservableObject {
         activeUseTracker.reset(at: date)
         scheduledCheckIn = nil
         isPaused = false
+        isCheckInCollapsed = false
         stepIndex = 0
         elapsedInStep = 0
         statusText = nil
@@ -458,6 +523,9 @@ final class CompanionStore: ObservableObject {
             sessionSelection.clearPendingSession()
         }
         let now = nowProvider()
+        if countAsCompleted {
+            pauseHistory.recordCompletedPause(at: now)
+        }
         mode = .complete
         activeUseTracker.reset(at: now)
         scheduledCheckIn = nil
@@ -498,6 +566,7 @@ final class CompanionStore: ObservableObject {
 
     private func transitionToIdle() {
         guard mode == .checkIn else { return }
+        isCheckInCollapsed = false
         mode = .idle
         statusText = nil
         activityRecoveryExplanation = nil
@@ -505,7 +574,81 @@ final class CompanionStore: ObservableObject {
     }
 
     private func notifySizeChange() {
+        persistState()
         onSizeChange?(mode)
+    }
+
+    private func restorePersistedState(at now: Date) {
+        guard let state = stateStore?.load(),
+              !bodyAreaPreferences.shouldPresentFirstRunSetup else { return }
+
+        activeUseTracker = ActiveUseTracker(
+            activeInterval: workInterval,
+            idleThreshold: idleThreshold,
+            startedAt: now,
+            persistenceState: state.activeUse
+        )
+        if let startedAt = state.scheduledCheckInStartedAt,
+           let dueAt = state.scheduledCheckInDueAt,
+           startedAt <= dueAt,
+           startedAt.timeIntervalSinceReferenceDate.isFinite,
+           dueAt.timeIntervalSinceReferenceDate.isFinite {
+            scheduledCheckIn = ScheduledCheckInWindow(startedAt: startedAt, dueAt: dueAt)
+        }
+
+        guard let persistedRoutine = routineFromPersistedMoveIDs(state.routineMoveIDs) else {
+            updateCheckInProgress(at: now)
+            return
+        }
+        routine = persistedRoutine
+
+        switch state.mode {
+        case .idle:
+            mode = .idle
+        case .checkIn where scheduledCheckIn != nil:
+            mode = .idle
+            isCheckInCollapsed = false
+        case .checkIn:
+            mode = .checkIn
+            isCheckInCollapsed = state.isCheckInCollapsed
+            updateLastCompletedPauseContext(at: now)
+        case .routine:
+            guard state.stepIndex >= 0,
+                  state.stepIndex < routine.steps.count,
+                  state.elapsedInStep >= 0,
+                  state.elapsedInStep < routine.steps[state.stepIndex].duration else {
+                mode = .idle
+                updateCheckInProgress(at: now)
+                return
+            }
+            mode = .routine
+            stepIndex = state.stepIndex
+            elapsedInStep = state.elapsedInStep
+            isPaused = state.isPaused
+            routineActivityDetector.start(at: now, signal: activitySignalProvider())
+        case .complete:
+            mode = .complete
+            scheduleCompletionAutoDismiss()
+        }
+        updateCheckInProgress(at: now)
+    }
+
+    private func routineFromPersistedMoveIDs(_ moveIDs: [String]) -> BreakRoutine? {
+        guard moveIDs.count == SessionComposer.sessionMoveCount,
+              Set(moveIDs).count == moveIDs.count else { return nil }
+        let movesByID = Dictionary(uniqueKeysWithValues: MoveLibrary.all.map { ($0.id, $0) })
+        let moves = moveIDs.compactMap { movesByID[$0] }
+        guard moves.count == moveIDs.count else { return nil }
+        return BreakRoutine.composed(from: moves, selectedAreas: selectedAreas)
+    }
+
+    private func updateLastCompletedPauseContext(at now: Date) {
+        let context = pauseHistory.lastCompletedPause(beforeOrAt: now).flatMap {
+            PauseRelativeTimeFormatter.string(for: $0, relativeTo: now)
+        }
+        if lastCompletedPauseContext != context {
+            lastCompletedPauseContext = context
+        }
     }
 
     private func updateCheckInProgress(at now: Date) {

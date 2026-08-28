@@ -1,13 +1,23 @@
 import AppKit
 import SwiftUI
 
-private final class CompanionPanel: NSPanel {
+final class CompanionPanel: NSPanel {
     override var canBecomeKey: Bool { true }
+
+    override init(
+        contentRect: NSRect,
+        styleMask: NSWindow.StyleMask,
+        backing: NSWindow.BackingStoreType,
+        defer flag: Bool
+    ) {
+        super.init(contentRect: contentRect, styleMask: styleMask, backing: backing, defer: flag)
+        isMovableByWindowBackground = true
+    }
 }
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, NSMenuDelegate, NSWindowDelegate {
-    private let store = CompanionStore()
+    private let store = CompanionStore(stateStore: CompanionStateStore())
     private var panel: NSPanel?
     private var statusItem: NSStatusItem?
     private var updateMenuItem: NSMenuItem?
@@ -39,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        store.persistState()
         if let keyMonitor {
             NSEvent.removeMonitor(keyMonitor)
         }
@@ -55,7 +66,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
-        panel.isMovableByWindowBackground = false
+        // AppKit moves the panel from its non-control background. SwiftUI controls,
+        // links, text selection, and accessibility actions retain their own hit testing.
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         panel.contentView = NSHostingView(rootView: CompanionView(store: store))
@@ -262,6 +274,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         frame.origin.x = min(max(frame.origin.x, visible.minX + 12), visible.maxX - newSize.width - 12)
         frame.origin.y = min(max(frame.origin.y, visible.minY + 12), visible.maxY - newSize.height - 12)
         panel.setFrame(frame, display: true, animate: true)
+        if mode == .checkIn, store.isCheckInCollapsed {
+            panel.orderFrontRegardless()
+            if let previouslyActiveApplication {
+                previouslyActiveApplication.activate(options: [])
+                self.previouslyActiveApplication = nil
+            }
+            return
+        }
+
         switch mode {
         case .complete, .setup, .configuration:
             let frontmost = NSWorkspace.shared.frontmostApplication
@@ -286,6 +307,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         switch mode {
         case .idle: return NSSize(width: 92, height: 92)
         case .setup, .configuration: return fittedSize(width: 370, minimumHeight: 480)
+        case .checkIn where store.isCheckInCollapsed: return size(for: .idle)
         case .checkIn: return fittedSize(width: 370, minimumHeight: 300)
         case .routine: return fittedSize(width: 370, minimumHeight: 390)
         case .complete: return fittedSize(width: 300, minimumHeight: 270)

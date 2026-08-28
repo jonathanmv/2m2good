@@ -21,7 +21,11 @@ struct CompanionView: View {
             case .setup, .configuration:
                 areaConfigurationView
             case .checkIn:
-                checkInView
+                if store.isCheckInCollapsed {
+                    collapsedCheckInView
+                } else {
+                    checkInView
+                }
             case .routine:
                 routineView
             case .complete:
@@ -186,6 +190,14 @@ struct CompanionView: View {
                 Spacer(minLength: 0)
             }
 
+            if let context = store.lastCompletedPauseContext {
+                Text("Last pause taken — \(context)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel("Last pause taken — \(context)")
+            }
+
             if let explanation = store.activityRecoveryExplanation {
                 Text(explanation)
                     .font(.system(size: 14, weight: .medium))
@@ -216,7 +228,33 @@ struct CompanionView: View {
             }
             .buttonStyle(QuietButtonStyle())
 
+            Button(PauseScreenControl.collapse.title, action: store.collapseCheckIn)
+                .buttonStyle(QuietButtonStyle())
+                .keyboardShortcut(.cancelAction)
+                .accessibilityLabel(PauseScreenControl.collapse.accessibilityLabel)
+                .accessibilityHint(PauseScreenControl.collapse.accessibilityHint)
         }
+    }
+
+    private var collapsedCheckInView: some View {
+        CompanionOrb(
+            motion: .breathe,
+            warmth: 0.9,
+            active: true,
+            progressColor: BreakProgress.color(at: store.checkInProgress)
+        )
+            .frame(width: 58, height: 58)
+            .padding(10)
+            .overlay {
+                OrbPointerInteraction(onTap: store.restoreCheckIn)
+            }
+        .help("Pause waiting — click to show choices")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(PauseScreenControl.restore.accessibilityLabel)
+        .accessibilityValue(PauseScreenControl.restore.accessibilityValue ?? "")
+        .accessibilityHint(PauseScreenControl.restore.accessibilityHint)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { store.restoreCheckIn() }
     }
 
     private var routineView: some View {
