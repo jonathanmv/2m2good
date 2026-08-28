@@ -62,29 +62,28 @@ timer/session checkpoints and pause history stay in the invoking user's
 Application Support/preferences data, outside the replaceable bundle. Its
 optional update check sends only the documented GitHub request.
 
-## v0.1.4 active-session reminders and pause controls
+## v0.1.5 reliable offers and pending state
 
-The next developer-preview release is **v0.1.4 (build 5)**. It brings the
-already-merged break-trigger and pause-screen fixes to installed users:
+The next developer-preview release is **v0.1.5 (build 6)**. It brings the
+merged pending-offer visibility and orb-color fixes to installed users:
 
-- Break reminders follow active keyboard or mouse use, while idle time and
-  sleep do not advance the reminder. A pause can also be offered immediately
-  by clicking the orb or choosing **Offer a break now** from the menu bar.
-- **Settings…** remains available from the orb, an undecided pause offer, a
-  routine, and the completion screen, so the pause rhythm and supported areas
-  can be changed without losing the current state or offer.
-- A pause prompt shows brief context about the last completed pause, or
-  **Last pause taken — none yet** when there is no completed history. It does
-  not add a browsable history.
-- The top-right chevron-up control (or Escape) collapses an undecided prompt
-  without choosing a response; clicking the orb or choosing **Show pause
-  choices** restores the pause choices. Both the full prompt and collapsed
-  pending orb use a warm due color.
-- The one-second active-use clock is installed after normal app launch and
-  remains alive through relaunch, update handoff, Settings, and panel resizing.
-  Timer progress and an active pause session are retained in local user data,
-  outside the replaceable app bundle, so a normal relaunch or update handoff
-  can resume safely without discarding the current session.
+- After enough active keyboard or mouse use, a pause offer appears reliably
+  with the full **Start**, **Later**, and **Tomorrow** choices. Idle time and
+  sleep do not advance the reminder, and **Offer a break now** provides the
+  same clear offer on demand.
+- A pending offer remains clearly visible while it awaits a decision. If the
+  choices are collapsed, a warm due-colored orb keeps that pending state
+  apparent; clicking the orb or choosing **Show pause choices** restores the
+  full choices.
+- **Settings…** remains actionable from the orb, a pending offer, a routine,
+  and the completion screen, so the pause rhythm and supported areas can be
+  changed without losing the current state or offer.
+- A small, styled chevron-up collapse control (or Escape) postpones the choice
+  without selecting a response. A pause prompt also shows brief context about
+  the last completed pause, or **Last pause taken — none yet** when there is no
+  completed history; it does not add a browsable history.
+- Relaunches and update handoff preserve an in-progress timer or active pause
+  session, so an update does not discard the current session.
 - The one-line installer updates an existing installation through the same
   verified replacement flow: it asks a running app to quit gracefully, retains
   the previous bundle for rollback, replaces the app, and relaunches it while

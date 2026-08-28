@@ -38,8 +38,8 @@ final class BreakCompanionTests: XCTestCase {
             patch: currentVersion.patch,
             prerelease: [.text("self-check")]
         )
-        XCTAssertEqual(currentVersion.description, "0.1.4")
-        XCTAssertEqual(ProductIdentity.buildNumber, "5")
+        XCTAssertEqual(currentVersion.description, "0.1.5")
+        XCTAssertEqual(ProductIdentity.buildNumber, "6")
         XCTAssertEqual(SemanticVersion(tag: "v\(currentVersion)"), currentVersion)
         XCTAssertGreaterThan(nextVersion, currentVersion)
         XCTAssertLessThan(sameCorePrerelease, sameCoreStable)
