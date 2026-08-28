@@ -516,6 +516,253 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertFalse(store.isCheckInCollapsed)
     }
 
+    @MainActor
+    func testCollapsedPendingOfferRepeatsEveryFiveMinutesWithTheSameDecision() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let start = referenceDate(7_000)
+        var now = start
+        let speaker = RecordingSpeaker()
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults,
+            speaker: speaker,
+            nowProvider: { now }
+        )
+        store.continueWithBalancedDefaults()
+        store.offerBreakNow()
+        let offeredRoutine = store.routine
+        let progressAfterOffer = store.checkInProgress
+        let remainingAfterOffer = store.nextCheckInRemainingSeconds
+        XCTAssertEqual(speaker.spoken, [CompanionStore.checkInPrompt])
+
+        now = start.addingTimeInterval(60)
+        store.collapseCheckIn()
+        store.tickForTesting(
+            at: now.addingTimeInterval(CompanionStore.pendingOfferReminderInterval - 1),
+            userIsActive: false
+        )
+        XCTAssertTrue(store.isCheckInCollapsed, "the collapsed orb stays collapsed until its five-minute reminder")
+        XCTAssertEqual(store.routine, offeredRoutine)
+
+        store.tickForTesting(
+            at: now.addingTimeInterval(CompanionStore.pendingOfferReminderInterval),
+            userIsActive: false
+        )
+        XCTAssertEqual(store.mode, .checkIn)
+        XCTAssertFalse(store.isCheckInCollapsed, "the first reminder must restore the existing pause choices")
+        XCTAssertEqual(store.routine, offeredRoutine)
+        XCTAssertEqual(store.checkInProgress, progressAfterOffer)
+        XCTAssertEqual(store.nextCheckInRemainingSeconds, remainingAfterOffer)
+        XCTAssertEqual(speaker.spoken, [CompanionStore.checkInPrompt, CompanionStore.checkInPrompt])
+
+        now = now.addingTimeInterval(CompanionStore.pendingOfferReminderInterval)
+        store.collapseCheckIn()
+        store.tickForTesting(
+            at: now.addingTimeInterval(CompanionStore.pendingOfferReminderInterval),
+            userIsActive: false
+        )
+        XCTAssertEqual(store.mode, .checkIn)
+        XCTAssertFalse(store.isCheckInCollapsed, "a second collapse must schedule another five-minute reminder")
+        XCTAssertEqual(store.routine, offeredRoutine)
+        XCTAssertEqual(speaker.spoken.count, 3)
+    }
+
+    @MainActor
+    func testVisiblePendingOfferReannouncesWithoutDuplicatingItsState() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let start = referenceDate(7_500)
+        let speaker = RecordingSpeaker()
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults,
+            speaker: speaker,
+            nowProvider: { start }
+        )
+        store.continueWithBalancedDefaults()
+        var resizeEvents: [CompanionStore.Mode] = []
+        store.onSizeChange = { resizeEvents.append($0) }
+        store.offerBreakNow()
+        let offeredRoutine = store.routine
+        let shownIDs = defaults.stringArray(forKey: "session.recentShownMoveIDs")
+
+        store.tickForTesting(
+            at: start.addingTimeInterval(CompanionStore.pendingOfferReminderInterval),
+            userIsActive: false
+        )
+
+        XCTAssertEqual(store.mode, .checkIn)
+        XCTAssertFalse(store.isCheckInCollapsed)
+        XCTAssertEqual(store.routine, offeredRoutine)
+        XCTAssertEqual(defaults.stringArray(forKey: "session.recentShownMoveIDs"), shownIDs)
+        XCTAssertEqual(resizeEvents, [.checkIn], "a visible reminder must not create a second presentation")
+        XCTAssertEqual(speaker.spoken.count, 2, "a visible reminder should reannounce the existing prompt once")
+
+        store.tickForTesting(
+            at: start.addingTimeInterval(CompanionStore.pendingOfferReminderInterval + 1),
+            userIsActive: false
+        )
+        XCTAssertEqual(speaker.spoken.count, 2, "one reminder deadline must not fire in a tight loop")
+    }
+
+    @MainActor
+    func testExplicitStartLaterAndTomorrowStopPendingOfferReminders() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let start = referenceDate(8_000)
+        var now = start
+        let scheduler = ManualDelayedActionScheduler()
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults,
+            activitySignalProvider: {
+                LocalActivitySignal(keyboardIdle: 10_000, pointerIdle: 10_000)
+            },
+            speaker: RecordingSpeaker(),
+            nowProvider: { now },
+            postponementScheduler: scheduler
+        )
+        store.continueWithBalancedDefaults()
+
+        store.offerBreakNow()
+        store.collapseCheckIn()
+        store.startRoutine(at: now, activitySignal: activitySignal(10_000, 10_000))
+        store.tickForTesting(
+            at: start.addingTimeInterval(CompanionStore.pendingOfferReminderInterval),
+            userIsActive: false
+        )
+        XCTAssertEqual(store.mode, .routine, "Start must stop the pending reminder cadence")
+        store.endRoutine()
+        store.dismissCompletion()
+
+        now = start.addingTimeInterval(1_000)
+        store.offerBreakNow()
+        store.collapseCheckIn()
+        store.postpone(minutes: 60)
+        store.tickForTesting(at: now.addingTimeInterval(CompanionStore.pendingOfferReminderInterval), userIsActive: false)
+        XCTAssertEqual(store.mode, .checkIn, "Later's confirmation should remain on the existing path")
+        scheduler.runPendingAction()
+        XCTAssertEqual(store.mode, .idle)
+        store.tickForTesting(at: now.addingTimeInterval(CompanionStore.pendingOfferReminderInterval * 2), userIsActive: false)
+        XCTAssertEqual(store.mode, .idle, "Later must stop repeat reminders after returning to the orb")
+
+        now = start.addingTimeInterval(2_000)
+        store.offerBreakNow()
+        store.collapseCheckIn()
+        store.postponeUntilTomorrow()
+        store.tickForTesting(at: now.addingTimeInterval(CompanionStore.pendingOfferReminderInterval), userIsActive: false)
+        XCTAssertEqual(store.mode, .checkIn, "Tomorrow's confirmation should remain on the existing path")
+        scheduler.runPendingAction()
+        XCTAssertEqual(store.mode, .idle)
+        store.tickForTesting(at: now.addingTimeInterval(CompanionStore.pendingOfferReminderInterval * 2), userIsActive: false)
+        XCTAssertEqual(store.mode, .idle, "Tomorrow must stop repeat reminders after returning to the orb")
+    }
+
+    @MainActor
+    func testPendingOfferReminderSurvivesRelaunchAndCoalescesAnOverdueDeadline() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let stateURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("2m2better-reminder-state-\(UUID().uuidString)")
+        let stateStore = CompanionStateStore(fileURL: stateURL)
+        defer { try? FileManager.default.removeItem(at: stateURL) }
+
+        let start = referenceDate(9_000)
+        var now = start
+        let first = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults,
+            speaker: RecordingSpeaker(),
+            nowProvider: { now },
+            stateStore: stateStore
+        )
+        first.continueWithBalancedDefaults()
+        first.offerBreakNow()
+        let offeredRoutine = first.routine
+        first.collapseCheckIn()
+
+        now = start.addingTimeInterval(CompanionStore.pendingOfferReminderInterval - 1)
+        let restarted = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults,
+            speaker: RecordingSpeaker(),
+            nowProvider: { now },
+            stateStore: stateStore
+        )
+        restarted.continueWithBalancedDefaults()
+        XCTAssertEqual(restarted.mode, .checkIn)
+        XCTAssertTrue(restarted.isCheckInCollapsed)
+        XCTAssertEqual(restarted.routine, offeredRoutine)
+
+        restarted.tickForTesting(at: start.addingTimeInterval(CompanionStore.pendingOfferReminderInterval), userIsActive: false)
+        XCTAssertEqual(restarted.mode, .checkIn)
+        XCTAssertFalse(restarted.isCheckInCollapsed)
+        XCTAssertEqual(restarted.routine, offeredRoutine)
+
+        now = start.addingTimeInterval(3 * CompanionStore.pendingOfferReminderInterval)
+        let overdueSpeaker = RecordingSpeaker()
+        let overdue = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults,
+            speaker: overdueSpeaker,
+            nowProvider: { now },
+            stateStore: stateStore
+        )
+        overdue.continueWithBalancedDefaults()
+        overdue.tickForTesting(at: now, userIsActive: false)
+        XCTAssertEqual(overdue.mode, .checkIn)
+        XCTAssertEqual(overdueSpeaker.spoken.count, 1, "an overdue relaunch reminder should be delivered once")
+        overdue.tickForTesting(at: now, userIsActive: false)
+        XCTAssertEqual(overdueSpeaker.spoken.count, 1, "handling an overdue deadline must move it forward five minutes")
+    }
+
+    @MainActor
+    func testSettingsDoNotDiscardOrAccelerateAPendingReminder() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let start = referenceDate(9_500)
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults,
+            speaker: RecordingSpeaker(),
+            nowProvider: { start }
+        )
+        store.continueWithBalancedDefaults()
+        store.offerBreakNow()
+        let offeredRoutine = store.routine
+        let progress = store.checkInProgress
+        let remaining = store.nextCheckInRemainingSeconds
+        store.collapseCheckIn()
+        store.openAreaConfiguration()
+        store.tickForTesting(at: start.addingTimeInterval(CompanionStore.pendingOfferReminderInterval), userIsActive: false)
+        XCTAssertEqual(store.mode, .configuration, "Settings must not present a pending reminder over the settings surface")
+
+        store.cancelAreaConfiguration()
+        XCTAssertEqual(store.mode, .checkIn)
+        XCTAssertTrue(store.isCheckInCollapsed)
+        XCTAssertEqual(store.checkInProgress, progress)
+        XCTAssertEqual(store.nextCheckInRemainingSeconds, remaining)
+        store.tickForTesting(at: start.addingTimeInterval(CompanionStore.pendingOfferReminderInterval), userIsActive: false)
+        XCTAssertEqual(store.mode, .checkIn)
+        XCTAssertFalse(store.isCheckInCollapsed)
+        XCTAssertEqual(store.routine, offeredRoutine)
+    }
+
     func testEnterDismissesOnlyTheVisibleCompletion() {
         XCTAssertTrue(
             CompletionDismissalPolicy.shouldDismiss(

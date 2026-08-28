@@ -44,7 +44,7 @@ enum SelfCheck {
         checkActivityDetectionAndRecovery(&failures)
 
         if failures.isEmpty {
-            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, concise update prompt states and recovery actions, standing session composition, cadence settings, body-area selection, first-run and menu-bar configuration, legacy migration, privacy-safe diagnostics, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, durable pause history and relative context, honest empty pause context, timer/session relaunch checkpoints, settings-safe check-in restoration, chevron collapse-and-restore behavior, spoken movement guidance, completion dismissal, progress color, keyboard and mouse activity signals, pointer movement, routine activity recovery, and idle-session reset.")
+            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, concise update prompt states and recovery actions, standing session composition, cadence settings, body-area selection, first-run and menu-bar configuration, legacy migration, privacy-safe diagnostics, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, durable pause history and relative context, honest empty pause context, timer/session relaunch checkpoints, settings-safe check-in restoration, five-minute pending-offer reminders, chevron collapse-and-restore behavior, spoken movement guidance, completion dismissal, progress color, keyboard and mouse activity signals, pointer movement, routine activity recovery, and idle-session reset.")
             return true
         }
 
@@ -523,11 +523,31 @@ enum SelfCheck {
                     failures.append("a fresh install should show an honest empty pause context")
                 }
                 let remaining = store.nextCheckInRemainingSeconds
+                let offeredRoutine = store.routine
                 store.collapseCheckIn()
                 if store.mode != .checkIn
                     || !store.isCheckInCollapsed
                     || store.nextCheckInRemainingSeconds != remaining {
                     failures.append("hiding a check-in should preserve its decision and timer")
+                }
+                store.tickForTesting(
+                    at: now.addingTimeInterval(CompanionStore.pendingOfferReminderInterval),
+                    userIsActive: false
+                )
+                if store.mode != .checkIn
+                    || store.isCheckInCollapsed
+                    || store.routine != offeredRoutine
+                    || store.nextCheckInRemainingSeconds != remaining {
+                    failures.append("a collapsed check-in should re-present the same choice after five minutes")
+                }
+                now = now.addingTimeInterval(CompanionStore.pendingOfferReminderInterval)
+                store.collapseCheckIn()
+                store.tickForTesting(
+                    at: now.addingTimeInterval(CompanionStore.pendingOfferReminderInterval),
+                    userIsActive: false
+                )
+                if store.mode != .checkIn || store.isCheckInCollapsed || store.routine != offeredRoutine {
+                    failures.append("a pending check-in should repeat after each collapse")
                 }
                 store.restoreCheckIn()
                 store.startRoutine(at: now, activitySignal: signal)

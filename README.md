@@ -6,7 +6,7 @@ A deliberately small, local macOS break companion. After 60 minutes of active ke
 
 - A small floating orb plus a menu-bar fallback; no dashboard, browsable pause history, streaks, or account.
 - Active-use timing that pauses while the Mac is idle and starts a fresh interval when activity returns after at least the idle threshold; delayed timer callbacks and sleep gaps never count as work.
-- Warm check-ins with **Start**, **Later** (one hour), and **Tomorrow**, plus a small chevron-up collapse control when the choice needs to wait without changing.
+- Warm check-ins with **Start**, **Later** (one hour), and **Tomorrow**, plus a small chevron-up collapse control when the choice needs to wait without changing. An unhandled offer reappears five minutes after it is collapsed and continues every five minutes until the user chooses a response.
 - A subtle durable local context line shows the last completed pause with compact relative wording, or **Last pause taken — none yet** on a fresh install.
 - Click-only check-in responses: **Start**, **Later** (one hour), and **Tomorrow**, with keyboard-accessible controls.
 - A library of gentle, standing-compatible desk-break movements. Each offered session combines six different 20-second movements into a fresh two-minute reset.
@@ -26,7 +26,7 @@ newer or the matching Apple Command Line Tools.
 open ".build/app/2m2better.app"
 ```
 
-The app appears as a small orb near the upper-right of the screen and as a leaf in the menu bar. On a fresh install, a compact setup asks for a pause rhythm and which body areas the standing reset should support; every shipped movement is standing-only, so the reset is presented as a standing one rather than a seated alternative. Click the orb or **Offer a break now** in the menu bar to trigger a break immediately; use the small chevron-up control (or Escape) to return to the orb without choosing a response, then click the orb or use **Show pause choices** again to restore the choices. A pending offer is shown in a warm due color in both its full and collapsed presentations. The pause window can be dragged from its non-control background like a normal desktop window. Use **Settings…** there to review or change the selection; it remains actionable from the orb, an undecided offer, a routine, or the completion screen without discarding that state.
+The app appears as a small orb near the upper-right of the screen and as a leaf in the menu bar. On a fresh install, a compact setup asks for a pause rhythm and which body areas the standing reset should support; every shipped movement is standing-only, so the reset is presented as a standing one rather than a seated alternative. Click the orb or **Offer a break now** in the menu bar to trigger a break immediately; use the small chevron-up control (or Escape) to return to the orb without choosing a response, then click the orb or use **Show pause choices** again to restore the choices. If the offer remains unhandled, the same choices reappear five minutes after collapse and every five minutes thereafter; restoring or interacting with the orb does not dismiss it. **Start**, **Later**, or **Tomorrow** stops those repeat reminders. A pending offer is shown in a warm due color in both its full and collapsed presentations. The pause window can be dragged from its non-control background like a normal desktop window. Use **Settings…** there to review or change the selection; it remains actionable from the orb, an undecided offer, a routine, or the completion screen without discarding that state.
 
 The menu also includes **Settings…**, which changes the pause rhythm and body areas, and **Copy diagnostics**, which places a coarse local status report on the clipboard. **About 2m2better…** shows the shared release identity, and **Check for Updates…** checks GitHub Releases only. When a newer release is available, a short prompt offers **Install and Relaunch** or **Later**. Choosing install downloads and verifies in the background, shows brief progress, then hands off to the installer without a second technical confirmation. Installation is never silent. The helper waits for this app to exit, replaces only `~/Applications/2m2better.app`, retains a rollback copy, preserves preferences, and asks macOS to relaunch. Recoverable errors offer **Try Again** and write technical details to the update log. See [`docs/RELEASES.md`](docs/RELEASES.md) for the updater behavior, trust limitation, release asset contract, icon packaging, and validation.
 
@@ -69,7 +69,7 @@ checksum requirements, and updater compatibility are documented in
 
 The check-in is click-only: **Start**, **Later**, and **Tomorrow** remain visible and keyboard-accessible. The small chevron-up control (or Escape) collapses an undecided offer without choosing a response, so no audio-input or command-recognition permission is needed. During a routine, spoken movement guidance complements the on-screen instructions; the app does not listen for responses.
 
-The app does not need Accessibility permission. It reads only macOS’s aggregate local time since the last keyboard, mouse movement (including drags), mouse-button, or scroll event, not the keys pressed or the content of events. Live timer and session checkpoints are kept under `~/Library/Application Support/2m2better`, outside the replaceable app bundle.
+The app does not need Accessibility permission. It reads only macOS’s aggregate local time since the last keyboard, mouse movement (including drags), mouse-button, or scroll event, not the keys pressed or the content of events. Live timer, pending-offer reminder, and session checkpoints are kept under `~/Library/Application Support/2m2better`, outside the replaceable app bundle. A relaunch preserves an undecided offer and its next reminder; an overdue reminder is delivered once and then moved to the next five-minute deadline.
 
 While a routine is actively guiding, the app polls those same aggregate
 keyboard, mouse movement (including drags), mouse-button, and scroll ages once a
@@ -131,7 +131,10 @@ cadence, the timer resets and the store enters a **pending offer** state. The
 panel then resizes, moves into the current visible screen, orders itself in
 front, and activates so the full **Start**, **Later**, and **Tomorrow** choice is
 unmistakable. Collapsing it leaves that same pending decision in a warm orb;
-clicking the orb restores the choices. A manual **Offer a break now** follows
+clicking the orb restores the choices. If it remains unhandled, a collapsed offer
+returns to the full choices after five minutes and repeats on the same five-minute
+cadence after later collapses. A visible offer is reannounced rather than
+duplicated. A manual **Offer a break now** follows
 the same presentation path, which makes it a useful countercheck when
 investigating an automatic reminder.
 
