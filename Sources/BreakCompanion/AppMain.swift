@@ -3,6 +3,7 @@ import SwiftUI
 
 final class CompanionPanel: NSPanel {
     override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
 
     override init(
         contentRect: NSRect,
@@ -21,11 +22,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
     private var panel: NSPanel?
     private var statusItem: NSStatusItem?
     private var updateMenuItem: NSMenuItem?
+    private var offerMenuItem: NSMenuItem?
     private var aboutWindow: NSWindow?
     private let updateController = UpdateController()
     private lazy var updateFlow = UpdateFlowCoordinator(controller: updateController)
     private var updateDialogWindow: NSWindow?
     private var keyMonitor: Any?
+    private var workspaceObservers: [NSObjectProtocol] = []
     private weak var previouslyActiveApplication: NSRunningApplication?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -37,6 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         }
         updateFlow.checkAutomatically()
         store.onSizeChange = { [weak self] mode in
+            self?.updateMenuState()
             self?.resizePanel(for: mode)
         }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -47,19 +51,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
             ) ? nil : event
         }
         store.startClock()
+        observeSystemBoundaries()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         store.persistState()
+        let workspaceCenter = NSWorkspace.shared.notificationCenter
+        workspaceObservers.forEach { workspaceCenter.removeObserver($0) }
+        workspaceObservers.removeAll()
         if let keyMonitor {
             NSEvent.removeMonitor(keyMonitor)
+        }
+    }
+
+    private func observeSystemBoundaries() {
+        let workspaceCenter = NSWorkspace.shared.notificationCenter
+        let boundaryNotifications: [Notification.Name] = [
+            NSWorkspace.willSleepNotification,
+            NSWorkspace.screensDidSleepNotification,
+            NSWorkspace.sessionDidResignActiveNotification
+        ]
+        workspaceObservers = boundaryNotifications.map { name in
+            workspaceCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.store.noteSystemInactive()
+                }
+            }
         }
     }
 
     private func buildPanel() {
         let panel = CompanionPanel(
             contentRect: NSRect(origin: .zero, size: size(for: store.mode)),
-            styleMask: [.borderless, .nonactivatingPanel],
+            styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
@@ -67,6 +91,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
+        panel.isFloatingPanel = true
+        panel.becomesKeyOnlyIfNeeded = false
         // AppKit moves the panel from its non-control background. SwiftUI controls,
         // links, text selection, and accessibility actions retain their own hit testing.
         panel.hidesOnDeactivate = false
@@ -83,8 +109,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         item.button?.image = NSImage(systemSymbolName: "leaf.fill", accessibilityDescription: ProductIdentity.name)
 
         let menu = NSMenu()
-        menu.addItem(withTitle: "Offer a break now", action: #selector(offerBreak), keyEquivalent: "")
-        menu.addItem(withTitle: ProductIdentity.settingsMenuTitle, action: #selector(configureAreas), keyEquivalent: "")
+        // AppKit's responder-chain auto-validation can disable an accessory app's
+        // private action while a panel is changing state. These are explicit app
+        // actions, so keep them enabled and validate only the update operation below.
+        menu.autoenablesItems = false
+        let offerItem = menu.addItem(withTitle: "Offer a break now", action: #selector(offerBreak), keyEquivalent: "")
+        offerMenuItem = offerItem
+        let settingsItem = menu.addItem(withTitle: ProductIdentity.settingsMenuTitle, action: #selector(configureAreas), keyEquivalent: "")
+        settingsItem.isEnabled = true
         menu.addItem(withTitle: ProductIdentity.diagnosticsMenuTitle, action: #selector(copyDiagnostics), keyEquivalent: "")
         menu.addItem(NSMenuItem.separator())
         menu.addItem(withTitle: ProductIdentity.aboutMenuTitle, action: #selector(showAbout), keyEquivalent: "")
@@ -97,6 +129,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         menu.delegate = self
         item.menu = menu
         statusItem = item
+        updateMenuState()
+    }
+
+    private func updateMenuState() {
+        switch store.mode {
+        case .checkIn where store.statusText != nil:
+            offerMenuItem?.title = "Check-in scheduled"
+        case .checkIn where store.isCheckInCollapsed:
+            offerMenuItem?.title = "Show pause choices"
+        case .checkIn:
+            offerMenuItem?.title = "Pause offer pending"
+        default:
+            offerMenuItem?.title = "Offer a break now"
+        }
+        updateMenuItem?.isEnabled = !updateController.isBusy
     }
 
     @objc private func offerBreak() {
@@ -132,7 +179,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(configureAreas) {
-            return store.canOpenAreaConfiguration
+            // Settings is intentionally actionable from idle, pending, routine,
+            // and completion states. The store preserves the state on return.
+            return true
         }
         if menuItem.action == #selector(checkForUpdates) {
             return !updateController.isBusy
@@ -180,6 +229,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
 
     private func updateFlowDidChange() {
         updateMenuItem?.title = updateController.menuTitle
+        updateMenuState()
         guard updateFlow.shouldPresentDialog else {
             dismissUpdateDialog()
             return
@@ -266,17 +316,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
 
     private func resizePanel(for mode: CompanionStore.Mode) {
         guard let panel else { return }
-        let newSize = size(for: mode)
-        let screen = panel.screen ?? NSScreen.main
+        let screen = screenForPanel(panel)
         let visible = screen?.visibleFrame ?? .zero
+        let requestedSize = size(for: mode, screen: screen)
+        let newSize = visible.isEmpty
+            ? requestedSize
+            : NSSize(
+                width: min(requestedSize.width, max(1, visible.width - 24)),
+                height: min(requestedSize.height, max(1, visible.height - 24))
+            )
         let right = panel.frame.maxX
         let top = panel.frame.maxY
-        var frame = NSRect(x: right - newSize.width, y: top - newSize.height, width: newSize.width, height: newSize.height)
-        frame.origin.x = min(max(frame.origin.x, visible.minX + 12), visible.maxX - newSize.width - 12)
-        frame.origin.y = min(max(frame.origin.y, visible.minY + 12), visible.maxY - newSize.height - 12)
-        panel.setFrame(frame, display: true, animate: true)
+        var frame = NSRect(
+            x: right - newSize.width,
+            y: top - newSize.height,
+            width: newSize.width,
+            height: newSize.height
+        )
+        if !visible.isEmpty {
+            let minimumX = visible.minX + 12
+            let maximumX = max(minimumX, visible.maxX - frame.width - 12)
+            let minimumY = visible.minY + 12
+            let maximumY = max(minimumY, visible.maxY - frame.height - 12)
+            frame.origin.x = min(max(frame.origin.x, minimumX), maximumX)
+            frame.origin.y = min(max(frame.origin.y, minimumY), maximumY)
+        }
+
+        // Set the final frame before ordering the window. Animating this transition
+        // could leave an automatic offer at the old orb frame for a run-loop turn,
+        // which made a real pending offer appear to have been missed.
+        panel.setFrame(frame, display: true, animate: false)
+        panel.orderFrontRegardless()
+
         if mode == .checkIn, store.isCheckInCollapsed {
-            panel.orderFrontRegardless()
             if let previouslyActiveApplication {
                 previouslyActiveApplication.activate(options: [])
                 self.previouslyActiveApplication = nil
@@ -286,21 +358,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
 
         switch mode {
         case .complete, .setup, .configuration:
-            let frontmost = NSWorkspace.shared.frontmostApplication
-            if frontmost?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
-                previouslyActiveApplication = frontmost
-            }
+            rememberFrontmostApplication()
             NSApp.activate(ignoringOtherApps: true)
             panel.makeKeyAndOrderFront(nil)
         case .checkIn where store.activityRecoveryExplanation == nil:
-            let frontmost = NSWorkspace.shared.frontmostApplication
-            if frontmost?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
-                previouslyActiveApplication = frontmost
-            }
+            rememberFrontmostApplication()
             NSApp.activate(ignoringOtherApps: true)
             panel.makeKeyAndOrderFront(nil)
         default:
-            panel.orderFrontRegardless()
             if mode == .idle, let previouslyActiveApplication {
                 previouslyActiveApplication.activate(options: [])
                 self.previouslyActiveApplication = nil
@@ -308,23 +373,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         }
     }
 
-    private func size(for mode: CompanionStore.Mode) -> NSSize {
-        switch mode {
-        case .idle: return NSSize(width: 92, height: 92)
-        case .setup, .configuration: return fittedSize(width: 370, minimumHeight: 480)
-        case .checkIn where store.isCheckInCollapsed: return size(for: .idle)
-        case .checkIn: return fittedSize(width: 370, minimumHeight: 300)
-        case .routine: return fittedSize(width: 370, minimumHeight: 390)
-        case .complete: return fittedSize(width: 300, minimumHeight: 270)
+    private func rememberFrontmostApplication() {
+        let frontmost = NSWorkspace.shared.frontmostApplication
+        if frontmost?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+            previouslyActiveApplication = frontmost
         }
     }
 
-    private func fittedSize(width: CGFloat, minimumHeight: CGFloat) -> NSSize {
+    private func screenForPanel(_ panel: NSPanel) -> NSScreen? {
+        let mouseLocation = NSEvent.mouseLocation
+        return NSScreen.screens.first(where: { $0.visibleFrame.contains(mouseLocation) })
+            ?? panel.screen
+            ?? NSScreen.main
+    }
+
+    private func size(for mode: CompanionStore.Mode, screen: NSScreen? = nil) -> NSSize {
+        switch mode {
+        case .idle: return NSSize(width: 92, height: 92)
+        case .setup, .configuration: return fittedSize(width: 370, minimumHeight: 480, screen: screen)
+        case .checkIn where store.isCheckInCollapsed: return size(for: .idle, screen: screen)
+        case .checkIn:
+            // Keep the offer compact and deterministic. A measured hosting view can
+            // report the window's unconstrained height, leaving a large blank panel
+            // and making the actual top-right control easy to miss.
+            return NSSize(width: 370, height: 330)
+        case .routine: return fittedSize(width: 370, minimumHeight: 390, screen: screen)
+        case .complete: return fittedSize(width: 300, minimumHeight: 270, screen: screen)
+        }
+    }
+
+    private func fittedSize(width: CGFloat, minimumHeight: CGFloat, screen: NSScreen? = nil) -> NSSize {
         let measuring = NSHostingController(
             rootView: CompanionView(store: store).fixedSize(horizontal: false, vertical: true)
         )
         let needed = measuring.sizeThatFits(in: NSSize(width: width, height: 10_000)).height
-        let available = (NSScreen.main?.visibleFrame.height ?? 600) - 44
+        let available = (screen?.visibleFrame.height ?? NSScreen.main?.visibleFrame.height ?? 600) - 44
         return NSSize(width: width, height: min(max(minimumHeight, needed.rounded(.up)), available))
     }
 

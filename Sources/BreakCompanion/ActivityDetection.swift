@@ -180,6 +180,36 @@ struct RoutineActivityDetector {
         companionProtectedUntil = currentEnd.addingTimeInterval(granted)
     }
 
+    /// Settings is a companion surface, not resumed work. Re-baseline the aggregate
+    /// signal when a routine returns from it so the settings visit cannot be mistaken
+    /// for keyboard or pointer activity in the routine's window.
+    mutating func suspendObservation(at date: Date, signal: LocalActivitySignal) {
+        guard startedAt != nil else { return }
+        previousSignal = signal
+        consecutivePointerActivityPolls = 0
+        noteCompanionInteraction(at: date)
+    }
+
+    /// A locked session or sleep is a system boundary, not companion interaction.
+    /// Clear the signal baseline without spending the control-protection budget.
+    mutating func resetObservation(at _: Date, signal: LocalActivitySignal) {
+        guard startedAt != nil else { return }
+        previousSignal = signal
+        companionProtectedUntil = nil
+        consecutivePointerActivityPolls = 0
+    }
+
+    /// Grants the closing click/keystroke a short grace without spending the lifetime budget.
+    mutating func resumeObservation(at date: Date, signal: LocalActivitySignal) {
+        guard startedAt != nil else { return }
+        previousSignal = signal
+        consecutivePointerActivityPolls = 0
+        companionProtectedUntil = max(
+            companionProtectedUntil ?? date,
+            date.addingTimeInterval(RoutineActivityPolicy.companionInteractionTolerance)
+        )
+    }
+
     mutating func decision(
         at date: Date,
         isPaused: Bool,

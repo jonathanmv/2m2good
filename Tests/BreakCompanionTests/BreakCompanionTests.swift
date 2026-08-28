@@ -479,6 +479,43 @@ final class BreakCompanionTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testPendingOfferWarmColorSurvivesCollapseToTheOrb() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "5"],
+            defaults: defaults,
+            speaker: RecordingSpeaker()
+        )
+        store.continueWithBalancedDefaults()
+        store.offerBreakNow()
+        XCTAssertEqual(store.mode, .checkIn)
+
+        // showCheckIn resets progress to zero; pending state, not old progress,
+        // must make both the full offer and its collapsed orb warm.
+        let expandedColor = BreakProgress.color(
+            at: store.checkInProgress,
+            pendingOffer: true
+        )
+        store.collapseCheckIn()
+        XCTAssertTrue(store.isCheckInCollapsed)
+        XCTAssertEqual(store.diagnosticSnapshot().pendingOfferPresentation, .collapsedOrb)
+        let collapsedColor = BreakProgress.color(
+            at: store.checkInProgress,
+            pendingOffer: true
+        )
+
+        XCTAssertEqual(collapsedColor, expandedColor)
+        XCTAssertNotEqual(collapsedColor, BreakProgress.color(at: store.checkInProgress))
+        XCTAssertLessThan(collapsedColor.green, 0.68)
+        store.restoreCheckIn()
+        XCTAssertFalse(store.isCheckInCollapsed)
+    }
+
     func testEnterDismissesOnlyTheVisibleCompletion() {
         XCTAssertTrue(
             CompletionDismissalPolicy.shouldDismiss(
@@ -623,6 +660,33 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertTrue(resumed.didResetAfterIdle)
         XCTAssertEqual(resumed.activeSeconds, 2)
         XCTAssertFalse(resumed.shouldOfferCheckIn)
+    }
+
+    @MainActor
+    func testSystemInactiveBoundaryResetsActiveUseBeforeUnlock() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let start = referenceDate(5_100)
+        let active = activitySignal(0.2, 0.2)
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "5", "BREAK_IDLE_THRESHOLD_SECONDS": "10"],
+            defaults: defaults,
+            activitySignalProvider: { active },
+            speaker: RecordingSpeaker(),
+            nowProvider: { start }
+        )
+        store.continueWithBalancedDefaults()
+        for second in 1...4 {
+            store.tickForTesting(at: start.addingTimeInterval(TimeInterval(second)))
+        }
+        store.noteSystemInactive(at: start.addingTimeInterval(4))
+        store.tickForTesting(at: start.addingTimeInterval(5))
+
+        XCTAssertEqual(store.mode, .idle, "lock or sleep must never complete an active-use interval")
+        XCTAssertEqual(store.nextCheckInRemainingSeconds, 4)
     }
 
     @MainActor
@@ -2199,7 +2263,16 @@ final class BreakCompanionTests: XCTestCase {
         )
 
         store.offerBreakNow()
-        XCTAssertEqual(store.diagnosticSnapshot(activityIsActive: true).activeUsePath, .otherwisePaused)
+        XCTAssertEqual(store.diagnosticSnapshot(activityIsActive: true).activeUsePath, .pendingOffer)
+        XCTAssertEqual(
+            store.diagnosticSnapshot(activityIsActive: true).pendingOfferPresentation,
+            .visibleChoices
+        )
+        XCTAssertTrue(store.diagnosticReport().contains("active-use path: pending offer"))
+        XCTAssertTrue(store.diagnosticReport().contains("offer presentation: visible pause choices"))
+        store.collapseCheckIn()
+        XCTAssertEqual(store.diagnosticSnapshot().pendingOfferPresentation, .collapsedOrb)
+        store.restoreCheckIn()
         store.postpone(minutes: 60)
         scheduler.runPendingAction()
         XCTAssertEqual(store.diagnosticSnapshot(activityIsActive: true).activeUsePath, .scheduled)
@@ -2208,7 +2281,7 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertTrue(report.contains("cadence: Every hour"))
         XCTAssertTrue(report.contains("body areas: balanced mix"))
         XCTAssertTrue(report.contains("mode: idle"))
-        XCTAssertTrue(report.contains("active-use path: scheduled"))
+        XCTAssertTrue(report.contains("active-use path: scheduled check-in"))
         for forbidden in ["keyboardIdle", "pointer", "coordinates", "content", "analytics", "network"] {
             XCTAssertFalse(report.lowercased().contains(forbidden.lowercased()), forbidden)
         }
@@ -2278,7 +2351,7 @@ final class BreakCompanionTests: XCTestCase {
             defaults: defaults
         )
         XCTAssertEqual(store.mode, .setup)
-        XCTAssertFalse(store.canOpenAreaConfiguration)
+        XCTAssertTrue(store.canOpenAreaConfiguration)
         XCTAssertTrue(store.offersBalancedChoice)
 
         store.saveSelectedAreas([.neck])
@@ -2289,7 +2362,7 @@ final class BreakCompanionTests: XCTestCase {
 
         store.openAreaConfiguration()
         XCTAssertEqual(store.mode, .configuration)
-        XCTAssertFalse(store.canOpenAreaConfiguration)
+        XCTAssertTrue(store.canOpenAreaConfiguration)
         XCTAssertTrue(store.offersBalancedChoice)
 
         store.continueWithBalancedDefaults()
@@ -2358,6 +2431,160 @@ final class BreakCompanionTests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsPreserveIdleCreditAndRoutineAndCompletionStates() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let start = referenceDate(32_000)
+        let now = start
+        let idleSignal = activitySignal(10_000, 10_000)
+        let store = CompanionStore(
+            environment: [:],
+            defaults: defaults,
+            activitySignalProvider: { idleSignal },
+            speaker: RecordingSpeaker(),
+            nowProvider: { now }
+        )
+        store.continueWithBalancedDefaults()
+        store.tickForTesting(at: start.addingTimeInterval(1), userIsActive: true)
+        store.tickForTesting(at: start.addingTimeInterval(2), userIsActive: true)
+        XCTAssertEqual(store.nextCheckInRemainingSeconds, Cadence.oneHour.interval - 2)
+
+        store.openAreaConfiguration()
+        XCTAssertEqual(store.mode, .configuration)
+        store.tickForTesting(at: start.addingTimeInterval(100), userIsActive: true)
+        store.saveSettings(cadence: .twentyMinutes, areas: [.neck])
+        XCTAssertEqual(store.mode, .idle)
+        XCTAssertEqual(store.nextCheckInRemainingSeconds, Cadence.twentyMinutes.interval - 2)
+
+        store.offerBreakNow()
+        store.openAreaConfiguration()
+        store.cancelAreaConfiguration()
+        XCTAssertEqual(store.mode, .checkIn)
+        XCTAssertEqual(store.diagnosticSnapshot().activeUsePath, .pendingOffer)
+
+        store.startRoutine(at: now, activitySignal: activitySignal(30, 30))
+        store.openAreaConfiguration()
+        XCTAssertEqual(store.mode, .configuration)
+        store.tickForTesting(at: now.addingTimeInterval(60), userIsActive: true)
+        store.cancelAreaConfiguration()
+        XCTAssertEqual(store.mode, .routine)
+        XCTAssertEqual(store.elapsedInStep, 0, "Settings must not advance a routine step")
+
+        store.openAreaConfiguration()
+        store.saveSettings(cadence: .oneHour, areas: [.shoulders])
+        XCTAssertEqual(store.mode, .routine)
+        XCTAssertEqual(store.selectedAreas, [.shoulders])
+        store.endRoutine()
+        store.dismissCompletion()
+
+        store.offerBreakNow()
+        store.startRoutine(at: now, activitySignal: activitySignal(10_000, 10_000))
+        for second in 1...120 {
+            store.tickForTesting(at: now.addingTimeInterval(TimeInterval(second)), userIsActive: false)
+        }
+        XCTAssertEqual(store.mode, .complete)
+        store.openAreaConfiguration()
+        XCTAssertEqual(store.mode, .configuration)
+        store.cancelAreaConfiguration()
+        XCTAssertEqual(store.mode, .complete)
+    }
+
+    @MainActor
+    func testSettingsVisitLongerThanCompanionToleranceDoesNotCancelRoutineOnReturnButSustainedWorkStillDoes() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let start = referenceDate(40_000)
+        var now = start
+        var signal = activitySignal(50, 50)
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults,
+            activitySignalProvider: { signal },
+            speaker: RecordingSpeaker(),
+            nowProvider: { now }
+        )
+        store.continueWithBalancedDefaults()
+        store.startRoutine(at: start, activitySignal: signal)
+
+        for second in 1...9 {
+            now = start.addingTimeInterval(TimeInterval(second))
+            store.tickForTesting(at: now, userIsActive: false)
+        }
+        XCTAssertEqual(store.mode, .routine)
+        XCTAssertEqual(store.elapsedInStep, 9)
+
+        // Open Settings mid-routine with a fresh click.
+        signal = activitySignal(50, 0.05)
+        now = start.addingTimeInterval(10)
+        store.openAreaConfiguration()
+        XCTAssertEqual(store.mode, .configuration)
+
+        // Stay in Settings well past the 3-second companion-interaction tolerance.
+        now = start.addingTimeInterval(25)
+        signal = activitySignal(50, 12)
+        store.saveSettings(cadence: .twentyMinutes, areas: [.neck])
+        XCTAssertEqual(store.mode, .routine, "Saving settings mid-routine must return to the routine")
+        XCTAssertEqual(store.elapsedInStep, 9, "Settings must not advance the routine step")
+
+        // The very next tick catches the closing interaction's own residual freshness.
+        now = start.addingTimeInterval(26)
+        signal = activitySignal(0.05, 50)
+        store.tickForTesting(at: now, userIsActive: true)
+        XCTAssertEqual(store.mode, .routine, "A settings visit longer than the interaction tolerance must not silently cancel the routine on return")
+        XCTAssertEqual(store.elapsedInStep, 10)
+
+        // Genuine sustained activity after the short return grace must still resume-cancel it.
+        for second in 27...29 {
+            now = start.addingTimeInterval(TimeInterval(second))
+            store.tickForTesting(at: now, userIsActive: true)
+        }
+        XCTAssertEqual(store.mode, .checkIn, "Genuine sustained work after returning from Settings must still be detected")
+    }
+
+    @MainActor
+    func testAutomaticThresholdCrossingRequestsVisiblePendingOfferAndClockCanStartAfterSetup() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let start = referenceDate(33_000)
+        let active = activitySignal(0.2, 0.2)
+        let store = CompanionStore(
+            environment: [
+                "BREAK_INTERVAL_SECONDS": "5",
+                "BREAK_IDLE_THRESHOLD_SECONDS": "10"
+            ],
+            defaults: defaults,
+            activitySignalProvider: { active },
+            speaker: RecordingSpeaker(),
+            nowProvider: { start }
+        )
+        store.continueWithBalancedDefaults()
+        var resizedModes: [CompanionStore.Mode] = []
+        store.onSizeChange = { resizedModes.append($0) }
+        XCTAssertFalse(store.isClockRunning)
+        store.startClock()
+        XCTAssertTrue(store.isClockRunning)
+
+        for second in 1...5 {
+            store.tickForTesting(at: start.addingTimeInterval(TimeInterval(second)))
+        }
+        XCTAssertEqual(store.mode, .checkIn)
+        XCTAssertEqual(resizedModes, [.checkIn])
+        XCTAssertEqual(store.checkInProgress, 0)
+        XCTAssertEqual(store.nextCheckInRemainingSeconds, 5)
+        XCTAssertEqual(store.diagnosticSnapshot().activeUsePath, .pendingOffer)
+        XCTAssertEqual(store.diagnosticSnapshot().pendingOfferPresentation, .visibleChoices)
+    }
+
+    @MainActor
     func testNextRequestsAPanelRefitForTheNewSessionContent() {
         let suiteName = "BreakCompanionTests.\(#function)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -2381,6 +2608,14 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertEqual(resizedModes, [.routine])
 
         store.endRoutine()
+    }
+
+    func testPauseScreenCollapseControlUsesChevronAccessibilityAndEscape() {
+        XCTAssertEqual(PauseScreenControl.collapse.systemImage, "chevron.up")
+        XCTAssertEqual(PauseScreenControl.collapse.title, "Collapse pause screen")
+        XCTAssertFalse(PauseScreenControl.collapse.accessibilityLabel.isEmpty)
+        XCTAssertFalse(PauseScreenControl.collapse.accessibilityHint.isEmpty)
+        XCTAssertNotNil(PauseScreenControl.collapse.keyboardShortcut)
     }
 
     @MainActor
@@ -2466,6 +2701,8 @@ final class BreakCompanionTests: XCTestCase {
             defer: false
         )
         XCTAssertTrue(panel.isMovableByWindowBackground)
+        XCTAssertTrue(panel.canBecomeKey)
+        XCTAssertTrue(panel.canBecomeMain)
     }
 
     func testPointerMovementClassifierKeepsTapDeadZone() {

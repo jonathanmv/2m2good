@@ -154,7 +154,12 @@ final class CompanionStore: ObservableObject {
         switch mode {
         case .idle, .setup: persistedMode = .idle
         case .configuration:
-            persistedMode = configurationReturnMode == .checkIn ? .checkIn : .idle
+            switch configurationReturnMode {
+            case .checkIn: persistedMode = .checkIn
+            case .routine: persistedMode = .routine
+            case .complete: persistedMode = .complete
+            default: persistedMode = .idle
+            }
         case .checkIn: persistedMode = .checkIn
         case .routine: persistedMode = .routine
         case .complete: persistedMode = .complete
@@ -175,11 +180,10 @@ final class CompanionStore: ObservableObject {
         stateStore.save(state)
     }
 
-    /// Settings are available from the idle orb and an undecided check-in. Opening them
-    /// from a check-in keeps that decision alive and returns to it when settings close.
-    var canOpenAreaConfiguration: Bool {
-        mode == .idle || mode == .checkIn
-    }
+    /// Settings never becomes a dead menu item. The action is enabled for every
+    /// running state; opening it from a routine or completion screen returns to that
+    /// state instead of discarding it.
+    var canOpenAreaConfiguration: Bool { true }
 
     /// Starts the one-second active-use clock after the application has installed its
     /// panel and entered its run loop. Keeping timer registration out of init avoids
@@ -191,6 +195,10 @@ final class CompanionStore: ObservableObject {
         }
         self.timer = timer
         RunLoop.main.add(timer, forMode: .common)
+    }
+
+    var isClockRunning: Bool {
+        timer?.isValid == true
     }
 
     func collapseCheckIn() {
@@ -208,46 +216,55 @@ final class CompanionStore: ObservableObject {
     var offersBalancedChoice: Bool { mode == .setup || mode == .configuration }
 
     func openAreaConfiguration() {
-        guard canOpenAreaConfiguration else { return }
-        configurationReturnMode = mode == .checkIn ? .checkIn : nil
-        activeUseTracker.suspend(at: nowProvider())
+        guard mode != .configuration, mode != .setup else { return }
+        let returnMode = mode
+        configurationReturnMode = returnMode
+        let now = nowProvider()
+        switch returnMode {
+        case .idle, .checkIn:
+            // Settings is not active use and must not create a delayed callback delta.
+            activeUseTracker.suspend(at: now)
+        case .routine:
+            // Re-baseline the aggregate signal so the settings visit cannot cancel the
+            // routine when the panel returns.
+            routineActivityDetector.suspendObservation(at: now, signal: activitySignalProvider())
+        case .complete:
+            // The completion timer is resumed when the completion screen returns.
+            cancelCompletionAutoDismiss()
+        case .setup, .configuration:
+            break
+        }
         mode = .configuration
         notifySizeChange()
     }
 
     func saveSettings(cadence: Cadence, areas: Set<BodyArea>) {
         guard !areas.isEmpty else { return }
+        let returnMode = configurationReturnMode
+        let wasConfiguration = mode == .configuration || mode == .setup
         let cadenceChanged = selectedCadence != cadence
+        let now = nowProvider()
         cadencePreferences.save(cadence: cadence)
         bodyAreaPreferences.save(selectedAreas: areas)
         selectedCadence = cadence
         selectedAreas = bodyAreaPreferences.selectedAreas
-        sessionSelection.clearPendingSession()
 
+        if returnMode != .routine {
+            sessionSelection.clearPendingSession()
+        }
+
+        workInterval = testingIntervalOverride ?? cadence.interval
         if cadenceChanged {
-            workInterval = testingIntervalOverride ?? cadence.interval
-            activeUseTracker = ActiveUseTracker(
-                activeInterval: workInterval,
-                idleThreshold: idleThreshold,
-                startedAt: nowProvider()
-            )
-            updateCheckInProgress(at: nowProvider())
+            // Keep any active credit accrued before Settings opened, but never count
+            // time spent editing the setting as active use.
+            activeUseTracker.reconfigure(activeInterval: workInterval, at: now)
+        } else {
+            activeUseTracker.suspend(at: now)
         }
+        updateCheckInProgress(at: now)
 
-        guard offersBalancedChoice else { return }
-        let returnMode = configurationReturnMode
-        configurationReturnMode = nil
-        if returnMode == .checkIn,
-           let suggestion = sessionSelection.suggestion(
-               from: MoveLibrary.all,
-               selectedAreas: selectedAreas
-           ) {
-            // Keep the pending decision, while making its invitation match the
-            // newly selected body areas.
-            routine = suggestion
-        }
-        mode = returnMode ?? .idle
-        notifySizeChange()
+        guard wasConfiguration else { return }
+        restoreFromConfiguration(returnMode, refreshPendingOffer: returnMode == .checkIn)
     }
 
     // Kept as a small compatibility shim for the existing menu/setup path.
@@ -259,38 +276,53 @@ final class CompanionStore: ObservableObject {
         cadencePreferences.save(cadence: selectedCadence)
         bodyAreaPreferences.continueWithBalancedDefaults()
         selectedAreas = []
-        sessionSelection.clearPendingSession()
-        guard offersBalancedChoice else { return }
-        let returnMode = configurationReturnMode
-        configurationReturnMode = nil
-        if returnMode == .checkIn,
-           let suggestion = sessionSelection.suggestion(
-               from: MoveLibrary.all,
-               selectedAreas: selectedAreas
-           ) {
-            routine = suggestion
+        if configurationReturnMode != .routine {
+            sessionSelection.clearPendingSession()
         }
-        mode = returnMode ?? .idle
-        notifySizeChange()
+        guard offersBalancedChoice else { return }
+        restoreFromConfiguration(configurationReturnMode, refreshPendingOffer: configurationReturnMode == .checkIn)
     }
 
     func diagnosticSnapshot(activityIsActive: Bool? = nil) -> CompanionDiagnosticSnapshot {
         let path: ActiveUsePath
+        let presentation: PendingOfferPresentation
         switch mode {
         case .idle where scheduledCheckIn != nil:
             path = .scheduled
+            presentation = .notPending
         case .idle where activityIsActive ?? userIsActive:
             path = .accumulating
+            presentation = .notPending
         case .idle:
             path = .waitingForActivity
-        default:
-            path = .otherwisePaused
+            presentation = .notPending
+        case .checkIn where statusText != nil:
+            path = .scheduled
+            presentation = .notPending
+        case .checkIn:
+            path = .pendingOffer
+            presentation = isCheckInCollapsed ? .collapsedOrb : .visibleChoices
+        case .configuration:
+            path = .settings
+            presentation = configurationReturnMode == .checkIn && statusText == nil
+                ? (isCheckInCollapsed ? .collapsedOrb : .visibleChoices)
+                : .notPending
+        case .routine:
+            path = .routine
+            presentation = .notPending
+        case .complete:
+            path = .complete
+            presentation = .notPending
+        case .setup:
+            path = .settings
+            presentation = .notPending
         }
         return CompanionDiagnosticSnapshot(
             cadence: selectedCadence,
             selectedAreas: BodyArea.allCases.filter { selectedAreas.contains($0) },
             mode: mode.diagnosticLabel,
-            activeUsePath: path
+            activeUsePath: path,
+            pendingOfferPresentation: presentation
         )
     }
 
@@ -300,14 +332,36 @@ final class CompanionStore: ObservableObject {
 
     func cancelAreaConfiguration() {
         guard mode == .configuration else { return }
-        let returnMode = configurationReturnMode
+        restoreFromConfiguration(configurationReturnMode)
+    }
+
+    private func restoreFromConfiguration(_ returnMode: Mode?, refreshPendingOffer: Bool = false) {
+        // Close-time observation is needed as well as the per-second configuration
+        // guard for a Settings sheet opened and closed between clock ticks.
+        activeUseTracker.suspend(at: nowProvider())
+        if returnMode == .routine {
+            // Discard the whole Settings visit's activity delta without spending protection budget.
+            routineActivityDetector.resumeObservation(at: nowProvider(), signal: activitySignalProvider())
+        }
         configurationReturnMode = nil
+        if returnMode == .checkIn, refreshPendingOffer,
+           let suggestion = sessionSelection.suggestion(
+               from: MoveLibrary.all,
+               selectedAreas: selectedAreas
+           ) {
+            // Settings changes may alter the invitation, but never the fact that a
+            // decision is pending.
+            routine = suggestion
+        }
         mode = returnMode ?? .idle
+        if returnMode == .complete {
+            scheduleCompletionAutoDismiss()
+        }
         notifySizeChange()
     }
 
     func startRoutine() {
-        startRoutine(at: Date(), activitySignal: activitySignalProvider())
+        startRoutine(at: nowProvider(), activitySignal: activitySignalProvider())
     }
 
     func startRoutine(at date: Date, activitySignal: LocalActivitySignal) {
@@ -362,6 +416,21 @@ final class CompanionStore: ObservableObject {
     func noteCompanionInteraction(at date: Date) {
         guard mode == .routine else { return }
         routineActivityDetector.noteCompanionInteraction(at: date)
+    }
+
+    /// A locked session or system sleep is an observation boundary, never active
+    /// work. The app's clock remains installed; this only re-anchors its state.
+    func noteSystemInactive(at date: Date? = nil) {
+        let date = date ?? nowProvider()
+        activeUseTracker.reset(at: date)
+        if mode == .routine {
+            routineActivityDetector.resetObservation(
+                at: date,
+                signal: activitySignalProvider()
+            )
+        }
+        updateCheckInProgress(at: date)
+        persistState()
     }
 
     func togglePause() {
@@ -447,6 +516,14 @@ final class CompanionStore: ObservableObject {
             return
         }
 
+        if mode == .configuration {
+            // The one-second clock remains alive through Settings, but the settings
+            // visit is neither active work nor a routine step.
+            activeUseTracker.suspend(at: now)
+            updateCheckInProgress(at: now)
+            return
+        }
+
         if mode == .routine {
             if evaluateRoutineActivity(signal: activitySignalProvider(), at: now) == .resumedWork {
                 return
@@ -506,6 +583,7 @@ final class CompanionStore: ObservableObject {
         guard mode == .idle else { return }
         cancelCompletionAutoDismiss()
         activeUseTracker.reset(at: date)
+        updateCheckInProgress(at: date)
         guard let suggestion = sessionSelection.suggestion(
             from: MoveLibrary.all,
             selectedAreas: selectedAreas

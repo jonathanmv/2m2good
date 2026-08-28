@@ -43,15 +43,26 @@ enum BreakProgress {
         return max(0, activeInterval - activeSeconds)
     }
 
-    static func color(at progress: Double) -> OrbProgressColor {
+    static func color(at progress: Double, pendingOffer: Bool = false) -> OrbProgressColor {
         let progress = clamp(progress)
-        if progress == 0 { return beginningColor }
-        if progress == 0.5 { return midpointColor }
-        if progress == 1 { return dueColor }
-        if progress <= 0.5 {
-            return interpolate(from: beginningColor, to: midpointColor, fraction: progress * 2)
+        guard pendingOffer else {
+            if progress == 0 { return beginningColor }
+            if progress == 0.5 { return midpointColor }
+            if progress == 1 { return dueColor }
+            if progress <= 0.5 {
+                return interpolate(from: beginningColor, to: midpointColor, fraction: progress * 2)
+            }
+            return interpolate(from: midpointColor, to: dueColor, fraction: (progress - 0.5) * 2)
         }
-        return interpolate(from: midpointColor, to: dueColor, fraction: (progress - 0.5) * 2)
+
+        // A pending offer is due even though its active-use counter has reset to
+        // zero. Keep the offer unmistakably warm, then move it toward the due
+        // color as the pending state remains visible.
+        return interpolate(
+            from: midpointColor,
+            to: dueColor,
+            fraction: max(0.25, progress)
+        )
     }
 
     static func accessibilityValue(progress: Double, remainingSeconds: TimeInterval) -> String {

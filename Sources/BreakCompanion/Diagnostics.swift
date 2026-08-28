@@ -4,14 +4,34 @@ enum ActiveUsePath: Equatable {
     case accumulating
     case waitingForActivity
     case scheduled
-    case otherwisePaused
+    case pendingOffer
+    case settings
+    case routine
+    case complete
 
     var label: String {
         switch self {
-        case .accumulating: return "accumulating"
-        case .waitingForActivity: return "waiting for activity"
-        case .scheduled: return "scheduled"
-        case .otherwisePaused: return "otherwise paused"
+        case .accumulating: return "accumulating active use"
+        case .waitingForActivity: return "waiting for active use"
+        case .scheduled: return "scheduled check-in"
+        case .pendingOffer: return "pending offer"
+        case .settings: return "settings open"
+        case .routine: return "routine in progress"
+        case .complete: return "completion screen"
+        }
+    }
+}
+
+enum PendingOfferPresentation: Equatable {
+    case notPending
+    case visibleChoices
+    case collapsedOrb
+
+    var label: String {
+        switch self {
+        case .notPending: return "no pending offer"
+        case .visibleChoices: return "visible pause choices"
+        case .collapsedOrb: return "collapsed pending orb"
         }
     }
 }
@@ -34,6 +54,21 @@ struct CompanionDiagnosticSnapshot: Equatable {
     let selectedAreas: [BodyArea]
     let mode: String
     let activeUsePath: ActiveUsePath
+    let pendingOfferPresentation: PendingOfferPresentation
+
+    init(
+        cadence: Cadence,
+        selectedAreas: [BodyArea],
+        mode: String,
+        activeUsePath: ActiveUsePath,
+        pendingOfferPresentation: PendingOfferPresentation = .notPending
+    ) {
+        self.cadence = cadence
+        self.selectedAreas = selectedAreas
+        self.mode = mode
+        self.activeUsePath = activeUsePath
+        self.pendingOfferPresentation = pendingOfferPresentation
+    }
 
     var report: String {
         let areaDescription = selectedAreas.isEmpty
@@ -44,7 +79,8 @@ struct CompanionDiagnosticSnapshot: Equatable {
             "cadence: \(cadence.label)",
             "body areas: \(areaDescription)",
             "mode: \(mode)",
-            "active-use path: \(activeUsePath.label)"
+            "active-use path: \(activeUsePath.label)",
+            "offer presentation: \(pendingOfferPresentation.label)"
         ].joined(separator: "\n")
     }
 }
