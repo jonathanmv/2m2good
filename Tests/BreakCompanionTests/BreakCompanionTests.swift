@@ -1,5 +1,6 @@
 import AppKit
 import CryptoKit
+import SwiftUI
 import XCTest
 @testable import BreakCompanion
 
@@ -573,6 +574,23 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertTrue(due.shouldOfferCheckIn)
     }
 
+    func testSuspendingActiveUseDoesNotGrantSettingsTime() {
+        let start = referenceDate(3_500)
+        var tracker = ActiveUseTracker(
+            activeInterval: 5,
+            idleThreshold: 60,
+            startedAt: start
+        )
+        _ = tracker.tick(at: start.addingTimeInterval(1), userIsActive: true)
+        tracker.suspend(at: start.addingTimeInterval(100))
+
+        let resumed = tracker.tick(at: start.addingTimeInterval(101), userIsActive: true)
+
+        XCTAssertTrue(resumed.didResetAfterIdle)
+        XCTAssertEqual(resumed.activeSeconds, 1)
+        XCTAssertFalse(resumed.shouldOfferCheckIn)
+    }
+
     func testFreshRelaunchStartsWithNoActiveCredit() {
         var tracker = ActiveUseTracker(
             activeInterval: 3_600,
@@ -605,6 +623,48 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertTrue(resumed.didResetAfterIdle)
         XCTAssertEqual(resumed.activeSeconds, 2)
         XCTAssertFalse(resumed.shouldOfferCheckIn)
+    }
+
+    @MainActor
+    func testControllerCountsActiveKeyboardAndMouseWorkButExcludesIdleAndLockGaps() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let start = referenceDate(5_200)
+        var signal = LocalActivitySignal(
+            keyboardIdle: 10_000,
+            mouseMovementIdle: 10_000,
+            mouseClickIdle: 10_000,
+            scrollWheelIdle: 10_000,
+            mouseDragIdle: 10_000
+        )
+        let store = CompanionStore(
+            environment: [
+                "BREAK_INTERVAL_SECONDS": "5",
+                "BREAK_IDLE_THRESHOLD_SECONDS": "10"
+            ],
+            defaults: defaults,
+            activitySignalProvider: { signal },
+            speaker: RecordingSpeaker(),
+            nowProvider: { start }
+        )
+        store.continueWithBalancedDefaults()
+
+        // A locked/idle period must be a mask, not active app uptime.
+        for second in 1...20 {
+            store.tickForTesting(at: start.addingTimeInterval(TimeInterval(second)))
+        }
+        XCTAssertEqual(store.mode, .idle)
+
+        signal = LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 0.2)
+        for second in 21...24 {
+            store.tickForTesting(at: start.addingTimeInterval(TimeInterval(second)))
+        }
+        XCTAssertEqual(store.mode, .idle)
+        store.tickForTesting(at: start.addingTimeInterval(25))
+        XCTAssertEqual(store.mode, .checkIn, "the active controller path should offer at the configured cadence")
     }
 
     func testPauseRelativeTimeUsesLocalCalendarBoundariesAndIgnoresFutureHistory() {
@@ -701,7 +761,7 @@ final class BreakCompanionTests: XCTestCase {
         store.onSizeChange = { resizedModes.append($0) }
         store.offerBreakNow()
         XCTAssertEqual(store.mode, .checkIn)
-        XCTAssertNil(store.lastCompletedPauseContext, "No completed pause should not produce made-up context")
+        XCTAssertEqual(store.lastCompletedPauseContext, "none yet", "No completed pause should show an honest empty context")
 
         let remainingBeforeCollapse = store.nextCheckInRemainingSeconds
         let progressBeforeCollapse = store.checkInProgress
@@ -2250,6 +2310,54 @@ final class BreakCompanionTests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsStayActionableAndPreserveAnUndecidedCheckIn() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let start = referenceDate(31_000)
+        let stateURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("2m2better-settings-state-\(UUID().uuidString)")
+        let stateStore = CompanionStateStore(fileURL: stateURL)
+        defer { try? FileManager.default.removeItem(at: stateURL) }
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "5"],
+            defaults: defaults,
+            speaker: RecordingSpeaker(),
+            nowProvider: { start },
+            stateStore: stateStore
+        )
+        store.continueWithBalancedDefaults()
+        store.offerBreakNow()
+        XCTAssertEqual(store.mode, .checkIn)
+        XCTAssertTrue(store.canOpenAreaConfiguration)
+
+        store.openAreaConfiguration()
+        XCTAssertEqual(store.mode, .configuration)
+        store.cancelAreaConfiguration()
+        XCTAssertEqual(store.mode, .checkIn, "cancelling settings must restore the pending offer")
+
+        store.openAreaConfiguration()
+        store.saveSettings(cadence: .twentyMinutes, areas: [.neck])
+        XCTAssertEqual(store.mode, .checkIn, "saving settings must restore the pending offer")
+        XCTAssertEqual(store.selectedCadence, .twentyMinutes)
+        XCTAssertEqual(store.selectedAreas, [.neck])
+        XCTAssertTrue(store.routine.invitation.lowercased().contains("neck"))
+
+        store.openAreaConfiguration()
+        let restarted = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "5"],
+            defaults: defaults,
+            speaker: RecordingSpeaker(),
+            nowProvider: { start },
+            stateStore: stateStore
+        )
+        XCTAssertEqual(restarted.mode, .checkIn, "an update while settings are open must not discard the offer")
+        XCTAssertEqual(restarted.selectedAreas, [.neck])
+    }
+
+    @MainActor
     func testNextRequestsAPanelRefitForTheNewSessionContent() {
         let suiteName = "BreakCompanionTests.\(#function)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -2276,10 +2384,12 @@ final class BreakCompanionTests: XCTestCase {
     }
 
     func testPauseScreenControlsHaveActionableAccessibilityLabels() {
-        XCTAssertEqual(PauseScreenControl.collapse.action, .collapse)
-        XCTAssertEqual(PauseScreenControl.collapse.title, "Hide pause screen")
+        XCTAssertEqual(PauseScreenControl.collapse.action, PauseScreenControl.Action.collapse)
+        XCTAssertEqual(PauseScreenControl.collapse.title, "^")
+        XCTAssertEqual(PauseScreenControl.collapse.keyboardShortcut, KeyboardShortcut.cancelAction)
         XCTAssertTrue(PauseScreenControl.collapse.accessibilityLabel.lowercased().contains("collapse"))
         XCTAssertTrue(PauseScreenControl.collapse.accessibilityHint.lowercased().contains("without changing"))
+        XCTAssertFalse(PauseScreenControl.collapse.accessibilityLabel.lowercased().contains("hide"))
 
         XCTAssertEqual(PauseScreenControl.restore.action, .restore)
         XCTAssertTrue(PauseScreenControl.restore.accessibilityLabel.lowercased().contains("show pause choices"))

@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 
 struct PauseScreenControl: Equatable {
     enum Action: Equatable {
@@ -11,13 +11,15 @@ struct PauseScreenControl: Equatable {
     let accessibilityLabel: String
     let accessibilityValue: String?
     let accessibilityHint: String
+    let keyboardShortcut: KeyboardShortcut?
 
     static let collapse = PauseScreenControl(
         action: .collapse,
-        title: "Hide pause screen",
+        title: "^",
         accessibilityLabel: "Collapse pause screen",
         accessibilityValue: nil,
-        accessibilityHint: "Hide the pause choices and return to the floating orb without changing this pause decision"
+        accessibilityHint: "Collapse the pause choices and return to the floating orb without changing this pause decision",
+        keyboardShortcut: KeyboardShortcut.cancelAction
     )
 
     static let restore = PauseScreenControl(
@@ -25,6 +27,7 @@ struct PauseScreenControl: Equatable {
         title: "Show pause choices",
         accessibilityLabel: "Pause waiting. Show pause choices.",
         accessibilityValue: "Pause choices are hidden",
-        accessibilityHint: "Click to restore the pause screen without changing your pause decision"
+        accessibilityHint: "Click to restore the pause screen without changing your pause decision",
+        keyboardShortcut: nil
     )
 }

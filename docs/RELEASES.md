@@ -67,12 +67,13 @@ optional update check sends only the documented GitHub request.
 The next developer-preview release is **v0.1.3 (build 4)**. It brings the
 already-merged pause-screen and update improvements to installed users:
 
-- A pause prompt can show brief context about a recently completed pause,
-  without adding a browsable history.
-- **Hide pause screen** collapses the prompt without changing the pending
-  choice or its timing; clicking the orb or choosing **Offer a break now**
-  restores the pause choices. The pause window can also be dragged from its
-  non-control background.
+- A pause prompt shows brief context about a recently completed pause, or
+  **Last pause taken — none yet** when there is no completed history, without
+  adding a browsable history.
+- A small **^** control (or Escape) collapses the prompt without changing the
+  pending choice or its timing; clicking the orb or choosing **Offer a break
+  now** restores the pause choices. The pause window can also be dragged from
+  its non-control background.
 - Timer progress and an active pause session are retained in local user data,
   outside the replaceable app bundle, so a normal relaunch or update handoff
   can resume safely without discarding the current session.

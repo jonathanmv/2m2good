@@ -176,6 +176,17 @@ struct CompanionView: View {
 
     private var checkInView: some View {
         VStack(spacing: 17) {
+            HStack {
+                Spacer(minLength: 0)
+                Button(PauseScreenControl.collapse.title, action: store.collapseCheckIn)
+                    .buttonStyle(CollapseButtonStyle())
+                    .keyboardShortcut(PauseScreenControl.collapse.keyboardShortcut ?? .cancelAction)
+                    .help(PauseScreenControl.collapse.accessibilityHint)
+                    .accessibilityLabel(PauseScreenControl.collapse.accessibilityLabel)
+                    .accessibilityHint(PauseScreenControl.collapse.accessibilityHint)
+                    .disabled(store.statusText != nil)
+            }
+
             HStack(spacing: 14) {
                 CompanionOrb(motion: .breathe, warmth: 0.9, active: true)
                     .frame(width: 62, height: 62)
@@ -190,13 +201,11 @@ struct CompanionView: View {
                 Spacer(minLength: 0)
             }
 
-            if let context = store.lastCompletedPauseContext {
-                Text("Last pause taken — \(context)")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityLabel("Last pause taken — \(context)")
-            }
+            Text("Last pause taken — \(store.lastCompletedPauseContext)")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel("Last pause taken — \(store.lastCompletedPauseContext)")
 
             if let explanation = store.activityRecoveryExplanation {
                 Text(explanation)
@@ -227,12 +236,6 @@ struct CompanionView: View {
                 Button("Tomorrow", action: store.postponeUntilTomorrow)
             }
             .buttonStyle(QuietButtonStyle())
-
-            Button(PauseScreenControl.collapse.title, action: store.collapseCheckIn)
-                .buttonStyle(QuietButtonStyle())
-                .keyboardShortcut(.cancelAction)
-                .accessibilityLabel(PauseScreenControl.collapse.accessibilityLabel)
-                .accessibilityHint(PauseScreenControl.collapse.accessibilityHint)
         }
     }
 
@@ -459,6 +462,16 @@ private struct AreaOptionButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .strokeBorder(Color.primary.opacity(selected ? 0.16 : 0.06), lineWidth: 0.7)
             }
+    }
+}
+
+private struct CollapseButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 16, weight: .semibold, design: .rounded))
+            .foregroundStyle(.primary.opacity(configuration.isPressed ? 0.55 : 0.68))
+            .frame(width: 24, height: 20)
+            .contentShape(Rectangle())
     }
 }
 

@@ -73,6 +73,13 @@ struct ActiveUseTracker {
         return result(didResetAfterIdle: didResetAfterIdle)
     }
 
+    /// Advances the timer's observation point without granting active credit. This keeps
+    /// time spent in a non-timing surface, such as settings, out of both the delta and
+    /// the delayed-callback calculation.
+    mutating func suspend(at date: Date) {
+        lastTickAt = date
+    }
+
     mutating func reset(at date: Date) {
         accumulatedActiveTime = 0
         lastTickAt = date

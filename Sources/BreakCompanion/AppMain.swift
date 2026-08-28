@@ -46,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
                 keyCode: event.keyCode
             ) ? nil : event
         }
+        store.startClock()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

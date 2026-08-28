@@ -47,7 +47,7 @@ final class CompanionStore: ObservableObject {
     @Published private(set) var selectedAreas: Set<BodyArea>
     @Published private(set) var selectedCadence: Cadence
     @Published private(set) var isCheckInCollapsed = false
-    @Published private(set) var lastCompletedPauseContext: String?
+    @Published private(set) var lastCompletedPauseContext = "none yet"
 
     var onSizeChange: ((Mode) -> Void)?
     /// Set by the app so keystrokes aimed at the companion's own panel are read as
@@ -69,6 +69,7 @@ final class CompanionStore: ObservableObject {
     private let nowProvider: () -> Date
     private let postponementScheduler: any DelayedActionScheduling
     private var timer: Timer?
+    private var configurationReturnMode: Mode?
     private var completionDismissTask: Task<Void, Never>?
     private var completionDismissalState = CompletionDismissalState()
     private var routineActivityDetector = RoutineActivityDetector()
@@ -112,8 +113,6 @@ final class CompanionStore: ObservableObject {
         nextCheckInRemainingSeconds = workInterval
         mode = bodyAreaPreferences.shouldPresentFirstRunSetup ? .setup : .idle
         restorePersistedState(at: initialNow)
-
-        startClock()
     }
 
     deinit {
@@ -153,7 +152,9 @@ final class CompanionStore: ObservableObject {
         guard let stateStore else { return }
         let persistedMode: PersistedCompanionMode
         switch mode {
-        case .idle, .setup, .configuration: persistedMode = .idle
+        case .idle, .setup: persistedMode = .idle
+        case .configuration:
+            persistedMode = configurationReturnMode == .checkIn ? .checkIn : .idle
         case .checkIn: persistedMode = .checkIn
         case .routine: persistedMode = .routine
         case .complete: persistedMode = .complete
@@ -174,7 +175,23 @@ final class CompanionStore: ObservableObject {
         stateStore.save(state)
     }
 
-    var canOpenAreaConfiguration: Bool { mode == .idle }
+    /// Settings are available from the idle orb and an undecided check-in. Opening them
+    /// from a check-in keeps that decision alive and returns to it when settings close.
+    var canOpenAreaConfiguration: Bool {
+        mode == .idle || mode == .checkIn
+    }
+
+    /// Starts the one-second active-use clock after the application has installed its
+    /// panel and entered its run loop. Keeping timer registration out of init avoids
+    /// silently losing the timer while AppKit is still launching the accessory app.
+    func startClock() {
+        guard timer == nil else { return }
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.tick() }
+        }
+        self.timer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
 
     func collapseCheckIn() {
         guard mode == .checkIn, statusText == nil else { return }
@@ -192,6 +209,8 @@ final class CompanionStore: ObservableObject {
 
     func openAreaConfiguration() {
         guard canOpenAreaConfiguration else { return }
+        configurationReturnMode = mode == .checkIn ? .checkIn : nil
+        activeUseTracker.suspend(at: nowProvider())
         mode = .configuration
         notifySizeChange()
     }
@@ -216,7 +235,18 @@ final class CompanionStore: ObservableObject {
         }
 
         guard offersBalancedChoice else { return }
-        mode = .idle
+        let returnMode = configurationReturnMode
+        configurationReturnMode = nil
+        if returnMode == .checkIn,
+           let suggestion = sessionSelection.suggestion(
+               from: MoveLibrary.all,
+               selectedAreas: selectedAreas
+           ) {
+            // Keep the pending decision, while making its invitation match the
+            // newly selected body areas.
+            routine = suggestion
+        }
+        mode = returnMode ?? .idle
         notifySizeChange()
     }
 
@@ -231,7 +261,16 @@ final class CompanionStore: ObservableObject {
         selectedAreas = []
         sessionSelection.clearPendingSession()
         guard offersBalancedChoice else { return }
-        mode = .idle
+        let returnMode = configurationReturnMode
+        configurationReturnMode = nil
+        if returnMode == .checkIn,
+           let suggestion = sessionSelection.suggestion(
+               from: MoveLibrary.all,
+               selectedAreas: selectedAreas
+           ) {
+            routine = suggestion
+        }
+        mode = returnMode ?? .idle
         notifySizeChange()
     }
 
@@ -261,7 +300,9 @@ final class CompanionStore: ObservableObject {
 
     func cancelAreaConfiguration() {
         guard mode == .configuration else { return }
-        mode = .idle
+        let returnMode = configurationReturnMode
+        configurationReturnMode = nil
+        mode = returnMode ?? .idle
         notifySizeChange()
     }
 
@@ -381,13 +422,6 @@ final class CompanionStore: ObservableObject {
         }
         dismissCompletion()
         return true
-    }
-
-    private func startClock() {
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.tick() }
-        }
-        RunLoop.main.add(timer!, forMode: .common)
     }
 
     private func tick() {
@@ -649,7 +683,7 @@ final class CompanionStore: ObservableObject {
     private func updateLastCompletedPauseContext(at now: Date) {
         let context = pauseHistory.lastCompletedPause(beforeOrAt: now).flatMap {
             PauseRelativeTimeFormatter.string(for: $0, relativeTo: now)
-        }
+        } ?? "none yet"
         if lastCompletedPauseContext != context {
             lastCompletedPauseContext = context
         }
