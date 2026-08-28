@@ -292,6 +292,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
             NSApp.activate(ignoringOtherApps: true)
             panel.makeKeyAndOrderFront(nil)
         case .checkIn where store.activityRecoveryExplanation == nil:
+            let frontmost = NSWorkspace.shared.frontmostApplication
+            if frontmost?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+                previouslyActiveApplication = frontmost
+            }
             NSApp.activate(ignoringOtherApps: true)
             panel.makeKeyAndOrderFront(nil)
         default:
