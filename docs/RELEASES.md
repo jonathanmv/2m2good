@@ -62,22 +62,27 @@ timer/session checkpoints and pause history stay in the invoking user's
 Application Support/preferences data, outside the replaceable bundle. Its
 optional update check sends only the documented GitHub request.
 
-## v0.1.3 pause context and seamless updates
+## v0.1.4 active-session reminders and pause controls
 
-The next developer-preview release is **v0.1.3 (build 4)**. It brings the
-already-merged pause-screen and update improvements to installed users:
+The next developer-preview release is **v0.1.4 (build 5)**. It brings the
+already-merged break-trigger and pause-screen fixes to installed users:
 
-- A pause prompt shows brief context about a recently completed pause, or
-  **Last pause taken — none yet** when there is no completed history, without
-  adding a browsable history.
-- A small **^** control (or Escape) collapses the prompt without changing the
-  pending choice or its timing; clicking the orb or choosing **Offer a break
-  now** restores the pause choices. The pause window can also be dragged from
-  its non-control background.
+- Break reminders follow active keyboard or mouse use, while idle time and
+  sleep do not advance the reminder. A pause can also be offered immediately
+  by clicking the orb or choosing **Offer a break now** from the menu bar.
+- **Settings…** remains available from the idle orb and an undecided pause
+  offer, so the pause rhythm and supported areas can be changed without losing
+  the offer.
+- A pause prompt shows brief context about the last completed pause, or
+  **Last pause taken — none yet** when there is no completed history. It does
+  not add a browsable history.
+- The top-right **^** control (or Escape) collapses an undecided prompt without
+  choosing a response; clicking the orb or choosing **Offer a break now**
+  restores the pause choices.
 - Timer progress and an active pause session are retained in local user data,
   outside the replaceable app bundle, so a normal relaunch or update handoff
   can resume safely without discarding the current session.
-- The one-line installer now updates an existing installation through the same
+- The one-line installer updates an existing installation through the same
   verified replacement flow: it asks a running app to quit gracefully, retains
   the previous bundle for rollback, replaces the app, and relaunches it while
   preserving user data. `--replace` remains accepted for older scripts.
