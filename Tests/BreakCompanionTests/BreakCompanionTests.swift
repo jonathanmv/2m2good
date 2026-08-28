@@ -2383,18 +2383,78 @@ final class BreakCompanionTests: XCTestCase {
         store.endRoutine()
     }
 
-    func testPauseScreenControlsHaveActionableAccessibilityLabels() {
-        XCTAssertEqual(PauseScreenControl.collapse.action, PauseScreenControl.Action.collapse)
-        XCTAssertEqual(PauseScreenControl.collapse.title, "^")
-        XCTAssertEqual(PauseScreenControl.collapse.keyboardShortcut, KeyboardShortcut.cancelAction)
-        XCTAssertTrue(PauseScreenControl.collapse.accessibilityLabel.lowercased().contains("collapse"))
-        XCTAssertTrue(PauseScreenControl.collapse.accessibilityHint.lowercased().contains("without changing"))
-        XCTAssertFalse(PauseScreenControl.collapse.accessibilityLabel.lowercased().contains("hide"))
+    @MainActor
+    func testPauseScreenCollapseControlIsReachableByEscapeThroughTheRealKeyboardSeam() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        XCTAssertEqual(PauseScreenControl.restore.action, .restore)
-        XCTAssertTrue(PauseScreenControl.restore.accessibilityLabel.lowercased().contains("show pause choices"))
-        XCTAssertEqual(PauseScreenControl.restore.accessibilityValue, "Pause choices are hidden")
-        XCTAssertTrue(PauseScreenControl.restore.accessibilityHint.lowercased().contains("restore"))
+        let start = referenceDate(20_000)
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults,
+            speaker: RecordingSpeaker(),
+            nowProvider: { start }
+        )
+        store.continueWithBalancedDefaults()
+        store.offerBreakNow()
+        XCTAssertEqual(store.mode, .checkIn)
+
+        let panel = CompanionPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 370, height: 420),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        let hostingView = NSHostingView(rootView: CompanionView(store: store))
+        hostingView.frame = NSRect(x: 0, y: 0, width: 370, height: 420)
+        panel.contentView = hostingView
+        panel.orderFrontRegardless()
+        hostingView.layoutSubtreeIfNeeded()
+
+        func escapeKeyDown() -> NSEvent {
+            NSEvent.keyEvent(
+                with: .keyDown,
+                location: .zero,
+                modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: panel.windowNumber,
+                context: nil,
+                characters: "\u{1B}",
+                charactersIgnoringModifiers: "\u{1B}",
+                isARepeat: false,
+                keyCode: 53
+            )!
+        }
+
+        let selectedAreasBeforeCollapse = store.selectedAreas
+        let remainingBeforeCollapse = store.nextCheckInRemainingSeconds
+        XCTAssertTrue(
+            panel.performKeyEquivalent(with: escapeKeyDown()),
+            "Escape must reach the rendered collapse control through its real keyboard shortcut wiring"
+        )
+        XCTAssertTrue(store.isCheckInCollapsed)
+        XCTAssertEqual(store.mode, .checkIn, "collapsing through the keyboard must preserve the pending decision")
+        XCTAssertEqual(store.nextCheckInRemainingSeconds, remainingBeforeCollapse)
+        XCTAssertEqual(store.selectedAreas, selectedAreasBeforeCollapse)
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        hostingView.layoutSubtreeIfNeeded()
+        XCTAssertFalse(
+            panel.performKeyEquivalent(with: escapeKeyDown()),
+            "the collapsed orb view has no Escape-bound control, so a second Escape must not be swallowed"
+        )
+
+        store.restoreCheckIn()
+        XCTAssertFalse(store.isCheckInCollapsed)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        hostingView.layoutSubtreeIfNeeded()
+        XCTAssertTrue(
+            panel.performKeyEquivalent(with: escapeKeyDown()),
+            "restoring the pause screen must bring the collapse control's keyboard shortcut back"
+        )
+        XCTAssertTrue(store.isCheckInCollapsed, "the real Escape seam must still reach collapse after a restore")
     }
 
     @MainActor

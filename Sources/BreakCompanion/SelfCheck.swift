@@ -949,12 +949,43 @@ enum SelfCheck {
     }
 
     private static func checkPauseScreenControls(_ failures: inout [String]) {
-        if PauseScreenControl.collapse.action != PauseScreenControl.Action.collapse
-            || PauseScreenControl.collapse.title != "^"
-            || PauseScreenControl.collapse.keyboardShortcut != KeyboardShortcut.cancelAction
-            || PauseScreenControl.collapse.accessibilityLabel.lowercased().contains("hide")
-            || PauseScreenControl.restore.action != .restore {
-            failures.append("pause screen collapse and restore controls should remain accessible")
+        MainActor.assumeIsolated {
+            withIsolatedDefaults("pause-screen-controls") { defaults in
+                let start = Date(timeIntervalSinceReferenceDate: 900_000)
+                let store = CompanionStore(
+                    environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+                    defaults: defaults,
+                    nowProvider: { start }
+                )
+                store.continueWithBalancedDefaults()
+                store.offerBreakNow()
+                guard store.mode == .checkIn else {
+                    failures.append("collapsing a pause offer requires it to be showing first")
+                    return
+                }
+
+                let remainingBeforeCollapse = store.nextCheckInRemainingSeconds
+                let selectedAreasBeforeCollapse = store.selectedAreas
+                store.collapseCheckIn()
+                if !store.isCheckInCollapsed || store.mode != .checkIn {
+                    failures.append("collapsing the pause screen should hide it without changing the pending decision")
+                }
+                if store.nextCheckInRemainingSeconds != remainingBeforeCollapse
+                    || store.selectedAreas != selectedAreasBeforeCollapse {
+                    failures.append("collapsing the pause screen should not reset its timer, cadence, or areas")
+                }
+
+                store.restoreCheckIn()
+                if store.isCheckInCollapsed || store.mode != .checkIn {
+                    failures.append("restoring the pause screen should bring back the same pending choices")
+                }
+
+                store.startRoutine(at: start, activitySignal: LocalActivitySignal(keyboardIdle: 10_000, pointerIdle: 10_000))
+                if store.mode != .routine {
+                    failures.append("the Start choice must still work after a collapse and restore")
+                }
+                store.endRoutine()
+            }
         }
     }
 
