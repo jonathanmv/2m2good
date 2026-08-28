@@ -62,6 +62,7 @@ final class CompanionStore: ObservableObject {
     private let cadencePreferences: CadencePreferences
     private let pauseHistory: PauseHistoryStore
     private let stateStore: CompanionStateStore?
+    private var lastPersistedState: PersistedCompanionState?
     private let testingIntervalOverride: TimeInterval?
     private var activeUseTracker: ActiveUseTracker
     private var scheduledCheckIn: ScheduledCheckInWindow?
@@ -157,7 +158,7 @@ final class CompanionStore: ObservableObject {
         case .routine: persistedMode = .routine
         case .complete: persistedMode = .complete
         }
-        stateStore.save(PersistedCompanionState(
+        let state = PersistedCompanionState(
             mode: persistedMode,
             activeUse: activeUseTracker.persistenceState,
             scheduledCheckInStartedAt: scheduledCheckIn?.startedAt,
@@ -167,7 +168,10 @@ final class CompanionStore: ObservableObject {
             elapsedInStep: elapsedInStep,
             isPaused: isPaused,
             isCheckInCollapsed: isCheckInCollapsed
-        ))
+        )
+        guard state != lastPersistedState else { return }
+        lastPersistedState = state
+        stateStore.save(state)
     }
 
     var canOpenAreaConfiguration: Bool { mode == .idle }

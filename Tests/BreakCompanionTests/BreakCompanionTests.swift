@@ -634,6 +634,14 @@ final class BreakCompanionTests: XCTestCase {
                 relativeTo: now,
                 calendar: calendar
             ),
+            "over 1h ago"
+        )
+        XCTAssertEqual(
+            PauseRelativeTimeFormatter.string(
+                for: now.addingTimeInterval(-120 * 60),
+                relativeTo: now,
+                calendar: calendar
+            ),
             "over 2h ago"
         )
         XCTAssertEqual(

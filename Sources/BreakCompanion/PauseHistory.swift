@@ -51,8 +51,8 @@ enum PauseRelativeTimeFormatter {
             if elapsed < 60 * 60 {
                 return "\(max(1, Int(elapsed / 60)))m ago"
             }
-            let roundedHours = max(1, Int((elapsed / (60 * 60)).rounded()))
-            return "over \(roundedHours)h ago"
+            let fullHours = max(1, Int(elapsed / (60 * 60)))
+            return "over \(fullHours)h ago"
         }
 
         let completedDay = calendar.startOfDay(for: completedAt)
