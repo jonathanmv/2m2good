@@ -9,6 +9,12 @@ struct ActiveUseTick: Equatable {
 /// Tracks active-use time without turning a delayed timer callback into work.
 /// A new active sample after the idle threshold starts a fresh active interval.
 struct ActiveUseTracker {
+    struct PersistenceState: Codable, Equatable {
+        let accumulatedActiveTime: TimeInterval
+        let lastActiveSampleAt: Date?
+        let lastSampleWasIdle: Bool
+    }
+
     static let maximumTimerDelta: TimeInterval = 2
 
     let activeInterval: TimeInterval
@@ -22,11 +28,26 @@ struct ActiveUseTracker {
     init(
         activeInterval: TimeInterval,
         idleThreshold: TimeInterval,
-        startedAt: Date
+        startedAt: Date,
+        persistenceState: PersistenceState? = nil
     ) {
         self.activeInterval = activeInterval
         self.idleThreshold = idleThreshold
         lastTickAt = startedAt
+        guard let persistenceState,
+              persistenceState.accumulatedActiveTime.isFinite,
+              persistenceState.accumulatedActiveTime >= 0 else { return }
+        accumulatedActiveTime = min(activeInterval, persistenceState.accumulatedActiveTime)
+        lastActiveSampleAt = persistenceState.lastActiveSampleAt.flatMap { $0 <= startedAt ? $0 : nil }
+        lastSampleWasIdle = persistenceState.lastSampleWasIdle
+    }
+
+    var persistenceState: PersistenceState {
+        PersistenceState(
+            accumulatedActiveTime: accumulatedActiveTime,
+            lastActiveSampleAt: lastActiveSampleAt,
+            lastSampleWasIdle: lastSampleWasIdle
+        )
     }
 
     mutating func tick(at date: Date, userIsActive: Bool) -> ActiveUseTick {

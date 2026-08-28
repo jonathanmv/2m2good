@@ -1,13 +1,13 @@
 # 2m2better
 
-A deliberately small, local macOS break companion. After 60 minutes of active keyboard or mouse use, 2m2better's quiet floating orb offers one two-minute reset. It keeps the Start, Later, and Tomorrow choices visible, guides the routine with spoken movement guidance and motion, and then gets out of the way.
+A deliberately small, local macOS break companion. After 60 minutes of active keyboard or mouse use, 2m2better's quiet floating orb offers one two-minute reset. It keeps the Start, Later, Tomorrow, and Hide pause screen choices clear, guides the routine with spoken movement guidance and motion, and then gets out of the way.
 
 ## What is in the pilot
 
-- A small floating orb plus a menu-bar fallback; no dashboard, history, streaks, or account.
+- A small floating orb plus a menu-bar fallback; no dashboard, browsable pause history, streaks, or account.
 - Active-use timing that pauses while the Mac is idle and starts a fresh interval when activity returns after at least the idle threshold; delayed timer callbacks and sleep gaps never count as work.
-- Warm check-ins with **Start**, **Later** (one hour), and **Tomorrow**.
-- Click-only check-in responses: **Start**, **Later** (one hour), and **Tomorrow**, with keyboard-accessible buttons.
+- Warm check-ins with **Start**, **Later** (one hour), **Tomorrow**, and **Hide pause screen** when the choice needs to wait without changing.
+- Click-only check-in responses: **Start**, **Later** (one hour), **Tomorrow**, and **Hide pause screen**, with keyboard-accessible buttons.
 - A library of gentle, standing-compatible desk-break movements. Each offered session combines six different 20-second movements into a fresh two-minute reset.
 - On first launch, choose a pause rhythm (**Every 20 minutes**, **Every hour**, or **Every 3 hours**) and one or more areas to support: **Lower back**, **Neck**, **Shoulders**, or **Hands + wrists**, or keep the balanced mix. Settings stay local and can be reviewed from the menu bar without becoming a dashboard or body-data profile.
 - Every session is exactly 120 seconds, with a gentle standing invitation, on-screen and spoken movement guidance, simple motion cues, Pause, Next, End, and safety wording.
@@ -25,7 +25,7 @@ newer or the matching Apple Command Line Tools.
 open ".build/app/2m2better.app"
 ```
 
-The app appears as a small orb near the upper-right of the screen and as a leaf in the menu bar. On a fresh install, a compact setup asks for a pause rhythm and which body areas the standing reset should support; every shipped movement is standing-only, so the reset is presented as a standing one rather than a seated alternative. Click the orb or **Offer a break now** in the menu bar to trigger a break immediately; use **Settings…** there to review or change the selection, which stays available while the orb is idle so an offered or running reset is never discarded.
+The app appears as a small orb near the upper-right of the screen and as a leaf in the menu bar. On a fresh install, a compact setup asks for a pause rhythm and which body areas the standing reset should support; every shipped movement is standing-only, so the reset is presented as a standing one rather than a seated alternative. Click the orb or **Offer a break now** in the menu bar to trigger a break immediately; use **Hide pause screen** (or Escape) to return to the orb without choosing a response, then click the orb or use **Offer a break now** again to restore the choices. The pause window can be dragged from its non-control background like a normal desktop window. Use **Settings…** there to review or change the selection, which stays available while the orb is idle so an offered or running reset is never discarded.
 
 The menu also includes **Settings…**, which changes the pause rhythm and body areas, and **Copy diagnostics**, which places a coarse local status report on the clipboard. **About 2m2better…** shows the shared release identity, and **Check for Updates…** checks GitHub Releases only. When a newer release is available, a short prompt offers **Install and Relaunch** or **Later**. Choosing install downloads and verifies in the background, shows brief progress, then hands off to the installer without a second technical confirmation. Installation is never silent. The helper waits for this app to exit, replaces only `~/Applications/2m2better.app`, retains a rollback copy, preserves preferences, and asks macOS to relaunch. Recoverable errors offer **Try Again** and write technical details to the update log. See [`docs/RELEASES.md`](docs/RELEASES.md) for the updater behavior, trust limitation, release asset contract, icon packaging, and validation.
 
@@ -48,13 +48,14 @@ requires matching ZIP and `.sha256` assets in the latest GitHub Release, and
 verifies the exact SHA-256 checksum before extracting anything. It installs
 without `sudo` to the invoking user's `~/Applications/2m2better.app`, refreshes
 Spotlight indexing, and launches the app or prints a manual launch command.
-It refuses an existing installation by default; download the script and pass
-`--replace` only as the explicitly documented choice to retain the old app in a
-`.previous` backup. It does not delete user data, use credentials, or contact a
-separate update server.
+When `~/Applications/2m2better.app` already exists, it asks only 2m2better to
+quit gracefully, retains the old app in a timestamped `.previous` backup, and
+relaunches the verified replacement; `--replace` remains accepted for older
+scripts. It does not delete user data, use credentials, or contact a separate
+update server.
 
 Prerequisites are macOS 14 (Sonoma) or newer, GitHub HTTPS access, and the
-standard macOS `curl`, `plutil`, `shasum`, `ditto`, and `sw_vers` tools.
+standard macOS `curl`, `plutil`, `shasum`, `ditto`, `sw_vers`, and `osascript` tools.
 Xcode and Swift are not required for the packaged installer. This is an
 ad-hoc-signed developer preview: it has no Apple Developer ID signature and is
 not notarized, so macOS may require Finder **Open** or Privacy & Security
@@ -65,9 +66,9 @@ checksum requirements, and updater compatibility are documented in
 
 ## Permissions
 
-The check-in is click-only: **Start**, **Later**, and **Tomorrow** remain visible and keyboard-accessible, so no audio-input or command-recognition permission is needed. During a routine, spoken movement guidance complements the on-screen instructions; the app does not listen for responses.
+The check-in is click-only: **Start**, **Later**, **Tomorrow**, and **Hide pause screen** remain visible and keyboard-accessible (Escape hides the prompt), so no audio-input or command-recognition permission is needed. During a routine, spoken movement guidance complements the on-screen instructions; the app does not listen for responses.
 
-The app does not need Accessibility permission. It reads only macOS’s aggregate local time since the last keyboard, mouse movement (including drags), mouse-button, or scroll event, not the keys pressed or the content of events.
+The app does not need Accessibility permission. It reads only macOS’s aggregate local time since the last keyboard, mouse movement (including drags), mouse-button, or scroll event, not the keys pressed or the content of events. Live timer and session checkpoints are kept under `~/Library/Application Support/2m2better`, outside the replaceable app bundle.
 
 While a routine is actively guiding, the app polls those same aggregate
 keyboard, mouse movement (including drags), mouse-button, and scroll ages once a
@@ -99,7 +100,9 @@ detector.
 
 This integrity check is local-only and deliberately coarse. It stores no key
 values, pointer coordinates or paths, application content, account information,
-analytics, or network data. It does not identify which application caused activity,
+analytics, or network data. Completed pause timestamps are kept in local macOS
+preferences only, for the small relative-time context shown on a later pause
+screen. It does not identify which application caused activity,
 distinguish a person from another local input source, or interpret keys or pointer
 paths; it also does not install an event monitor or require Accessibility
 permission. Activity from another app is indistinguishable from resumed work; the
@@ -142,6 +145,6 @@ The Swift package and XCTest target are included for use in a standard Xcode too
 
 ## Pilot boundaries
 
-This prototype intentionally does not launch at login, collect wellbeing data, sync, coach, score, or expose a browsable routine catalog. “Tomorrow” means 24 hours from the response. The optional updater is the only runtime network activity; its privacy and trust contract is documented in [`docs/RELEASES.md`](docs/RELEASES.md) and does not change the local-only break experience. For a later iteration, “Tomorrow” could become a user-selected quiet-hours-aware morning without changing the core state machine.
+This prototype intentionally does not launch at login, collect wellbeing data, sync, coach, score, or expose a browsable pause-history or routine catalog. “Tomorrow” means 24 hours from the response. The optional updater is the only runtime network activity; its privacy and trust contract is documented in [`docs/RELEASES.md`](docs/RELEASES.md) and does not change the local-only break experience. For a later iteration, “Tomorrow” could become a user-selected quiet-hours-aware morning without changing the core state machine.
 
 A quiet idle orb shifts from soft green through muted orange to calm red as the next check-in approaches. The same timing is available to VoiceOver as remaining time and interval progress, so color is never the only signal.

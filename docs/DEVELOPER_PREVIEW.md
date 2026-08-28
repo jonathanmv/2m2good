@@ -12,13 +12,16 @@ matching ZIP and exact `.sha256` manifest from the latest non-draft,
 non-prerelease release on GitHub, verifies SHA-256 before extraction, and
 installs to the invoking user's `~/Applications/2m2better.app` without `sudo`.
 It refreshes Spotlight indexing and launches the app, or reports the manual
-`open` command. It refuses an existing app unless `--replace` is explicitly
-passed; replacement retains the previous app in a timestamped backup. It never
-deletes user data, asks for credentials, uses a separate feed or update server,
-or follows an installation symlink.
+`open` command. If an existing app is running, it asks only 2m2better to quit
+gracefully before replacement; the previous app is retained in a timestamped
+backup, and `--replace` remains accepted for compatibility. It never deletes
+user data, asks for credentials, uses a separate feed or update server, or
+follows an installation symlink. Live timer/session checkpoints stay in the
+user's Application Support directory outside the replaceable bundle.
 
 The command requires macOS 14 (Sonoma) or newer on arm64 or Intel x86_64 and
-standard macOS `curl`, `plutil`, `shasum`, `ditto`, and `sw_vers` tools.
+standard macOS `curl`, `plutil`, `shasum`, `ditto`, `sw_vers`, and
+`osascript` tools.
 GitHub HTTPS access is required; Xcode and Swift are not needed for this
 packaged path. The release must contain both
 `2m2better-v<version>-macos-<architecture>.zip` and its exact

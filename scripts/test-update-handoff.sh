@@ -56,8 +56,9 @@ EOF
 # app. The helper's second checksum check protects the handoff window too.
 success_root="$test_root/success"
 success_home="$success_root/home"
-mkdir -p "$success_home/Applications" "$success_home/Library/Preferences" "$success_root/fake-bin"
+mkdir -p "$success_home/Applications" "$success_home/Library/Preferences" "$success_home/Library/Application Support/2m2better" "$success_root/fake-bin"
 printf '%s\n' 'keep user preference' > "$success_home/Library/Preferences/local.break-companion.pilot.plist"
+printf '%s\n' 'keep timer and session state' > "$success_home/Library/Application Support/2m2better/companion-state.json"
 success_digest=$(make_fixture "$success_root")
 success_download_dir="$success_root/2m2better-update-test-uuid"
 mkdir "$success_download_dir"
@@ -79,6 +80,7 @@ assert_contains "$success_output" '2m2better update handoff completed.'
 [ -x "$success_home/Applications/2m2better.app/Contents/MacOS/BreakCompanion" ] || fail_test 'new app was not installed'
 [ "$("$success_home/Applications/2m2better.app/Contents/MacOS/BreakCompanion")" = 'new-app' ] || fail_test 'new app executable did not run'
 [ "$(cat "$success_home/Library/Preferences/local.break-companion.pilot.plist")" = 'keep user preference' ] || fail_test 'user preferences changed'
+[ "$(cat "$success_home/Library/Application Support/2m2better/companion-state.json")" = 'keep timer and session state' ] || fail_test 'timer/session state changed'
 [ "$(cat "$success_root/open.log")" = "$success_home/Applications/2m2better.app" ] || fail_test 'new app was not relaunched'
 backup_count=0
 backup_marker=

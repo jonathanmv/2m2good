@@ -1,3 +1,4 @@
+import AppKit
 import CryptoKit
 import XCTest
 @testable import BreakCompanion
@@ -604,6 +605,216 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertTrue(resumed.didResetAfterIdle)
         XCTAssertEqual(resumed.activeSeconds, 2)
         XCTAssertFalse(resumed.shouldOfferCheckIn)
+    }
+
+    func testPauseRelativeTimeUsesLocalCalendarBoundariesAndIgnoresFutureHistory() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        let now = calendar.date(from: DateComponents(year: 2026, month: 1, day: 10, hour: 12))!
+
+        XCTAssertEqual(
+            PauseRelativeTimeFormatter.string(
+                for: now.addingTimeInterval(-23 * 60),
+                relativeTo: now,
+                calendar: calendar
+            ),
+            "23m ago"
+        )
+        XCTAssertEqual(
+            PauseRelativeTimeFormatter.string(
+                for: now.addingTimeInterval(-60 * 60),
+                relativeTo: now,
+                calendar: calendar
+            ),
+            "over 1h ago"
+        )
+        XCTAssertEqual(
+            PauseRelativeTimeFormatter.string(
+                for: now.addingTimeInterval(-90 * 60),
+                relativeTo: now,
+                calendar: calendar
+            ),
+            "over 1h ago"
+        )
+        XCTAssertEqual(
+            PauseRelativeTimeFormatter.string(
+                for: now.addingTimeInterval(-120 * 60),
+                relativeTo: now,
+                calendar: calendar
+            ),
+            "over 2h ago"
+        )
+        XCTAssertEqual(
+            PauseRelativeTimeFormatter.string(
+                for: calendar.date(from: DateComponents(year: 2026, month: 1, day: 9, hour: 23, minute: 59))!,
+                relativeTo: now,
+                calendar: calendar
+            ),
+            "yesterday"
+        )
+        XCTAssertEqual(
+            PauseRelativeTimeFormatter.string(
+                for: calendar.date(from: DateComponents(year: 2026, month: 1, day: 8, hour: 12))!,
+                relativeTo: now,
+                calendar: calendar
+            ),
+            "day before yesterday"
+        )
+        XCTAssertEqual(
+            PauseRelativeTimeFormatter.string(
+                for: calendar.date(from: DateComponents(year: 2026, month: 1, day: 5, hour: 12))!,
+                relativeTo: now,
+                calendar: calendar
+            ),
+            "5 days ago"
+        )
+        XCTAssertEqual(
+            PauseRelativeTimeFormatter.string(
+                for: now.addingTimeInterval(60),
+                relativeTo: now,
+                calendar: calendar
+            ),
+            nil
+        )
+    }
+
+    @MainActor
+    func testPauseHistoryPersistsCompletedPausesAndCollapsePreservesDecision() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let scheduler = ManualDelayedActionScheduler()
+        let start = referenceDate(10_000)
+        var now = start
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults,
+            activitySignalProvider: { LocalActivitySignal(keyboardIdle: 10_000, pointerIdle: 10_000) },
+            speaker: RecordingSpeaker(),
+            nowProvider: { now },
+            postponementScheduler: scheduler
+        )
+        store.continueWithBalancedDefaults()
+        var resizedModes: [CompanionStore.Mode] = []
+        store.onSizeChange = { resizedModes.append($0) }
+        store.offerBreakNow()
+        XCTAssertEqual(store.mode, .checkIn)
+        XCTAssertNil(store.lastCompletedPauseContext, "No completed pause should not produce made-up context")
+
+        let remainingBeforeCollapse = store.nextCheckInRemainingSeconds
+        let progressBeforeCollapse = store.checkInProgress
+        store.collapseCheckIn()
+        XCTAssertTrue(store.isCheckInCollapsed)
+        XCTAssertEqual(store.mode, .checkIn)
+        XCTAssertEqual(store.nextCheckInRemainingSeconds, remainingBeforeCollapse)
+        XCTAssertEqual(store.checkInProgress, progressBeforeCollapse)
+
+        store.tickForTesting(at: start.addingTimeInterval(30), userIsActive: true)
+        XCTAssertEqual(store.mode, .checkIn, "Hiding the prompt must not turn it into an idle/deferral state")
+        store.restoreCheckIn()
+        XCTAssertFalse(store.isCheckInCollapsed)
+        XCTAssertEqual(resizedModes, [.checkIn, .checkIn, .checkIn], "Offer, collapse, and restore must refit the real panel without changing mode")
+        store.startRoutine(at: start, activitySignal: LocalActivitySignal(keyboardIdle: 10_000, pointerIdle: 10_000))
+        XCTAssertEqual(store.mode, .routine, "The existing Start choice must still work after restore")
+
+        for second in 1...119 {
+            store.tickForTesting(at: start.addingTimeInterval(TimeInterval(second)), userIsActive: false)
+        }
+        now = start.addingTimeInterval(120)
+        store.tickForTesting(at: now, userIsActive: false)
+        XCTAssertEqual(store.mode, .complete)
+        XCTAssertEqual(PauseHistoryStore(defaults: defaults).completedPauseDates.count, 1)
+        store.dismissCompletion()
+
+        now = start.addingTimeInterval(120 + 23 * 60)
+        store.offerBreakNow()
+        XCTAssertEqual(store.lastCompletedPauseContext, "23m ago")
+
+        let restarted = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults,
+            speaker: RecordingSpeaker(),
+            nowProvider: { now },
+            postponementScheduler: scheduler
+        )
+        restarted.continueWithBalancedDefaults()
+        restarted.offerBreakNow()
+        XCTAssertEqual(restarted.lastCompletedPauseContext, "23m ago", "Completed pause context must survive relaunch")
+
+        let remainingAfterRelaunch = restarted.nextCheckInRemainingSeconds
+        restarted.collapseCheckIn()
+        restarted.restoreCheckIn()
+        XCTAssertEqual(restarted.nextCheckInRemainingSeconds, remainingAfterRelaunch)
+        restarted.postpone(minutes: 60)
+        XCTAssertEqual(restarted.statusText, "I’ll check back in an hour.")
+        scheduler.runPendingAction()
+        XCTAssertEqual(restarted.mode, .idle, "Later must retain its existing deferral behavior after restore")
+    }
+
+    @MainActor
+    func testTimerAndRoutineStateSurviveRelaunchOutsideTheAppBundle() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let stateURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("2m2better-state-\(UUID().uuidString)", isDirectory: false)
+        let stateStore = CompanionStateStore(fileURL: stateURL)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: stateURL)
+        }
+
+        let productionPath = CompanionStateStore().fileURL.path
+        XCTAssertTrue(productionPath.contains("Library/Application Support/2m2better"))
+        let start = referenceDate(20_000)
+        var now = start
+        let signal = LocalActivitySignal(keyboardIdle: 10_000, pointerIdle: 10_000)
+        let firstStore = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults,
+            activitySignalProvider: { signal },
+            speaker: RecordingSpeaker(),
+            nowProvider: { now },
+            stateStore: stateStore
+        )
+        firstStore.continueWithBalancedDefaults()
+        firstStore.tickForTesting(at: start.addingTimeInterval(1), userIsActive: true)
+        XCTAssertEqual(firstStore.nextCheckInRemainingSeconds, 3_599)
+
+        now = start.addingTimeInterval(2)
+        let restartedIdle = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults,
+            activitySignalProvider: { signal },
+            speaker: RecordingSpeaker(),
+            nowProvider: { now },
+            stateStore: stateStore
+        )
+        XCTAssertEqual(restartedIdle.nextCheckInRemainingSeconds, 3_599)
+        restartedIdle.tickForTesting(at: start.addingTimeInterval(3), userIsActive: true)
+        XCTAssertEqual(restartedIdle.nextCheckInRemainingSeconds, 3_598)
+
+        restartedIdle.offerBreakNow()
+        restartedIdle.startRoutine(at: start.addingTimeInterval(4), activitySignal: signal)
+        for second in 1...7 {
+            restartedIdle.tickForTesting(at: start.addingTimeInterval(4 + TimeInterval(second)), userIsActive: false)
+        }
+        restartedIdle.togglePause()
+
+        now = start.addingTimeInterval(12)
+        let restartedRoutine = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults,
+            activitySignalProvider: { signal },
+            speaker: RecordingSpeaker(),
+            nowProvider: { now },
+            stateStore: stateStore
+        )
+        XCTAssertEqual(restartedRoutine.mode, .routine)
+        XCTAssertEqual(restartedRoutine.elapsedInStep, 7)
+        XCTAssertTrue(restartedRoutine.isPaused, "The active pause session must resume from durable state")
     }
 
     @MainActor
@@ -2062,6 +2273,29 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertEqual(resizedModes, [.routine])
 
         store.endRoutine()
+    }
+
+    func testPauseScreenControlsHaveActionableAccessibilityLabels() {
+        XCTAssertEqual(PauseScreenControl.collapse.action, .collapse)
+        XCTAssertEqual(PauseScreenControl.collapse.title, "Hide pause screen")
+        XCTAssertTrue(PauseScreenControl.collapse.accessibilityLabel.lowercased().contains("collapse"))
+        XCTAssertTrue(PauseScreenControl.collapse.accessibilityHint.lowercased().contains("without changing"))
+
+        XCTAssertEqual(PauseScreenControl.restore.action, .restore)
+        XCTAssertTrue(PauseScreenControl.restore.accessibilityLabel.lowercased().contains("show pause choices"))
+        XCTAssertEqual(PauseScreenControl.restore.accessibilityValue, "Pause choices are hidden")
+        XCTAssertTrue(PauseScreenControl.restore.accessibilityHint.lowercased().contains("restore"))
+    }
+
+    @MainActor
+    func testCompanionPanelUsesAppKitBackgroundDragging() {
+        let panel = CompanionPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        XCTAssertTrue(panel.isMovableByWindowBackground)
     }
 
     func testPointerMovementClassifierKeepsTapDeadZone() {

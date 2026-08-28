@@ -14,6 +14,7 @@ REPOSITORY="jonathanmv/2m2good"
 RELEASE_API_URL="https://api.github.com/repos/$REPOSITORY/releases/latest"
 APPLICATION_NAME="2m2better.app"
 APPLICATION_EXECUTABLE="BreakCompanion"
+BUNDLE_IDENTIFIER="local.break-companion.pilot"
 
 fail() {
     printf '%s: ERROR: %s\n' "$SCRIPT_NAME" "$1" >&2
@@ -28,12 +29,13 @@ Usage:
   install.sh [--replace] [--no-launch] [--dry-run]
 
 The default installs the latest non-draft, non-prerelease GitHub Release for
-this Mac's architecture into ~/Applications/2m2better.app. It refuses an
-existing app. Pass --replace only when you explicitly want to replace it; the
-old app bundle is moved to a timestamped .previous backup and is not deleted.
+this Mac's architecture into ~/Applications/2m2better.app. If that app already
+exists, the installer asks only 2m2better to quit, waits for it to exit, then
+replaces it safely; the old app bundle is moved to a timestamped .previous
+backup and is not deleted.
 
 Options:
-  --replace    Explicitly replace an existing ~/Applications/2m2better.app.
+  --replace    Accepted for compatibility; existing apps are now updated by default.
   --no-launch  Install and index the app, but do not ask macOS to open it.
   --dry-run    Check macOS and architecture, then print the plan without
                contacting GitHub or changing files.
@@ -121,9 +123,6 @@ if [ -e "$install_root" ] || [ -L "$install_root" ]; then
     [ ! -L "$install_root" ] || fail "installation directory is a symlink; refusing to follow it: $install_root"
 fi
 if [ -e "$installed_app" ] || [ -L "$installed_app" ]; then
-    if [ "$replace" -ne 1 ]; then
-        fail "installation already exists: $installed_app. Nothing was changed; pass --replace only after reviewing its documented backup behavior."
-    fi
     [ ! -L "$installed_app" ] || fail "existing installation is a symlink; refusing to replace it: $installed_app"
     [ -d "$installed_app" ] || fail "existing installation is not an app bundle directory: $installed_app"
 fi
@@ -147,9 +146,9 @@ if [ "$dry_run" -eq 1 ]; then
     printf '  Checksum asset:   2m2better-v<latest-version>-macos-%s.zip.sha256\n' "$architecture"
     printf '  Install location: %s\n' "$installed_app"
     if [ "$replace" -eq 1 ]; then
-        printf '%s\n' '  Existing app:     replace only after verification; retain a timestamped .previous backup'
+        printf '%s\n' '  Existing app:     update after verification; --replace is accepted for compatibility; retain a timestamped .previous backup'
     else
-        printf '%s\n' '  Existing app:     refuse without --replace'
+        printf '%s\n' '  Existing app:     update after verification; ask only 2m2better to quit; retain a timestamped .previous backup'
     fi
     if [ "$launch" -eq 1 ]; then
         printf '%s\n' '  After install:    refresh Spotlight indexing and open the app'
@@ -210,6 +209,41 @@ download() {
         api) is_allowed_api_url "$effective_url" || fail "release API redirected outside approved GitHub API hosts: $effective_url" ;;
         asset) is_allowed_asset_url "$effective_url" || fail "release asset redirected outside approved GitHub asset hosts: $effective_url" ;;
     esac
+}
+
+app_is_running() {
+    running=$(osascript -e "tell application id \"$BUNDLE_IDENTIFIER\" to get running" 2>/dev/null) || return 2
+    [ "$running" = true ]
+}
+
+quit_running_app() {
+    require_command osascript 'osascript is required to ask the existing 2m2better app to quit gracefully.'
+    if app_is_running; then
+        :
+    else
+        status=$?
+        [ "$status" -eq 1 ] || fail 'could not verify whether 2m2better is running; nothing was replaced.'
+        return 0
+    fi
+
+    printf '%s\n' 'Asking the existing 2m2better app to quit gracefully before replacement...'
+    if ! osascript -e "tell application id \"$BUNDLE_IDENTIFIER\" to quit"; then
+        fail '2m2better could not be asked to quit gracefully; nothing was replaced.'
+    fi
+
+    waited=0
+    while :; do
+        if app_is_running; then
+            :
+        else
+            status=$?
+            [ "$status" -eq 1 ] || fail 'could not verify that 2m2better quit; nothing was replaced.'
+            break
+        fi
+        [ "$waited" -lt 60 ] || fail '2m2better did not quit within one minute; nothing was replaced.'
+        sleep 1
+        waited=$((waited + 1))
+    done
 }
 
 extract_release_value() {
@@ -332,9 +366,9 @@ staged_app="$staging_root/$APPLICATION_NAME"
 mv "$extracted_app" "$staged_app" || fail 'could not stage the verified app bundle; nothing was installed.'
 
 if [ -e "$installed_app" ] || [ -L "$installed_app" ]; then
-    [ "$replace" -eq 1 ] || fail "installation appeared during download; refusing to overwrite $installed_app."
     [ ! -L "$installed_app" ] || fail "installation appeared as a symlink; refusing to replace it: $installed_app"
     [ -d "$installed_app" ] || fail "installation appeared as a non-directory; refusing to replace it: $installed_app"
+    quit_running_app
     backup="$install_root/.2m2better.app.previous.$$.app"
     backup_number=0
     while [ -e "$backup" ] || [ -L "$backup" ]; do
