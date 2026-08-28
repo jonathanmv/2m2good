@@ -199,6 +199,17 @@ struct RoutineActivityDetector {
         consecutivePointerActivityPolls = 0
     }
 
+    /// Grants the closing click/keystroke a short grace without spending the lifetime budget.
+    mutating func resumeObservation(at date: Date, signal: LocalActivitySignal) {
+        guard startedAt != nil else { return }
+        previousSignal = signal
+        consecutivePointerActivityPolls = 0
+        companionProtectedUntil = max(
+            companionProtectedUntil ?? date,
+            date.addingTimeInterval(RoutineActivityPolicy.companionInteractionTolerance)
+        )
+    }
+
     mutating func decision(
         at date: Date,
         isPaused: Bool,

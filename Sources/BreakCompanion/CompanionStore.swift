@@ -339,6 +339,10 @@ final class CompanionStore: ObservableObject {
         // Close-time observation is needed as well as the per-second configuration
         // guard for a Settings sheet opened and closed between clock ticks.
         activeUseTracker.suspend(at: nowProvider())
+        if returnMode == .routine {
+            // Discard the whole Settings visit's activity delta without spending protection budget.
+            routineActivityDetector.resumeObservation(at: nowProvider(), signal: activitySignalProvider())
+        }
         configurationReturnMode = nil
         if returnMode == .checkIn, refreshPendingOffer,
            let suggestion = sessionSelection.suggestion(

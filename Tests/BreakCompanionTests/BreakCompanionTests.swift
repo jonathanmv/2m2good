@@ -2493,6 +2493,61 @@ final class BreakCompanionTests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsVisitLongerThanCompanionToleranceDoesNotCancelRoutineOnReturnButSustainedWorkStillDoes() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let start = referenceDate(40_000)
+        var now = start
+        var signal = activitySignal(50, 50)
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults,
+            activitySignalProvider: { signal },
+            speaker: RecordingSpeaker(),
+            nowProvider: { now }
+        )
+        store.continueWithBalancedDefaults()
+        store.startRoutine(at: start, activitySignal: signal)
+
+        for second in 1...9 {
+            now = start.addingTimeInterval(TimeInterval(second))
+            store.tickForTesting(at: now, userIsActive: false)
+        }
+        XCTAssertEqual(store.mode, .routine)
+        XCTAssertEqual(store.elapsedInStep, 9)
+
+        // Open Settings mid-routine with a fresh click.
+        signal = activitySignal(50, 0.05)
+        now = start.addingTimeInterval(10)
+        store.openAreaConfiguration()
+        XCTAssertEqual(store.mode, .configuration)
+
+        // Stay in Settings well past the 3-second companion-interaction tolerance.
+        now = start.addingTimeInterval(25)
+        signal = activitySignal(50, 12)
+        store.saveSettings(cadence: .twentyMinutes, areas: [.neck])
+        XCTAssertEqual(store.mode, .routine, "Saving settings mid-routine must return to the routine")
+        XCTAssertEqual(store.elapsedInStep, 9, "Settings must not advance the routine step")
+
+        // The very next tick catches the closing interaction's own residual freshness.
+        now = start.addingTimeInterval(26)
+        signal = activitySignal(0.05, 50)
+        store.tickForTesting(at: now, userIsActive: true)
+        XCTAssertEqual(store.mode, .routine, "A settings visit longer than the interaction tolerance must not silently cancel the routine on return")
+        XCTAssertEqual(store.elapsedInStep, 10)
+
+        // Genuine sustained activity after the short return grace must still resume-cancel it.
+        for second in 27...29 {
+            now = start.addingTimeInterval(TimeInterval(second))
+            store.tickForTesting(at: now, userIsActive: true)
+        }
+        XCTAssertEqual(store.mode, .checkIn, "Genuine sustained work after returning from Settings must still be detected")
+    }
+
+    @MainActor
     func testAutomaticThresholdCrossingRequestsVisiblePendingOfferAndClockCanStartAfterSetup() {
         let suiteName = "BreakCompanionTests.\(#function)"
         let defaults = UserDefaults(suiteName: suiteName)!
