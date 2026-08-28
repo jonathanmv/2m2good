@@ -6,7 +6,7 @@ A deliberately small, local macOS break companion. After 60 minutes of active ke
 
 - A small floating orb plus a menu-bar fallback; no dashboard, browsable pause history, streaks, or account.
 - Active-use timing that pauses while the Mac is idle and starts a fresh interval when activity returns after at least the idle threshold; delayed timer callbacks and sleep gaps never count as work.
-- Warm check-ins with **Start**, **Later** (one hour), and **Tomorrow**, plus a small **^** collapse control when the choice needs to wait without changing.
+- Warm check-ins with **Start**, **Later** (one hour), and **Tomorrow**, plus a small chevron-up collapse control when the choice needs to wait without changing.
 - A subtle durable local context line shows the last completed pause with compact relative wording, or **Last pause taken — none yet** on a fresh install.
 - Click-only check-in responses: **Start**, **Later** (one hour), and **Tomorrow**, with keyboard-accessible controls.
 - A library of gentle, standing-compatible desk-break movements. Each offered session combines six different 20-second movements into a fresh two-minute reset.
@@ -26,7 +26,7 @@ newer or the matching Apple Command Line Tools.
 open ".build/app/2m2better.app"
 ```
 
-The app appears as a small orb near the upper-right of the screen and as a leaf in the menu bar. On a fresh install, a compact setup asks for a pause rhythm and which body areas the standing reset should support; every shipped movement is standing-only, so the reset is presented as a standing one rather than a seated alternative. Click the orb or **Offer a break now** in the menu bar to trigger a break immediately; use the small **^** control (or Escape) to return to the orb without choosing a response, then click the orb or use **Offer a break now** again to restore the choices. The pause window can be dragged from its non-control background like a normal desktop window. Use **Settings…** there to review or change the selection; it remains actionable from the idle orb and an undecided offer without discarding that offer.
+The app appears as a small orb near the upper-right of the screen and as a leaf in the menu bar. On a fresh install, a compact setup asks for a pause rhythm and which body areas the standing reset should support; every shipped movement is standing-only, so the reset is presented as a standing one rather than a seated alternative. Click the orb or **Offer a break now** in the menu bar to trigger a break immediately; use the small chevron-up control (or Escape) to return to the orb without choosing a response, then click the orb or use **Show pause choices** again to restore the choices. A pending offer is shown in a warm due color in both its full and collapsed presentations. The pause window can be dragged from its non-control background like a normal desktop window. Use **Settings…** there to review or change the selection; it remains actionable from the orb, an undecided offer, a routine, or the completion screen without discarding that state.
 
 The menu also includes **Settings…**, which changes the pause rhythm and body areas, and **Copy diagnostics**, which places a coarse local status report on the clipboard. **About 2m2better…** shows the shared release identity, and **Check for Updates…** checks GitHub Releases only. When a newer release is available, a short prompt offers **Install and Relaunch** or **Later**. Choosing install downloads and verifies in the background, shows brief progress, then hands off to the installer without a second technical confirmation. Installation is never silent. The helper waits for this app to exit, replaces only `~/Applications/2m2better.app`, retains a rollback copy, preserves preferences, and asks macOS to relaunch. Recoverable errors offer **Try Again** and write technical details to the update log. See [`docs/RELEASES.md`](docs/RELEASES.md) for the updater behavior, trust limitation, release asset contract, icon packaging, and validation.
 
@@ -67,7 +67,7 @@ checksum requirements, and updater compatibility are documented in
 
 ## Permissions
 
-The check-in is click-only: **Start**, **Later**, and **Tomorrow** remain visible and keyboard-accessible. The small **^** control (or Escape) collapses an undecided offer without choosing a response, so no audio-input or command-recognition permission is needed. During a routine, spoken movement guidance complements the on-screen instructions; the app does not listen for responses.
+The check-in is click-only: **Start**, **Later**, and **Tomorrow** remain visible and keyboard-accessible. The small chevron-up control (or Escape) collapses an undecided offer without choosing a response, so no audio-input or command-recognition permission is needed. During a routine, spoken movement guidance complements the on-screen instructions; the app does not listen for responses.
 
 The app does not need Accessibility permission. It reads only macOS’s aggregate local time since the last keyboard, mouse movement (including drags), mouse-button, or scroll event, not the keys pressed or the content of events. Live timer and session checkpoints are kept under `~/Library/Application Support/2m2better`, outside the replaceable app bundle.
 
@@ -120,6 +120,21 @@ BREAK_INTERVAL_SECONDS=5 ".build/app/2m2better.app/Contents/MacOS/BreakCompanion
 
 `BREAK_IDLE_THRESHOLD_SECONDS` can also replace the default 60-second idle threshold. When no keyboard or mouse activity has been seen for at least that threshold, the next active sample resets the interval before adding only the current timer tick; a sleep gap is never counted as active work. Values are clamped to sensible testing minimums.
 
+### How an automatic offer appears
+
+The initiating signal is only macOS's aggregate age for recent keyboard and
+mouse movement, clicks, drags, and scrolling. After launch, a one-second clock
+samples that signal and the active-use timer credits only ticks whose signal is
+within the idle threshold. Idle, locked, sleeping, and app-uptime gaps are
+observation gaps, not work. When accumulated active use crosses the configured
+cadence, the timer resets and the store enters a **pending offer** state. The
+panel then resizes, moves into the current visible screen, orders itself in
+front, and activates so the full **Start**, **Later**, and **Tomorrow** choice is
+unmistakable. Collapsing it leaves that same pending decision in a warm orb;
+clicking the orb restores the choices. A manual **Offer a break now** follows
+the same presentation path, which makes it a useful countercheck when
+investigating an automatic reminder.
+
 Run the packaged logic checks with:
 
 ```sh
@@ -132,7 +147,7 @@ Inspect the deterministic, privacy-safe startup diagnostic with:
 ".build/app/2m2better.app/Contents/MacOS/BreakCompanion" --diagnostics
 ```
 
-For the live app, choose **Copy diagnostics** from the menu bar and inspect the clipboard with `pbpaste`. Both reports contain only the effective cadence, selected body areas, coarse mode, and one active-use status (`accumulating`, `waiting for activity`, `scheduled`, or `otherwise paused`). They never include key values, pointer coordinates, app content, agent data, analytics, or network state.
+For the live app, choose **Copy diagnostics** from the menu bar and inspect the clipboard with `pbpaste`. Both reports contain only the effective cadence, selected body areas, coarse mode, the active-use status (`accumulating active use`, `waiting for active use`, `scheduled check-in`, `pending offer`, `settings open`, `routine in progress`, or `completion screen`), and the pending-offer presentation (`visible pause choices`, `collapsed pending orb`, or `no pending offer`). A pending offer means the store has crossed the active-use threshold and is waiting for a decision; it does not mean that the offer failed to happen. They never include key values, pointer coordinates, app content, agent data, analytics, or network state.
 
 Exercise the release installer through its command-line interface with its
 network-free macOS command harness:
@@ -148,4 +163,4 @@ The Swift package and XCTest target are included for use in a standard Xcode too
 
 This prototype intentionally does not launch at login, collect wellbeing data, sync, coach, score, or expose a browsable pause-history or routine catalog. “Tomorrow” means 24 hours from the response. The optional updater is the only runtime network activity; its privacy and trust contract is documented in [`docs/RELEASES.md`](docs/RELEASES.md) and does not change the local-only break experience. For a later iteration, “Tomorrow” could become a user-selected quiet-hours-aware morning without changing the core state machine.
 
-A quiet idle orb shifts from soft green through muted orange to calm red as the next check-in approaches. The same timing is available to VoiceOver as remaining time and interval progress, so color is never the only signal.
+A quiet idle orb shifts from soft green through muted orange to calm red as the next check-in approaches. Once an offer is pending, both the full pause panel and collapsed orb stay in the warm due range even though the active-use counter has reset. The same timing is available to VoiceOver as remaining time and interval progress, so color is never the only signal.

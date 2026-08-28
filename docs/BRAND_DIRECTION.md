@@ -27,7 +27,7 @@ The product is a friendly, expressive companion—not a coach, tracker, therapis
 - It notices sustained computer use and makes a gentle check-in.
 - It suggests one safe, simple, exactly two-minute movement reset.
 - It guides the reset with clear on-screen instructions and spoken movement guidance.
-- It keeps **Start**, **Later**, and **Tomorrow** as visible, keyboard-accessible check-in choices, with a small **^** collapse control, without asking for command input.
+- It keeps **Start**, **Later**, and **Tomorrow** as visible, keyboard-accessible check-in choices, with a small chevron-up collapse control, without asking for command input.
 - It stays small and calm on the desktop, using simple animation and a little personality rather than a full animated character.
 
 The companion should feel observant and quietly confident: it is on the person's side, but it never acts like it knows better than they do.

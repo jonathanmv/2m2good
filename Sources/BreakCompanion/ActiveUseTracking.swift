@@ -17,7 +17,7 @@ struct ActiveUseTracker {
 
     static let maximumTimerDelta: TimeInterval = 2
 
-    let activeInterval: TimeInterval
+    private(set) var activeInterval: TimeInterval
     let idleThreshold: TimeInterval
     private(set) var accumulatedActiveTime: TimeInterval = 0
 
@@ -77,6 +77,16 @@ struct ActiveUseTracker {
     /// time spent in a non-timing surface, such as settings, out of both the delta and
     /// the delayed-callback calculation.
     mutating func suspend(at date: Date) {
+        lastTickAt = date
+    }
+
+    /// Changes the cadence without turning time spent in Settings into active use.
+    /// Existing active credit is intentionally retained; the new cadence applies to
+    /// the active interval already in progress and future intervals.
+    mutating func reconfigure(activeInterval: TimeInterval, at date: Date) {
+        guard activeInterval.isFinite, activeInterval > 0 else { return }
+        self.activeInterval = activeInterval
+        accumulatedActiveTime = min(activeInterval, accumulatedActiveTime)
         lastTickAt = date
     }
 

@@ -70,16 +70,19 @@ already-merged break-trigger and pause-screen fixes to installed users:
 - Break reminders follow active keyboard or mouse use, while idle time and
   sleep do not advance the reminder. A pause can also be offered immediately
   by clicking the orb or choosing **Offer a break now** from the menu bar.
-- **Settings…** remains available from the idle orb and an undecided pause
-  offer, so the pause rhythm and supported areas can be changed without losing
-  the offer.
+- **Settings…** remains available from the orb, an undecided pause offer, a
+  routine, and the completion screen, so the pause rhythm and supported areas
+  can be changed without losing the current state or offer.
 - A pause prompt shows brief context about the last completed pause, or
   **Last pause taken — none yet** when there is no completed history. It does
   not add a browsable history.
-- The top-right **^** control (or Escape) collapses an undecided prompt without
-  choosing a response; clicking the orb or choosing **Offer a break now**
-  restores the pause choices.
-- Timer progress and an active pause session are retained in local user data,
+- The top-right chevron-up control (or Escape) collapses an undecided prompt
+  without choosing a response; clicking the orb or choosing **Show pause
+  choices** restores the pause choices. Both the full prompt and collapsed
+  pending orb use a warm due color.
+- The one-second active-use clock is installed after normal app launch and
+  remains alive through relaunch, update handoff, Settings, and panel resizing.
+  Timer progress and an active pause session are retained in local user data,
   outside the replaceable app bundle, so a normal relaunch or update handoff
   can resume safely without discarding the current session.
 - The one-line installer updates an existing installation through the same

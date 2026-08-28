@@ -44,7 +44,7 @@ enum SelfCheck {
         checkActivityDetectionAndRecovery(&failures)
 
         if failures.isEmpty {
-            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, concise update prompt states and recovery actions, standing session composition, cadence settings, body-area selection, first-run and menu-bar configuration, legacy migration, privacy-safe diagnostics, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, durable pause history and relative context, honest empty pause context, timer/session relaunch checkpoints, settings-safe check-in restoration, caret collapse-and-restore behavior, spoken movement guidance, completion dismissal, progress color, keyboard and mouse activity signals, pointer movement, routine activity recovery, and idle-session reset.")
+            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, concise update prompt states and recovery actions, standing session composition, cadence settings, body-area selection, first-run and menu-bar configuration, legacy migration, privacy-safe diagnostics, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, durable pause history and relative context, honest empty pause context, timer/session relaunch checkpoints, settings-safe check-in restoration, chevron collapse-and-restore behavior, spoken movement guidance, completion dismissal, progress color, keyboard and mouse activity signals, pointer movement, routine activity recovery, and idle-session reset.")
             return true
         }
 
@@ -299,6 +299,30 @@ enum SelfCheck {
                     failures.append("active controller should offer after idle time is excluded")
                 }
             }
+
+            withIsolatedDefaults("system-inactive-boundary") { defaults in
+                let start = Date(timeIntervalSinceReferenceDate: 5_300)
+                let signal = LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 0.2)
+                let store = CompanionStore(
+                    environment: [
+                        "BREAK_INTERVAL_SECONDS": "5",
+                        "BREAK_IDLE_THRESHOLD_SECONDS": "10"
+                    ],
+                    defaults: defaults,
+                    activitySignalProvider: { signal },
+                    speaker: SelfCheckSpeaker(),
+                    nowProvider: { start }
+                )
+                store.continueWithBalancedDefaults()
+                for second in 1...4 {
+                    store.tickForTesting(at: start.addingTimeInterval(TimeInterval(second)))
+                }
+                store.noteSystemInactive(at: start.addingTimeInterval(4))
+                store.tickForTesting(at: start.addingTimeInterval(5))
+                if store.mode != .idle {
+                    failures.append("a system inactive boundary must reset active-use credit")
+                }
+            }
         }
     }
 
@@ -395,8 +419,10 @@ enum SelfCheck {
         }
         if BreakProgress.color(at: 0) != OrbProgressColor(red: 0.30, green: 0.68, blue: 0.52)
             || BreakProgress.color(at: 0.5) != OrbProgressColor(red: 0.88, green: 0.58, blue: 0.28)
-            || BreakProgress.color(at: 1) != OrbProgressColor(red: 0.78, green: 0.34, blue: 0.32) {
-            failures.append("orb progress color anchors changed")
+            || BreakProgress.color(at: 1) != OrbProgressColor(red: 0.78, green: 0.34, blue: 0.32)
+            || BreakProgress.color(at: 0, pendingOffer: true) == BreakProgress.color(at: 0)
+            || BreakProgress.color(at: 0, pendingOffer: true).green >= 0.68 {
+            failures.append("orb progress and pending-offer colors should remain distinct")
         }
     }
 
@@ -894,15 +920,16 @@ enum SelfCheck {
                     failures.append("diagnostics should distinguish waiting from accumulating")
                 }
                 store.offerBreakNow()
-                if store.diagnosticSnapshot(activityIsActive: true).activeUsePath != .otherwisePaused {
-                    failures.append("diagnostics should identify a visible check-in as paused")
+                if store.diagnosticSnapshot(activityIsActive: true).activeUsePath != .pendingOffer
+                    || store.diagnosticSnapshot(activityIsActive: true).pendingOfferPresentation != .visibleChoices {
+                    failures.append("diagnostics should identify a visible pending offer")
                 }
                 store.postpone(minutes: 60)
                 scheduler.runPendingAction()
                 let report = store.diagnosticReport(activityIsActive: true)
                 if !report.contains("cadence: Every hour")
                     || !report.contains("body areas: balanced mix")
-                    || !report.contains("active-use path: scheduled")
+                    || !report.contains("active-use path: scheduled check-in")
                     || report.lowercased().contains("coordinate")
                     || report.lowercased().contains("content") {
                     failures.append("diagnostics should be coarse and report the scheduled path")
@@ -949,6 +976,11 @@ enum SelfCheck {
     }
 
     private static func checkPauseScreenControls(_ failures: inout [String]) {
+        if PauseScreenControl.collapse.systemImage != "chevron.up"
+            || PauseScreenControl.collapse.accessibilityLabel.isEmpty
+            || PauseScreenControl.collapse.accessibilityHint.isEmpty {
+            failures.append("the pause collapse control should use a styled chevron with accessible copy")
+        }
         MainActor.assumeIsolated {
             withIsolatedDefaults("pause-screen-controls") { defaults in
                 let start = Date(timeIntervalSinceReferenceDate: 900_000)
@@ -966,9 +998,22 @@ enum SelfCheck {
 
                 let remainingBeforeCollapse = store.nextCheckInRemainingSeconds
                 let selectedAreasBeforeCollapse = store.selectedAreas
+                let expandedPendingColor = BreakProgress.color(
+                    at: store.checkInProgress,
+                    pendingOffer: true
+                )
                 store.collapseCheckIn()
+                let collapsedPendingColor = BreakProgress.color(
+                    at: store.checkInProgress,
+                    pendingOffer: true
+                )
                 if !store.isCheckInCollapsed || store.mode != .checkIn {
                     failures.append("collapsing the pause screen should hide it without changing the pending decision")
+                }
+                if collapsedPendingColor != expandedPendingColor
+                    || collapsedPendingColor == BreakProgress.color(at: store.checkInProgress)
+                    || collapsedPendingColor.green >= 0.68 {
+                    failures.append("the collapsed pending orb should keep the due warm color")
                 }
                 if store.nextCheckInRemainingSeconds != remainingBeforeCollapse
                     || store.selectedAreas != selectedAreasBeforeCollapse {

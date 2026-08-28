@@ -175,55 +175,69 @@ struct CompanionView: View {
     }
 
     private var checkInView: some View {
-        VStack(spacing: 17) {
-            HStack {
-                Spacer(minLength: 0)
-                Button(PauseScreenControl.collapse.title, action: store.collapseCheckIn)
-                    .buttonStyle(CollapseButtonStyle())
-                    .keyboardShortcut(PauseScreenControl.collapse.keyboardShortcut ?? .cancelAction)
-                    .help(PauseScreenControl.collapse.accessibilityHint)
-                    .accessibilityLabel(PauseScreenControl.collapse.accessibilityLabel)
-                    .accessibilityHint(PauseScreenControl.collapse.accessibilityHint)
-                    .disabled(store.statusText != nil)
-            }
-
-            HStack(spacing: 14) {
-                CompanionOrb(motion: .breathe, warmth: 0.9, active: true)
-                    .frame(width: 62, height: 62)
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("A small pause?")
-                        .font(.system(size: 19, weight: .semibold, design: .rounded))
-                    Text(store.routine.invitation)
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+        ZStack(alignment: .topTrailing) {
+            VStack(spacing: 17) {
+                HStack(spacing: 14) {
+                    CompanionOrb(
+                        motion: .breathe,
+                        warmth: 0.9,
+                        active: true,
+                        progressColor: BreakProgress.color(
+                            at: store.checkInProgress,
+                            pendingOffer: true
+                        )
+                    )
+                        .frame(width: 62, height: 62)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("A small pause?")
+                            .font(.system(size: 19, weight: .semibold, design: .rounded))
+                        Text(store.routine.invitation)
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
-            }
 
-            Text("Last pause taken — \(store.lastCompletedPauseContext)")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.tertiary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityLabel("Last pause taken — \(store.lastCompletedPauseContext)")
+                Text("Last pause taken — \(store.lastCompletedPauseContext)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel("Last pause taken — \(store.lastCompletedPauseContext)")
 
-            if let explanation = store.activityRecoveryExplanation {
-                Text(explanation)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color(red: 0.24, green: 0.42, blue: 0.38))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                checkInControls
-            } else if let status = store.statusText {
-                Text(status)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color(red: 0.24, green: 0.42, blue: 0.38))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                checkInControls
+                if let explanation = store.activityRecoveryExplanation {
+                    Text(explanation)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color(red: 0.24, green: 0.42, blue: 0.38))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    checkInControls
+                } else if let status = store.statusText {
+                    Text(status)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color(red: 0.24, green: 0.42, blue: 0.38))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    checkInControls
+                }
             }
+            .padding(25)
+
+            Button {
+                store.collapseCheckIn()
+            } label: {
+                Image(systemName: PauseScreenControl.collapse.systemImage)
+                    .accessibilityHidden(true)
+            }
+            .buttonStyle(CollapseButtonStyle())
+            .keyboardShortcut(PauseScreenControl.collapse.keyboardShortcut ?? .cancelAction)
+            .help(PauseScreenControl.collapse.accessibilityHint)
+            .accessibilityLabel(PauseScreenControl.collapse.accessibilityLabel)
+            .accessibilityHint(PauseScreenControl.collapse.accessibilityHint)
+            .disabled(store.statusText != nil)
+            .padding(.top, 13)
+            .padding(.trailing, 13)
         }
-        .padding(25)
     }
 
     private var checkInControls: some View {
@@ -244,7 +258,10 @@ struct CompanionView: View {
             motion: .breathe,
             warmth: 0.9,
             active: true,
-            progressColor: BreakProgress.color(at: store.checkInProgress)
+            progressColor: BreakProgress.color(
+                at: store.checkInProgress,
+                pendingOffer: true
+            )
         )
             .frame(width: 58, height: 58)
             .padding(10)
@@ -468,10 +485,14 @@ private struct AreaOptionButtonStyle: ButtonStyle {
 private struct CollapseButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 16, weight: .semibold, design: .rounded))
-            .foregroundStyle(.primary.opacity(configuration.isPressed ? 0.55 : 0.68))
-            .frame(width: 24, height: 20)
-            .contentShape(Rectangle())
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.primary.opacity(configuration.isPressed ? 0.52 : 0.70))
+            .frame(width: 32, height: 32)
+            .background(
+                Circle()
+                    .fill(Color.primary.opacity(configuration.isPressed ? 0.10 : 0.045))
+            )
+            .contentShape(Circle())
     }
 }
 
