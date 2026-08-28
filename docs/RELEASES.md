@@ -62,10 +62,11 @@ timer/session checkpoints and pause history stay in the invoking user's
 Application Support/preferences data, outside the replaceable bundle. Its
 optional update check sends only the documented GitHub request.
 
-## v0.1.5 reliable offers and pending state
+## v0.1.6 repeated pause reminders and preserved state
 
-The next developer-preview release is **v0.1.5 (build 6)**. It brings the
-merged pending-offer visibility and orb-color fixes to installed users:
+The next developer-preview release is **v0.1.6 (build 7)**. It brings the
+merged five-minute unhandled pause reminders to installed users while
+retaining the existing pause behavior:
 
 - After enough active keyboard or mouse use, a pause offer appears reliably
   with the full **Start**, **Later**, and **Tomorrow** choices. Idle time and
@@ -76,8 +77,8 @@ merged pending-offer visibility and orb-color fixes to installed users:
   apparent; clicking the orb or choosing **Show pause choices** restores the
   full choices. If it remains unhandled, the same offer returns five minutes
   after collapse and repeats every five minutes after later collapses. A visible
-  offer is reannounced without creating a duplicate prompt. **Start**,
-  **Later**, and **Tomorrow** stop the repeat reminders.
+  offer is reannounced without creating a duplicate prompt. Choosing **Start**,
+  **Later**, or **Tomorrow** stops the repeat reminders.
 - **Settings…** remains actionable from the orb, a pending offer, a routine,
   and the completion screen, so the pause rhythm and supported areas can be
   changed without losing the current state or offer.
@@ -86,9 +87,9 @@ merged pending-offer visibility and orb-color fixes to installed users:
   the last completed pause, or **Last pause taken — none yet** when there is no
   completed history; it does not add a browsable history.
 - Relaunches and update handoff preserve an in-progress timer or active pause
-  session, so an update does not discard the current session. An undecided pause
-  offer and its next five-minute reminder are also checkpointed; an overdue
-  reminder is presented once after relaunch and advanced to a future deadline.
+  session, so a relaunch or update does not discard the current pause. An
+  undecided offer remains available after relaunch and continues its
+  five-minute reminders if it is still unhandled.
 - The one-line installer updates an existing installation through the same
   verified replacement flow: it asks a running app to quit gracefully, retains
   the previous bundle for rollback, replaces the app, and relaunches it while
