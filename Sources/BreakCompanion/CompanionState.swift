@@ -12,6 +12,9 @@ struct PersistedCompanionState: Codable, Equatable {
     let activeUse: ActiveUseTracker.PersistenceState
     let scheduledCheckInStartedAt: Date?
     let scheduledCheckInDueAt: Date?
+    /// The next wall-clock reminder for an undecided pause offer. Optional keeps
+    /// checkpoints written before repeat reminders were introduced readable.
+    let pendingOfferReminderDueAt: Date?
     let routineMoveIDs: [String]
     let stepIndex: Int
     let elapsedInStep: Int

@@ -34,6 +34,7 @@ final class CompanionStore: ObservableObject {
     }
 
     static let checkInPrompt = "Time for a small pause."
+    static let pendingOfferReminderInterval: TimeInterval = 5 * 60
 
     @Published private(set) var mode: Mode = .idle
     @Published private(set) var routine: BreakRoutine
@@ -66,6 +67,10 @@ final class CompanionStore: ObservableObject {
     private let testingIntervalOverride: TimeInterval?
     private var activeUseTracker: ActiveUseTracker
     private var scheduledCheckIn: ScheduledCheckInWindow?
+    /// An undecided offer owns one wall-clock reminder at a time. Keeping the
+    /// deadline in the store (rather than creating a task per collapse) lets the
+    /// one-second clock, relaunch checkpoint, and tests share the same path.
+    private var pendingOfferReminderDueAt: Date?
     private let nowProvider: () -> Date
     private let postponementScheduler: any DelayedActionScheduling
     private var timer: Timer?
@@ -169,6 +174,7 @@ final class CompanionStore: ObservableObject {
             activeUse: activeUseTracker.persistenceState,
             scheduledCheckInStartedAt: scheduledCheckIn?.startedAt,
             scheduledCheckInDueAt: scheduledCheckIn?.dueAt,
+            pendingOfferReminderDueAt: pendingOfferReminderDueAt,
             routineMoveIDs: routine.moveIDs,
             stepIndex: stepIndex,
             elapsedInStep: elapsedInStep,
@@ -204,6 +210,10 @@ final class CompanionStore: ObservableObject {
     func collapseCheckIn() {
         guard mode == .checkIn, statusText == nil else { return }
         isCheckInCollapsed = true
+        // The collapse is the user's choice to defer seeing the same offer;
+        // start its five-minute reminder window at that interaction, without
+        // touching active-use credit.
+        pendingOfferReminderDueAt = nowProvider().addingTimeInterval(Self.pendingOfferReminderInterval)
         notifySizeChange()
     }
 
@@ -366,6 +376,7 @@ final class CompanionStore: ObservableObject {
 
     func startRoutine(at date: Date, activitySignal: LocalActivitySignal) {
         cancelCompletionAutoDismiss()
+        pendingOfferReminderDueAt = nil
         isCheckInCollapsed = false
         mode = .routine
         stepIndex = 0
@@ -380,6 +391,7 @@ final class CompanionStore: ObservableObject {
 
     func postpone(minutes: Int) {
         let now = nowProvider()
+        pendingOfferReminderDueAt = nil
         isCheckInCollapsed = false
         scheduledCheckIn = ScheduledCheckInWindow(
             startedAt: now,
@@ -395,6 +407,7 @@ final class CompanionStore: ObservableObject {
 
     func postponeUntilTomorrow() {
         let now = nowProvider()
+        pendingOfferReminderDueAt = nil
         isCheckInCollapsed = false
         let dueAt = Calendar.current.date(byAdding: .day, value: 1, to: now)
             ?? now.addingTimeInterval(24 * 60 * 60)
@@ -513,6 +526,7 @@ final class CompanionStore: ObservableObject {
 
         if mode == .checkIn {
             updateLastCompletedPauseContext(at: now)
+            handlePendingOfferReminder(at: now)
             return
         }
 
@@ -582,6 +596,9 @@ final class CompanionStore: ObservableObject {
     private func showCheckIn(at date: Date, activityRecoveryExplanation: String? = nil) {
         guard mode == .idle else { return }
         cancelCompletionAutoDismiss()
+        // A manual offer supersedes any earlier Later/Tomorrow window. This
+        // keeps the pending offer and its reminder independent on relaunch.
+        scheduledCheckIn = nil
         activeUseTracker.reset(at: date)
         updateCheckInProgress(at: date)
         guard let suggestion = sessionSelection.suggestion(
@@ -592,11 +609,37 @@ final class CompanionStore: ObservableObject {
         statusText = nil
         self.activityRecoveryExplanation = activityRecoveryExplanation
         isCheckInCollapsed = false
+        pendingOfferReminderDueAt = date.addingTimeInterval(Self.pendingOfferReminderInterval)
         updateLastCompletedPauseContext(at: date)
         mode = .checkIn
         notifySizeChange()
         // Someone who just went back to work should not be spoken to or have the
         // app focus taken from them; the written explanation carries it.
+        guard activityRecoveryExplanation == nil else { return }
+        speaker.speak(Self.checkInPrompt)
+    }
+
+    /// Re-present the existing pending choice without composing another routine or
+    /// resetting active-use credit. A visible offer only needs a reannouncement;
+    /// a collapsed offer also asks AppKit to refit the panel back to its choices.
+    private func handlePendingOfferReminder(at now: Date) {
+        guard mode == .checkIn,
+              statusText == nil,
+              let dueAt = pendingOfferReminderDueAt,
+              dueAt <= now else { return }
+
+        pendingOfferReminderDueAt = now.addingTimeInterval(Self.pendingOfferReminderInterval)
+        let wasCollapsed = isCheckInCollapsed
+        isCheckInCollapsed = false
+        if wasCollapsed {
+            notifySizeChange()
+        } else {
+            persistState()
+        }
+
+        // Recovery offers intentionally remain silent, just like their initial
+        // presentation. Normal pending offers are reannounced through the same
+        // prompt used for the initial offer.
         guard activityRecoveryExplanation == nil else { return }
         speaker.speak(Self.checkInPrompt)
     }
@@ -633,6 +676,7 @@ final class CompanionStore: ObservableObject {
 
     private func finishRoutine(countAsCompleted: Bool) {
         routineActivityDetector.reset()
+        pendingOfferReminderDueAt = nil
         if countAsCompleted {
             sessionSelection.markCompleted(routine)
         } else {
@@ -682,6 +726,7 @@ final class CompanionStore: ObservableObject {
 
     private func transitionToIdle() {
         guard mode == .checkIn else { return }
+        pendingOfferReminderDueAt = nil
         isCheckInCollapsed = false
         mode = .idle
         statusText = nil
@@ -718,6 +763,7 @@ final class CompanionStore: ObservableObject {
         }
         routine = persistedRoutine
 
+        pendingOfferReminderDueAt = nil
         switch state.mode {
         case .idle:
             mode = .idle
@@ -727,6 +773,13 @@ final class CompanionStore: ObservableObject {
         case .checkIn:
             mode = .checkIn
             isCheckInCollapsed = state.isCheckInCollapsed
+            // An older checkpoint can contain a pending offer but no reminder
+            // deadline. Give it one relative to this launch instead of dropping
+            // the decision or firing repeatedly for a stale deadline.
+            pendingOfferReminderDueAt = validPendingOfferReminderDueAt(
+                state.pendingOfferReminderDueAt,
+                now: now
+            )
             updateLastCompletedPauseContext(at: now)
         case .routine:
             guard state.stepIndex >= 0,
@@ -747,6 +800,14 @@ final class CompanionStore: ObservableObject {
             scheduleCompletionAutoDismiss()
         }
         updateCheckInProgress(at: now)
+    }
+
+    private func validPendingOfferReminderDueAt(_ candidate: Date?, now: Date) -> Date {
+        guard let candidate,
+              candidate.timeIntervalSinceReferenceDate.isFinite else {
+            return now.addingTimeInterval(Self.pendingOfferReminderInterval)
+        }
+        return candidate
     }
 
     private func routineFromPersistedMoveIDs(_ moveIDs: [String]) -> BreakRoutine? {

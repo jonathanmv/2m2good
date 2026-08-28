@@ -74,7 +74,10 @@ merged pending-offer visibility and orb-color fixes to installed users:
 - A pending offer remains clearly visible while it awaits a decision. If the
   choices are collapsed, a warm due-colored orb keeps that pending state
   apparent; clicking the orb or choosing **Show pause choices** restores the
-  full choices.
+  full choices. If it remains unhandled, the same offer returns five minutes
+  after collapse and repeats every five minutes after later collapses. A visible
+  offer is reannounced without creating a duplicate prompt. **Start**,
+  **Later**, and **Tomorrow** stop the repeat reminders.
 - **Settings…** remains actionable from the orb, a pending offer, a routine,
   and the completion screen, so the pause rhythm and supported areas can be
   changed without losing the current state or offer.
@@ -83,7 +86,9 @@ merged pending-offer visibility and orb-color fixes to installed users:
   the last completed pause, or **Last pause taken — none yet** when there is no
   completed history; it does not add a browsable history.
 - Relaunches and update handoff preserve an in-progress timer or active pause
-  session, so an update does not discard the current session.
+  session, so an update does not discard the current session. An undecided pause
+  offer and its next five-minute reminder are also checkpointed; an overdue
+  reminder is presented once after relaunch and advanced to a future deadline.
 - The one-line installer updates an existing installation through the same
   verified replacement flow: it asks a running app to quit gracefully, retains
   the previous bundle for rollback, replaces the app, and relaunches it while
