@@ -1,13 +1,14 @@
 # 2m2better
 
-A deliberately small, local macOS break companion. After 60 minutes of active keyboard or mouse use, 2m2better's quiet floating orb offers one two-minute reset. It keeps the Start, Later, Tomorrow, and Hide pause screen choices clear, guides the routine with spoken movement guidance and motion, and then gets out of the way.
+A deliberately small, local macOS break companion. After 60 minutes of active keyboard or mouse use, 2m2better's quiet floating orb offers one two-minute reset. It keeps the Start, Later, and Tomorrow choices clear, guides the routine with spoken movement guidance and motion, and then gets out of the way.
 
 ## What is in the pilot
 
 - A small floating orb plus a menu-bar fallback; no dashboard, browsable pause history, streaks, or account.
 - Active-use timing that pauses while the Mac is idle and starts a fresh interval when activity returns after at least the idle threshold; delayed timer callbacks and sleep gaps never count as work.
-- Warm check-ins with **Start**, **Later** (one hour), **Tomorrow**, and **Hide pause screen** when the choice needs to wait without changing.
-- Click-only check-in responses: **Start**, **Later** (one hour), **Tomorrow**, and **Hide pause screen**, with keyboard-accessible buttons.
+- Warm check-ins with **Start**, **Later** (one hour), and **Tomorrow**, plus a small **^** collapse control when the choice needs to wait without changing.
+- A subtle durable local context line shows the last completed pause with compact relative wording, or **Last pause taken — none yet** on a fresh install.
+- Click-only check-in responses: **Start**, **Later** (one hour), and **Tomorrow**, with keyboard-accessible controls.
 - A library of gentle, standing-compatible desk-break movements. Each offered session combines six different 20-second movements into a fresh two-minute reset.
 - On first launch, choose a pause rhythm (**Every 20 minutes**, **Every hour**, or **Every 3 hours**) and one or more areas to support: **Lower back**, **Neck**, **Shoulders**, or **Hands + wrists**, or keep the balanced mix. Settings stay local and can be reviewed from the menu bar without becoming a dashboard or body-data profile.
 - Every session is exactly 120 seconds, with a gentle standing invitation, on-screen and spoken movement guidance, simple motion cues, Pause, Next, End, and safety wording.
@@ -25,7 +26,7 @@ newer or the matching Apple Command Line Tools.
 open ".build/app/2m2better.app"
 ```
 
-The app appears as a small orb near the upper-right of the screen and as a leaf in the menu bar. On a fresh install, a compact setup asks for a pause rhythm and which body areas the standing reset should support; every shipped movement is standing-only, so the reset is presented as a standing one rather than a seated alternative. Click the orb or **Offer a break now** in the menu bar to trigger a break immediately; use **Hide pause screen** (or Escape) to return to the orb without choosing a response, then click the orb or use **Offer a break now** again to restore the choices. The pause window can be dragged from its non-control background like a normal desktop window. Use **Settings…** there to review or change the selection, which stays available while the orb is idle so an offered or running reset is never discarded.
+The app appears as a small orb near the upper-right of the screen and as a leaf in the menu bar. On a fresh install, a compact setup asks for a pause rhythm and which body areas the standing reset should support; every shipped movement is standing-only, so the reset is presented as a standing one rather than a seated alternative. Click the orb or **Offer a break now** in the menu bar to trigger a break immediately; use the small **^** control (or Escape) to return to the orb without choosing a response, then click the orb or use **Offer a break now** again to restore the choices. The pause window can be dragged from its non-control background like a normal desktop window. Use **Settings…** there to review or change the selection; it remains actionable from the idle orb and an undecided offer without discarding that offer.
 
 The menu also includes **Settings…**, which changes the pause rhythm and body areas, and **Copy diagnostics**, which places a coarse local status report on the clipboard. **About 2m2better…** shows the shared release identity, and **Check for Updates…** checks GitHub Releases only. When a newer release is available, a short prompt offers **Install and Relaunch** or **Later**. Choosing install downloads and verifies in the background, shows brief progress, then hands off to the installer without a second technical confirmation. Installation is never silent. The helper waits for this app to exit, replaces only `~/Applications/2m2better.app`, retains a rollback copy, preserves preferences, and asks macOS to relaunch. Recoverable errors offer **Try Again** and write technical details to the update log. See [`docs/RELEASES.md`](docs/RELEASES.md) for the updater behavior, trust limitation, release asset contract, icon packaging, and validation.
 
@@ -66,7 +67,7 @@ checksum requirements, and updater compatibility are documented in
 
 ## Permissions
 
-The check-in is click-only: **Start**, **Later**, **Tomorrow**, and **Hide pause screen** remain visible and keyboard-accessible (Escape hides the prompt), so no audio-input or command-recognition permission is needed. During a routine, spoken movement guidance complements the on-screen instructions; the app does not listen for responses.
+The check-in is click-only: **Start**, **Later**, and **Tomorrow** remain visible and keyboard-accessible. The small **^** control (or Escape) collapses an undecided offer without choosing a response, so no audio-input or command-recognition permission is needed. During a routine, spoken movement guidance complements the on-screen instructions; the app does not listen for responses.
 
 The app does not need Accessibility permission. It reads only macOS’s aggregate local time since the last keyboard, mouse movement (including drags), mouse-button, or scroll event, not the keys pressed or the content of events. Live timer and session checkpoints are kept under `~/Library/Application Support/2m2better`, outside the replaceable app bundle.
 

@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 
 @MainActor
 private final class SelfCheckSpeaker: RoutineSpeaking {
@@ -40,10 +40,11 @@ enum SelfCheck {
         checkSettingsAndDiagnostics(&failures)
         checkSupportiveCopy(&failures)
         checkPointer(&failures)
+        checkPauseScreenControls(&failures)
         checkActivityDetectionAndRecovery(&failures)
 
         if failures.isEmpty {
-            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, concise update prompt states and recovery actions, standing session composition, cadence settings, body-area selection, first-run and menu-bar configuration, legacy migration, privacy-safe diagnostics, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, durable pause history and relative context, timer/session relaunch checkpoints, collapse-and-restore behavior, spoken movement guidance, completion dismissal, progress color, keyboard and mouse activity signals, pointer movement, routine activity recovery, and idle-session reset.")
+            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, concise update prompt states and recovery actions, standing session composition, cadence settings, body-area selection, first-run and menu-bar configuration, legacy migration, privacy-safe diagnostics, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, durable pause history and relative context, honest empty pause context, timer/session relaunch checkpoints, settings-safe check-in restoration, caret collapse-and-restore behavior, spoken movement guidance, completion dismissal, progress color, keyboard and mouse activity signals, pointer movement, routine activity recovery, and idle-session reset.")
             return true
         }
 
@@ -265,6 +266,40 @@ enum SelfCheck {
             || maskedResult.shouldOfferCheckIn {
             failures.append("below-threshold credit should remain masked after idle")
         }
+
+        MainActor.assumeIsolated {
+            withIsolatedDefaults("active-controller-idle") { defaults in
+                let start = Date(timeIntervalSinceReferenceDate: 5_200)
+                var signal = LocalActivitySignal(
+                    keyboardIdle: 10_000,
+                    mouseMovementIdle: 10_000,
+                    mouseClickIdle: 10_000,
+                    scrollWheelIdle: 10_000,
+                    mouseDragIdle: 10_000
+                )
+                let store = CompanionStore(
+                    environment: [
+                        "BREAK_INTERVAL_SECONDS": "5",
+                        "BREAK_IDLE_THRESHOLD_SECONDS": "10"
+                    ],
+                    defaults: defaults,
+                    activitySignalProvider: { signal },
+                    speaker: SelfCheckSpeaker(),
+                    nowProvider: { start }
+                )
+                store.continueWithBalancedDefaults()
+                for second in 1...20 {
+                    store.tickForTesting(at: start.addingTimeInterval(TimeInterval(second)))
+                }
+                signal = LocalActivitySignal(keyboardIdle: 0.2, pointerIdle: 0.2)
+                for second in 21...25 {
+                    store.tickForTesting(at: start.addingTimeInterval(TimeInterval(second)))
+                }
+                if store.mode != .checkIn {
+                    failures.append("active controller should offer after idle time is excluded")
+                }
+            }
+        }
     }
 
     private static func nearDueTracker(start: Date) -> ActiveUseTracker {
@@ -458,6 +493,9 @@ enum SelfCheck {
                 )
                 store.continueWithBalancedDefaults()
                 store.offerBreakNow()
+                if store.lastCompletedPauseContext != "none yet" {
+                    failures.append("a fresh install should show an honest empty pause context")
+                }
                 let remaining = store.nextCheckInRemainingSeconds
                 store.collapseCheckIn()
                 if store.mode != .checkIn
@@ -751,6 +789,15 @@ enum SelfCheck {
                 if fresh.mode != .idle || fresh.selectedAreas != [.lowerBack, .handsWrists] {
                     failures.append("cancelling configuration should leave the selection untouched")
                 }
+                fresh.offerBreakNow()
+                if !fresh.canOpenAreaConfiguration {
+                    failures.append("settings should remain actionable while a check-in is visible")
+                }
+                fresh.openAreaConfiguration()
+                fresh.cancelAreaConfiguration()
+                if fresh.mode != .checkIn {
+                    failures.append("closing settings should restore the visible check-in")
+                }
 
                 let restarted = CompanionStore(environment: [:], defaults: defaults)
                 if restarted.mode != .idle || restarted.selectedAreas != [.lowerBack, .handsWrists] {
@@ -899,6 +946,47 @@ enum SelfCheck {
         defaults.removePersistentDomain(forName: suiteName)
         body(defaults)
         defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    private static func checkPauseScreenControls(_ failures: inout [String]) {
+        MainActor.assumeIsolated {
+            withIsolatedDefaults("pause-screen-controls") { defaults in
+                let start = Date(timeIntervalSinceReferenceDate: 900_000)
+                let store = CompanionStore(
+                    environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+                    defaults: defaults,
+                    nowProvider: { start }
+                )
+                store.continueWithBalancedDefaults()
+                store.offerBreakNow()
+                guard store.mode == .checkIn else {
+                    failures.append("collapsing a pause offer requires it to be showing first")
+                    return
+                }
+
+                let remainingBeforeCollapse = store.nextCheckInRemainingSeconds
+                let selectedAreasBeforeCollapse = store.selectedAreas
+                store.collapseCheckIn()
+                if !store.isCheckInCollapsed || store.mode != .checkIn {
+                    failures.append("collapsing the pause screen should hide it without changing the pending decision")
+                }
+                if store.nextCheckInRemainingSeconds != remainingBeforeCollapse
+                    || store.selectedAreas != selectedAreasBeforeCollapse {
+                    failures.append("collapsing the pause screen should not reset its timer, cadence, or areas")
+                }
+
+                store.restoreCheckIn()
+                if store.isCheckInCollapsed || store.mode != .checkIn {
+                    failures.append("restoring the pause screen should bring back the same pending choices")
+                }
+
+                store.startRoutine(at: start, activitySignal: LocalActivitySignal(keyboardIdle: 10_000, pointerIdle: 10_000))
+                if store.mode != .routine {
+                    failures.append("the Start choice must still work after a collapse and restore")
+                }
+                store.endRoutine()
+            }
+        }
     }
 
     private static func checkPointer(_ failures: inout [String]) {
