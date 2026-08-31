@@ -66,12 +66,14 @@ optional update check sends only the documented GitHub request.
 
 The next developer-preview release is **v0.1.6 (build 7)**. It brings the
 merged five-minute unhandled pause reminders to installed users while
-retaining the existing pause behavior:
+retaining the existing pause presentation, response, and durable-state behavior:
 
-- After enough active keyboard or mouse use, a pause offer appears reliably
-  with the full **Start**, **Later**, and **Tomorrow** choices. Idle time and
-  sleep do not advance the reminder, and **Offer a break now** provides the
-  same clear offer on demand.
+- Pause timing follows the weighted active-use credit contract documented in
+  [`README.md`](../README.md#how-an-automatic-offer-appears): observed or
+  system-marked inactivity discounts accumulated credit at 0.5x without
+  presenting a pause. The first active sample after an inactivity boundary
+  defers a due offer until the next active sample. **Offer a break now** provides
+  the same clear offer on demand.
 - A pending offer remains clearly visible while it awaits a decision. If the
   choices are collapsed, a warm due-colored orb keeps that pending state
   apparent; clicking the orb or choosing **Show pause choices** restores the

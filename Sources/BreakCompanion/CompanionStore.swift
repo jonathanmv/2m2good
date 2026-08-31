@@ -432,7 +432,8 @@ final class CompanionStore: ObservableObject {
     }
 
     /// A locked session or system sleep is an observation boundary, never active
-    /// work. The app's clock remains installed; this only re-anchors its state.
+    /// work. The app's clock remains installed; this marks the boundary, applies
+    /// inactivity decay, and never presents an offer.
     func noteSystemInactive(at date: Date? = nil) {
         let date = date ?? nowProvider()
         // System inactivity follows the same half-rate decay as an observed idle
