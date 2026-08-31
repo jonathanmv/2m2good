@@ -1635,6 +1635,38 @@ final class BreakCompanionTests: XCTestCase {
     }
 
     @MainActor
+    func testEnvironmentIdleThresholdOverrideRemainsStrictAndDeterministic() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        var signal = activitySignal(10.001, 10_000)
+        let store = CompanionStore(
+            environment: [
+                "BREAK_INTERVAL_SECONDS": "3600",
+                "BREAK_IDLE_THRESHOLD_SECONDS": "10"
+            ],
+            defaults: defaults,
+            activitySignalProvider: { signal },
+            speaker: RecordingSpeaker(),
+            nowProvider: { self.referenceDate(5_475) }
+        )
+        store.continueWithBalancedDefaults()
+
+        XCTAssertEqual(store.diagnosticSnapshot().activeUsePath, .waitingForActivity)
+
+        signal = activitySignal(9.999, 10_000)
+        XCTAssertEqual(store.diagnosticSnapshot().activeUsePath, .accumulating)
+
+        signal = activitySignal(10_000, 10.001)
+        XCTAssertEqual(store.diagnosticSnapshot().activeUsePath, .waitingForActivity)
+
+        signal = activitySignal(10_000, 9.999)
+        XCTAssertEqual(store.diagnosticSnapshot().activeUsePath, .accumulating)
+    }
+
+    @MainActor
     func testAutomaticActivitySignalsOfferForKeyboardMovementDragClickAndScroll() {
         let start = referenceDate(5_500)
         let cases: [(String, LocalActivitySignal)] = [

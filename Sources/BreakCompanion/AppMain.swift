@@ -425,8 +425,10 @@ enum BreakCompanionApp {
         }
         if CommandLine.arguments.contains("--diagnostics") {
             let report = MainActor.assumeIsolated {
-                CompanionStore().diagnosticReport(
-                    activityIsActive: LocalActivitySignal.current().workActivityIdle < CompanionStore.defaultIdleThreshold
+                let activityIsActive =
+                    LocalActivitySignal.current().workActivityIdle < CompanionStore.defaultIdleThreshold
+                return CompanionStore().diagnosticReport(
+                    activityIsActive: activityIsActive
                 )
             }
             print(report)
