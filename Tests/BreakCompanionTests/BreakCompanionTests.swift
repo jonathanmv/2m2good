@@ -826,6 +826,30 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertFalse(resumed.shouldOfferCheckIn)
     }
 
+    func testDelayedActiveSampleAfterObservedIdleDiscountsTheGap() {
+        let start = referenceDate(2_400)
+        var tracker = ActiveUseTracker(
+            activeInterval: 1_000,
+            idleThreshold: 60,
+            startedAt: start,
+            persistenceState: ActiveUseTracker.PersistenceState(
+                accumulatedActiveTime: 100,
+                lastActiveSampleAt: start,
+                lastSampleWasIdle: false
+            )
+        )
+
+        _ = tracker.tick(at: start.addingTimeInterval(1), userIsActive: false)
+        let resumed = tracker.tick(
+            at: start.addingTimeInterval(601),
+            userIsActive: true
+        )
+
+        XCTAssertTrue(resumed.didResetAfterIdle)
+        XCTAssertEqual(resumed.activeSeconds, 2)
+        XCTAssertFalse(resumed.shouldOfferCheckIn)
+    }
+
     func testActiveCadenceCreditUsesOneXAndInactiveUsesHalfX() {
         let start = referenceDate(2_500)
         var tracker = ActiveUseTracker(
@@ -978,6 +1002,33 @@ final class BreakCompanionTests: XCTestCase {
         let due = tracker.tick(at: start.addingTimeInterval(5), userIsActive: true)
 
         XCTAssertEqual(due.activeSeconds, 5)
+        XCTAssertTrue(due.shouldOfferCheckIn)
+    }
+
+    func testInactiveSampleAfterSuspensionDefersTheFirstActiveOffer() {
+        let start = referenceDate(3_400)
+        var tracker = ActiveUseTracker(
+            activeInterval: 10,
+            idleThreshold: 60,
+            startedAt: start,
+            persistenceState: ActiveUseTracker.PersistenceState(
+                accumulatedActiveTime: 9.5,
+                lastActiveSampleAt: start,
+                lastSampleWasIdle: false
+            )
+        )
+        tracker.suspend(at: start)
+        _ = tracker.tick(at: start.addingTimeInterval(1), userIsActive: false)
+
+        let resumed = tracker.tick(
+            at: start.addingTimeInterval(2),
+            userIsActive: true
+        )
+        XCTAssertTrue(resumed.didResetAfterIdle)
+        XCTAssertEqual(resumed.activeSeconds, 10)
+        XCTAssertFalse(resumed.shouldOfferCheckIn)
+
+        let due = tracker.tick(at: start.addingTimeInterval(3), userIsActive: true)
         XCTAssertTrue(due.shouldOfferCheckIn)
     }
 

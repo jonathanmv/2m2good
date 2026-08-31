@@ -76,15 +76,14 @@ struct ActiveUseTracker {
             // a delayed inactive sample still applies the intended half-rate decay.
             decayCredit(for: elapsedSinceLastTick)
             lastSampleWasIdle = true
+            observationSuspended = false
             return result(didResetAfterIdle: false, shouldOfferCheckIn: false)
         }
 
-        // A previously inactive sample makes the span since that sample inactive.
-        // A long gap between active samples is treated the same way so delayed
+        // A long gap since the last observation is treated as inactive so delayed
         // callbacks and sleep gaps cannot turn into active credit. Settings calls
         // suspend() first and deliberately opt out of this gap discount.
         let delayedActiveGap = !observationSuspended
-            && !lastSampleWasIdle
             && elapsedSinceLastTick >= idleThreshold
         let inactiveBoundaryGap = !observationSuspended && systemInactiveBoundary
         if delayedActiveGap || inactiveBoundaryGap {
