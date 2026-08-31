@@ -517,7 +517,7 @@ final class BreakCompanionTests: XCTestCase {
     }
 
     @MainActor
-    func testCollapsedPendingOfferRepeatsEveryFiveMinutesWithTheSameDecision() {
+    func testInactiveCollapsedPendingOfferStillRepeatsEveryFiveMinutesWithTheSameDecision() {
         let suiteName = "BreakCompanionTests.\(#function)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
@@ -534,6 +534,8 @@ final class BreakCompanionTests: XCTestCase {
         )
         store.continueWithBalancedDefaults()
         store.offerBreakNow()
+        // Inactivity does not clear an already-active pending decision; its existing
+        // five-minute reminder cadence remains unchanged.
         let offeredRoutine = store.routine
         let progressAfterOffer = store.checkInProgress
         let remainingAfterOffer = store.nextCheckInRemainingSeconds
@@ -808,7 +810,7 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertFalse(state.isCurrent(first), "A stale task from an earlier completion must not close a future screen")
     }
 
-    func testObservedIdleSampleResetsNearThresholdActiveUse() {
+    func testObservedIdleSampleDecaysNearThresholdActiveUse() {
         let start = referenceDate(1_000)
         var tracker = makeNearDueTracker(start: start)
         XCTAssertEqual(tracker.accumulatedActiveTime, 3_599)
@@ -820,7 +822,178 @@ final class BreakCompanionTests: XCTestCase {
         )
 
         XCTAssertTrue(resumed.didResetAfterIdle)
-        XCTAssertEqual(resumed.activeSeconds, 1)
+        XCTAssertEqual(resumed.activeSeconds, 3_599.5)
+        XCTAssertFalse(resumed.shouldOfferCheckIn)
+    }
+
+    func testDelayedActiveSampleAfterObservedIdleDiscountsTheGap() {
+        let start = referenceDate(2_400)
+        var tracker = ActiveUseTracker(
+            activeInterval: 1_000,
+            idleThreshold: 60,
+            startedAt: start,
+            persistenceState: ActiveUseTracker.PersistenceState(
+                accumulatedActiveTime: 100,
+                lastActiveSampleAt: start,
+                lastSampleWasIdle: false
+            )
+        )
+
+        _ = tracker.tick(at: start.addingTimeInterval(1), userIsActive: false)
+        let resumed = tracker.tick(
+            at: start.addingTimeInterval(601),
+            userIsActive: true
+        )
+
+        XCTAssertTrue(resumed.didResetAfterIdle)
+        XCTAssertEqual(resumed.activeSeconds, 2)
+        XCTAssertFalse(resumed.shouldOfferCheckIn)
+    }
+
+    func testSystemBoundaryFollowedByObservedIdleDoesNotDoubleDecayOnReturn() {
+        let start = referenceDate(2_450)
+        let boundary = start.addingTimeInterval(1)
+        var tracker = ActiveUseTracker(
+            activeInterval: 100,
+            idleThreshold: 60,
+            startedAt: boundary,
+            persistenceState: ActiveUseTracker.PersistenceState(
+                accumulatedActiveTime: 49.5,
+                lastActiveSampleAt: boundary,
+                lastSampleWasIdle: false
+            )
+        )
+
+        _ = tracker.markInactive(at: boundary)
+        _ = tracker.tick(at: start.addingTimeInterval(2), userIsActive: false)
+        let resumed = tracker.tick(
+            at: start.addingTimeInterval(3),
+            userIsActive: true
+        )
+
+        XCTAssertTrue(resumed.didResetAfterIdle)
+        XCTAssertEqual(resumed.activeSeconds, 50)
+        XCTAssertFalse(resumed.shouldOfferCheckIn)
+    }
+
+    func testActiveCadenceCreditUsesOneXAndInactiveUsesHalfX() {
+        let start = referenceDate(2_500)
+        var tracker = ActiveUseTracker(
+            activeInterval: 3_600,
+            idleThreshold: 60,
+            startedAt: start
+        )
+
+        for second in 1...1_200 {
+            _ = tracker.tick(
+                at: start.addingTimeInterval(TimeInterval(second)),
+                userIsActive: true
+            )
+        }
+        XCTAssertEqual(tracker.accumulatedActiveTime, 1_200)
+
+        let inactive = tracker.tick(
+            at: start.addingTimeInterval(1_800),
+            userIsActive: false
+        )
+        XCTAssertEqual(inactive.activeSeconds, 900, "10 inactive minutes should spend 5 minutes of credit")
+        XCTAssertFalse(inactive.shouldOfferCheckIn, "inactivity must not offer a pause")
+    }
+
+    func testInactiveCadenceCreditClampsAtZero() {
+        let start = referenceDate(2_700)
+        var tracker = ActiveUseTracker(
+            activeInterval: 3_600,
+            idleThreshold: 60,
+            startedAt: start
+        )
+
+        for second in 1...10 {
+            _ = tracker.tick(
+                at: start.addingTimeInterval(TimeInterval(second)),
+                userIsActive: true
+            )
+        }
+        let inactive = tracker.tick(
+            at: start.addingTimeInterval(1_010),
+            userIsActive: false
+        )
+
+        XCTAssertEqual(inactive.activeSeconds, 0)
+        XCTAssertFalse(inactive.shouldOfferCheckIn)
+    }
+
+    func testInactiveToActiveTransitionResumesFromDecayedCredit() {
+        let start = referenceDate(2_900)
+        var tracker = ActiveUseTracker(
+            activeInterval: 10,
+            idleThreshold: 60,
+            startedAt: start
+        )
+
+        for second in 1...8 {
+            _ = tracker.tick(
+                at: start.addingTimeInterval(TimeInterval(second)),
+                userIsActive: true
+            )
+        }
+        let inactive = tracker.tick(
+            at: start.addingTimeInterval(12),
+            userIsActive: false
+        )
+        XCTAssertEqual(inactive.activeSeconds, 6)
+        XCTAssertFalse(inactive.shouldOfferCheckIn)
+
+        let resumed = tracker.tick(
+            at: start.addingTimeInterval(13),
+            userIsActive: true
+        )
+        XCTAssertTrue(resumed.didResetAfterIdle)
+        XCTAssertEqual(resumed.activeSeconds, 7)
+        XCTAssertFalse(resumed.shouldOfferCheckIn, "returning to work must not immediately offer a pause")
+
+        _ = tracker.tick(at: start.addingTimeInterval(14), userIsActive: true)
+        _ = tracker.tick(at: start.addingTimeInterval(15), userIsActive: true)
+        let due = tracker.tick(at: start.addingTimeInterval(16), userIsActive: true)
+        XCTAssertEqual(due.activeSeconds, 10)
+        XCTAssertTrue(due.shouldOfferCheckIn, "active use must earn the remaining credit after returning")
+    }
+
+    func testCadenceCreditPersistsAcrossTrackerRelaunch() {
+        let start = referenceDate(3_100)
+        var tracker = ActiveUseTracker(
+            activeInterval: 3_600,
+            idleThreshold: 60,
+            startedAt: start
+        )
+        for second in 1...20 {
+            _ = tracker.tick(
+                at: start.addingTimeInterval(TimeInterval(second)),
+                userIsActive: true
+            )
+        }
+
+        let restarted = ActiveUseTracker(
+            activeInterval: 3_600,
+            idleThreshold: 60,
+            startedAt: start.addingTimeInterval(20),
+            persistenceState: tracker.persistenceState
+        )
+        XCTAssertEqual(restarted.accumulatedActiveTime, 20)
+
+        var inactiveTracker = tracker
+        _ = inactiveTracker.markInactive(at: start.addingTimeInterval(20))
+        var restartedAfterSystemInactivity = ActiveUseTracker(
+            activeInterval: 3_600,
+            idleThreshold: 60,
+            startedAt: start.addingTimeInterval(620),
+            persistenceState: inactiveTracker.persistenceState
+        )
+        let resumed = restartedAfterSystemInactivity.tick(
+            at: start.addingTimeInterval(621),
+            userIsActive: true
+        )
+        XCTAssertEqual(resumed.activeSeconds, 2)
         XCTAssertFalse(resumed.shouldOfferCheckIn)
     }
 
@@ -858,6 +1031,33 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertTrue(due.shouldOfferCheckIn)
     }
 
+    func testInactiveSampleAfterSuspensionDefersTheFirstActiveOffer() {
+        let start = referenceDate(3_400)
+        var tracker = ActiveUseTracker(
+            activeInterval: 10,
+            idleThreshold: 60,
+            startedAt: start,
+            persistenceState: ActiveUseTracker.PersistenceState(
+                accumulatedActiveTime: 9.5,
+                lastActiveSampleAt: start,
+                lastSampleWasIdle: false
+            )
+        )
+        tracker.suspend(at: start)
+        _ = tracker.tick(at: start.addingTimeInterval(1), userIsActive: false)
+
+        let resumed = tracker.tick(
+            at: start.addingTimeInterval(2),
+            userIsActive: true
+        )
+        XCTAssertTrue(resumed.didResetAfterIdle)
+        XCTAssertEqual(resumed.activeSeconds, 10)
+        XCTAssertFalse(resumed.shouldOfferCheckIn)
+
+        let due = tracker.tick(at: start.addingTimeInterval(3), userIsActive: true)
+        XCTAssertTrue(due.shouldOfferCheckIn)
+    }
+
     func testSuspendingActiveUseDoesNotGrantSettingsTime() {
         let start = referenceDate(3_500)
         var tracker = ActiveUseTracker(
@@ -870,8 +1070,8 @@ final class BreakCompanionTests: XCTestCase {
 
         let resumed = tracker.tick(at: start.addingTimeInterval(101), userIsActive: true)
 
-        XCTAssertTrue(resumed.didResetAfterIdle)
-        XCTAssertEqual(resumed.activeSeconds, 1)
+        XCTAssertFalse(resumed.didResetAfterIdle)
+        XCTAssertEqual(resumed.activeSeconds, 2)
         XCTAssertFalse(resumed.shouldOfferCheckIn)
     }
 
@@ -910,7 +1110,7 @@ final class BreakCompanionTests: XCTestCase {
     }
 
     @MainActor
-    func testSystemInactiveBoundaryResetsActiveUseBeforeUnlock() {
+    func testSystemInactiveBoundaryDecaysCreditAndDefersOfferOnUnlock() {
         let suiteName = "BreakCompanionTests.\(#function)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
@@ -932,8 +1132,83 @@ final class BreakCompanionTests: XCTestCase {
         store.noteSystemInactive(at: start.addingTimeInterval(4))
         store.tickForTesting(at: start.addingTimeInterval(5))
 
-        XCTAssertEqual(store.mode, .idle, "lock or sleep must never complete an active-use interval")
-        XCTAssertEqual(store.nextCheckInRemainingSeconds, 4)
+        XCTAssertEqual(store.mode, .idle, "a system-inactive boundary must not offer on the first active sample")
+        XCTAssertEqual(store.nextCheckInRemainingSeconds, 0.5)
+
+        store.tickForTesting(at: start.addingTimeInterval(6))
+        XCTAssertEqual(store.mode, .checkIn, "the next active sample may present the already-reached cadence")
+    }
+
+    @MainActor
+    func testSystemInactiveBoundarySurvivesSettingsObservation() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let start = referenceDate(5_125)
+        var now = start
+        let store = CompanionStore(
+            environment: [
+                "BREAK_INTERVAL_SECONDS": "5",
+                "BREAK_IDLE_THRESHOLD_SECONDS": "10"
+            ],
+            defaults: defaults,
+            speaker: RecordingSpeaker(),
+            nowProvider: { now }
+        )
+        store.continueWithBalancedDefaults()
+        for second in 1...4 {
+            store.tickForTesting(at: start.addingTimeInterval(TimeInterval(second)), userIsActive: true)
+        }
+
+        now = start.addingTimeInterval(4)
+        store.openAreaConfiguration()
+        store.noteSystemInactive(at: now)
+        now = start.addingTimeInterval(5)
+        store.tickForTesting(at: now, userIsActive: false)
+        store.cancelAreaConfiguration()
+        store.tickForTesting(at: start.addingTimeInterval(6), userIsActive: true)
+
+        XCTAssertEqual(store.mode, .idle)
+        XCTAssertEqual(store.nextCheckInRemainingSeconds, 0.5)
+        store.tickForTesting(at: start.addingTimeInterval(7), userIsActive: true)
+        XCTAssertEqual(store.mode, .checkIn)
+    }
+
+    @MainActor
+    func testInactiveToActiveControllerTransitionDoesNotOfferImmediately() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let start = referenceDate(5_150)
+        let store = CompanionStore(
+            environment: [
+                "BREAK_INTERVAL_SECONDS": "10",
+                "BREAK_IDLE_THRESHOLD_SECONDS": "60"
+            ],
+            defaults: defaults,
+            speaker: RecordingSpeaker(),
+            nowProvider: { start }
+        )
+        store.continueWithBalancedDefaults()
+
+        for second in 1...8 {
+            store.tickForTesting(at: start.addingTimeInterval(TimeInterval(second)), userIsActive: true)
+        }
+        store.tickForTesting(at: start.addingTimeInterval(12), userIsActive: false)
+        XCTAssertEqual(store.mode, .idle)
+        XCTAssertEqual(store.checkInProgress, 0.6)
+
+        store.tickForTesting(at: start.addingTimeInterval(13), userIsActive: true)
+        XCTAssertEqual(store.mode, .idle)
+        store.tickForTesting(at: start.addingTimeInterval(14), userIsActive: true)
+        store.tickForTesting(at: start.addingTimeInterval(15), userIsActive: true)
+        XCTAssertEqual(store.mode, .idle)
+        store.tickForTesting(at: start.addingTimeInterval(16), userIsActive: true)
+        XCTAssertEqual(store.mode, .checkIn)
     }
 
     @MainActor

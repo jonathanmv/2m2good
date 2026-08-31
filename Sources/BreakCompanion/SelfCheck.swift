@@ -44,7 +44,7 @@ enum SelfCheck {
         checkActivityDetectionAndRecovery(&failures)
 
         if failures.isEmpty {
-            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, concise update prompt states and recovery actions, standing session composition, cadence settings, body-area selection, first-run and menu-bar configuration, legacy migration, privacy-safe diagnostics, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, durable pause history and relative context, honest empty pause context, timer/session relaunch checkpoints, settings-safe check-in restoration, five-minute pending-offer reminders, chevron collapse-and-restore behavior, spoken movement guidance, completion dismissal, progress color, keyboard and mouse activity signals, pointer movement, routine activity recovery, and idle-session reset.")
+            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, concise update prompt states and recovery actions, standing session composition, cadence settings, body-area selection, first-run and menu-bar configuration, legacy migration, privacy-safe diagnostics, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, durable pause history and relative context, honest empty pause context, timer/session relaunch checkpoints, settings-safe check-in restoration, five-minute pending-offer reminders, chevron collapse-and-restore behavior, spoken movement guidance, completion dismissal, progress color, keyboard and mouse activity signals, pointer movement, routine activity recovery, and weighted cadence credit.")
             return true
         }
 
@@ -209,9 +209,9 @@ enum SelfCheck {
             userIsActive: true
         )
         if !resumed.didResetAfterIdle
-            || resumed.activeSeconds != 1
+            || resumed.activeSeconds != 3_599.5
             || resumed.shouldOfferCheckIn {
-            failures.append("near-due active credit should reset after a long idle")
+            failures.append("near-due active credit should decay rather than reset after inactivity")
         }
 
         var delayed = nearDueTracker(start: start.addingTimeInterval(20_000))
@@ -319,8 +319,8 @@ enum SelfCheck {
                 }
                 store.noteSystemInactive(at: start.addingTimeInterval(4))
                 store.tickForTesting(at: start.addingTimeInterval(5))
-                if store.mode != .idle {
-                    failures.append("a system inactive boundary must reset active-use credit")
+                if store.mode != .idle || store.nextCheckInRemainingSeconds != 0.5 {
+                    failures.append("a system inactive boundary must decay credit and defer the first return offer")
                 }
             }
         }

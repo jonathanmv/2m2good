@@ -1,11 +1,11 @@
 # 2m2better
 
-A deliberately small, local macOS break companion. After 60 minutes of active keyboard or mouse use, 2m2better's quiet floating orb offers one two-minute reset. It keeps the Start, Later, and Tomorrow choices clear, guides the routine with spoken movement guidance and motion, and then gets out of the way.
+A deliberately small, local macOS break companion. After enough weighted active-use credit (60 minutes by default), 2m2better's quiet floating orb offers one two-minute reset. It keeps the Start, Later, and Tomorrow choices clear, guides the routine with spoken movement guidance and motion, and then gets out of the way.
 
 ## What is in the pilot
 
 - A small floating orb plus a menu-bar fallback; no dashboard, browsable pause history, streaks, or account.
-- Active-use timing that pauses while the Mac is idle and starts a fresh interval when activity returns after at least the idle threshold; delayed timer callbacks and sleep gaps never count as work.
+- Active-use timing that earns cadence credit at 1x while the Mac is active and discounts inactive time at 0.5x, never below zero; delayed callbacks and sleep gaps never turn the elapsed gap into work credit.
 - Warm check-ins with **Start**, **Later** (one hour), and **Tomorrow**, plus a small chevron-up collapse control when the choice needs to wait without changing. An unhandled offer reappears five minutes after it is collapsed and continues every five minutes until the user chooses a response.
 - A subtle durable local context line shows the last completed pause with compact relative wording, or **Last pause taken — none yet** on a fresh install.
 - Click-only check-in responses: **Start**, **Later** (one hour), and **Tomorrow**, with keyboard-accessible controls.
@@ -118,16 +118,20 @@ The default active-work interval is one hour. Choose **Every 20 minutes**, **Eve
 BREAK_INTERVAL_SECONDS=5 ".build/app/2m2better.app/Contents/MacOS/BreakCompanion"
 ```
 
-`BREAK_IDLE_THRESHOLD_SECONDS` can also replace the default 60-second idle threshold. When no keyboard or mouse activity has been seen for at least that threshold, the next active sample resets the interval before adding only the current timer tick; a sleep gap is never counted as active work. Values are clamped to sensible testing minimums.
+`BREAK_IDLE_THRESHOLD_SECONDS` can also replace the default 60-second idle threshold. Active samples earn cadence credit at 1x; inactive samples discount it at 0.5x, never below zero. A long observation gap is discounted rather than counted as active work credit, and the first active sample resumes from the remaining credit. Values are clamped to sensible testing minimums.
 
 ### How an automatic offer appears
 
 The initiating signal is only macOS's aggregate age for recent keyboard and
 mouse movement, clicks, drags, and scrolling. After launch, a one-second clock
-samples that signal and the active-use timer credits only ticks whose signal is
-within the idle threshold. Idle, locked, sleeping, and app-uptime gaps are
-observation gaps, not work. When accumulated active use crosses the configured
-cadence, the timer resets and the store enters a **pending offer** state. The
+samples that signal and the active-use timer credits active ticks at 1x while
+discounting inactive ticks at 0.5x. Idle, locked, and sleeping gaps never earn
+active work credit; observed or system-marked inactivity spends accumulated
+credit but never presents a pause. App-uptime gaps likewise never earn work
+credit. The first active sample after an inactivity boundary resumes from the
+remaining credit and defers a due offer until the next active sample. During an
+ongoing active run, when active use reaches the configured cadence, the timer
+resets and the store enters a **pending offer** state. The
 panel then resizes, moves into the current visible screen, orders itself in
 front, and activates so the full **Start**, **Later**, and **Tomorrow** choice is
 unmistakable. Collapsing it leaves that same pending decision in a warm orb;
