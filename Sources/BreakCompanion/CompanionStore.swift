@@ -34,6 +34,7 @@ final class CompanionStore: ObservableObject {
     }
 
     static let checkInPrompt = "Time for a small pause."
+    static let defaultIdleThreshold: TimeInterval = 180
     static let pendingOfferReminderInterval: TimeInterval = 5 * 60
 
     @Published private(set) var mode: Mode = .idle
@@ -95,7 +96,7 @@ final class CompanionStore: ObservableObject {
         let testingIntervalOverride = configuredInterval.map { max(5, $0) }
         let configuredIdle = Double(environment["BREAK_IDLE_THRESHOLD_SECONDS"] ?? "")
         workInterval = testingIntervalOverride ?? initialCadence.interval
-        idleThreshold = max(10, configuredIdle ?? 60)
+        idleThreshold = max(10, configuredIdle ?? Self.defaultIdleThreshold)
         sessionSelection = SessionSelectionStore(defaults: defaults)
         bodyAreaPreferences = BodyAreaPreferences(defaults: defaults)
         self.cadencePreferences = cadencePreferences

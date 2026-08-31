@@ -118,7 +118,7 @@ The default active-work interval is one hour. Choose **Every 20 minutes**, **Eve
 BREAK_INTERVAL_SECONDS=5 ".build/app/2m2better.app/Contents/MacOS/BreakCompanion"
 ```
 
-`BREAK_IDLE_THRESHOLD_SECONDS` can also replace the default 60-second idle threshold. Active samples earn cadence credit at 1x; inactive samples discount it at 0.5x, never below zero. A long observation gap is discounted rather than counted as active work credit, and the first active sample resumes from the remaining credit. Values are clamped to sensible testing minimums.
+`BREAK_IDLE_THRESHOLD_SECONDS` can also replace the default 180-second (three-minute) idle threshold. Active samples earn cadence credit at 1x; inactive samples discount it at 0.5x, never below zero. A long observation gap is discounted rather than counted as active work credit, and the first active sample resumes from the remaining credit. Values are clamped to sensible testing minimums.
 
 ### How an automatic offer appears
 
