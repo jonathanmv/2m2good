@@ -1114,6 +1114,43 @@ final class BreakCompanionTests: XCTestCase {
     }
 
     @MainActor
+    func testSystemInactiveBoundarySurvivesSettingsObservation() {
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let start = referenceDate(5_125)
+        var now = start
+        let store = CompanionStore(
+            environment: [
+                "BREAK_INTERVAL_SECONDS": "5",
+                "BREAK_IDLE_THRESHOLD_SECONDS": "10"
+            ],
+            defaults: defaults,
+            speaker: RecordingSpeaker(),
+            nowProvider: { now }
+        )
+        store.continueWithBalancedDefaults()
+        for second in 1...4 {
+            store.tickForTesting(at: start.addingTimeInterval(TimeInterval(second)), userIsActive: true)
+        }
+
+        now = start.addingTimeInterval(4)
+        store.openAreaConfiguration()
+        store.noteSystemInactive(at: now)
+        now = start.addingTimeInterval(5)
+        store.tickForTesting(at: now, userIsActive: false)
+        store.cancelAreaConfiguration()
+        store.tickForTesting(at: start.addingTimeInterval(6), userIsActive: true)
+
+        XCTAssertEqual(store.mode, .idle)
+        XCTAssertEqual(store.nextCheckInRemainingSeconds, 0.5)
+        store.tickForTesting(at: start.addingTimeInterval(7), userIsActive: true)
+        XCTAssertEqual(store.mode, .checkIn)
+    }
+
+    @MainActor
     func testInactiveToActiveControllerTransitionDoesNotOfferImmediately() {
         let suiteName = "BreakCompanionTests.\(#function)"
         let defaults = UserDefaults(suiteName: suiteName)!

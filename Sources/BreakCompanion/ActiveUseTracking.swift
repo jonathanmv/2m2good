@@ -85,7 +85,7 @@ struct ActiveUseTracker {
         // suspend() first and deliberately opt out of this gap discount.
         let delayedActiveGap = !observationSuspended
             && elapsedSinceLastTick >= idleThreshold
-        let inactiveBoundaryGap = !observationSuspended && systemInactiveBoundary
+        let inactiveBoundaryGap = systemInactiveBoundary
         if delayedActiveGap || inactiveBoundaryGap {
             decayCredit(for: elapsedSinceLastTick)
         }
@@ -115,7 +115,6 @@ struct ActiveUseTracker {
         lastActiveSampleAt = date
         lastSampleWasIdle = false
         observationSuspended = true
-        systemInactiveBoundary = false
     }
 
     /// Changes the cadence without turning time spent in Settings into active use.
@@ -129,7 +128,6 @@ struct ActiveUseTracker {
         lastActiveSampleAt = date
         lastSampleWasIdle = false
         observationSuspended = true
-        systemInactiveBoundary = false
     }
 
     mutating func reset(at date: Date) {
