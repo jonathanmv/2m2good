@@ -2,20 +2,26 @@ import Foundation
 
 struct ActiveUseTick: Equatable {
     let activeSeconds: TimeInterval
+    /// Retained as a transition signal for existing callers. Inactivity no longer
+    /// clears the accumulated credit when activity resumes.
     let didResetAfterIdle: Bool
     let shouldOfferCheckIn: Bool
 }
 
-/// Tracks active-use time without turning a delayed timer callback into work.
-/// A new active sample after the idle threshold starts a fresh active interval.
+/// Tracks cadence credit: active time earns at 1x and inactive time spends it at
+/// 0.5x. Delayed timer callbacks are bounded so an observation gap cannot earn work.
 struct ActiveUseTracker {
     struct PersistenceState: Codable, Equatable {
         let accumulatedActiveTime: TimeInterval
         let lastActiveSampleAt: Date?
         let lastSampleWasIdle: Bool
+        /// Optional so checkpoints written before system-boundary decay remain readable.
+        var lastTickAt: Date? = nil
+        var systemInactiveBoundary: Bool? = nil
     }
 
     static let maximumTimerDelta: TimeInterval = 2
+    static let inactiveDecayRate: Double = 0.5
 
     private(set) var activeInterval: TimeInterval
     let idleThreshold: TimeInterval
@@ -24,6 +30,8 @@ struct ActiveUseTracker {
     private var lastTickAt: Date
     private var lastActiveSampleAt: Date?
     private var lastSampleWasIdle = false
+    private var observationSuspended = false
+    private var systemInactiveBoundary = false
 
     init(
         activeInterval: TimeInterval,
@@ -40,44 +48,75 @@ struct ActiveUseTracker {
         accumulatedActiveTime = min(activeInterval, persistenceState.accumulatedActiveTime)
         lastActiveSampleAt = persistenceState.lastActiveSampleAt.flatMap { $0 <= startedAt ? $0 : nil }
         lastSampleWasIdle = persistenceState.lastSampleWasIdle
+        systemInactiveBoundary = persistenceState.systemInactiveBoundary ?? false
+        if systemInactiveBoundary,
+           let persistedLastTickAt = persistenceState.lastTickAt,
+           persistedLastTickAt <= startedAt {
+            lastTickAt = persistedLastTickAt
+        }
     }
 
     var persistenceState: PersistenceState {
         PersistenceState(
             accumulatedActiveTime: accumulatedActiveTime,
             lastActiveSampleAt: lastActiveSampleAt,
-            lastSampleWasIdle: lastSampleWasIdle
+            lastSampleWasIdle: lastSampleWasIdle,
+            lastTickAt: systemInactiveBoundary ? lastTickAt : nil,
+            systemInactiveBoundary: systemInactiveBoundary
         )
     }
 
     mutating func tick(at date: Date, userIsActive: Bool) -> ActiveUseTick {
         let elapsedSinceLastTick = max(0, date.timeIntervalSince(lastTickAt))
-        let delta = min(Self.maximumTimerDelta, elapsedSinceLastTick)
+        let activeDelta = min(Self.maximumTimerDelta, elapsedSinceLastTick)
         lastTickAt = date
 
         guard userIsActive else {
+            // Inactive time is a debit, not a reset. Use the full elapsed span so
+            // a delayed inactive sample still applies the intended half-rate decay.
+            decayCredit(for: elapsedSinceLastTick)
             lastSampleWasIdle = true
-            return result(didResetAfterIdle: false)
+            return result(didResetAfterIdle: false, shouldOfferCheckIn: false)
         }
 
-        let didResetAfterIdle = lastSampleWasIdle || (lastActiveSampleAt.map {
-            date.timeIntervalSince($0) >= idleThreshold
-        } ?? false)
-        if didResetAfterIdle {
-            accumulatedActiveTime = 0
+        // A previously inactive sample makes the span since that sample inactive.
+        // A long gap between active samples is treated the same way so delayed
+        // callbacks and sleep gaps cannot turn into active credit. Settings calls
+        // suspend() first and deliberately opt out of this gap discount.
+        let delayedActiveGap = !observationSuspended
+            && !lastSampleWasIdle
+            && elapsedSinceLastTick >= idleThreshold
+        let inactiveBoundaryGap = !observationSuspended && systemInactiveBoundary
+        if delayedActiveGap || inactiveBoundaryGap {
+            decayCredit(for: elapsedSinceLastTick)
         }
+        let resumedAfterIdle = !observationSuspended && (
+            lastSampleWasIdle || delayedActiveGap || inactiveBoundaryGap
+        )
+        observationSuspended = false
+        systemInactiveBoundary = false
         lastSampleWasIdle = false
         lastActiveSampleAt = date
-        accumulatedActiveTime += delta
+        accumulatedActiveTime = min(activeInterval, accumulatedActiveTime + activeDelta)
 
-        return result(didResetAfterIdle: didResetAfterIdle)
+        return result(
+            didResetAfterIdle: resumedAfterIdle,
+            // Let the first active sample re-anchor after inactivity. If that
+            // sample reaches the threshold, the next active sample presents it;
+            // this avoids surprising someone immediately on returning to work.
+            shouldOfferCheckIn: !resumedAfterIdle && accumulatedActiveTime >= activeInterval
+        )
     }
 
-    /// Advances the timer's observation point without granting active credit. This keeps
-    /// time spent in a non-timing surface, such as settings, out of both the delta and
-    /// the delayed-callback calculation.
+    /// Advances the timer's observation point without granting or spending cadence
+    /// credit. This keeps time spent in a non-timing surface, such as Settings, out of
+    /// both the delta and the delayed-callback calculation.
     mutating func suspend(at date: Date) {
         lastTickAt = date
+        lastActiveSampleAt = date
+        lastSampleWasIdle = false
+        observationSuspended = true
+        systemInactiveBoundary = false
     }
 
     /// Changes the cadence without turning time spent in Settings into active use.
@@ -88,6 +127,10 @@ struct ActiveUseTracker {
         self.activeInterval = activeInterval
         accumulatedActiveTime = min(activeInterval, accumulatedActiveTime)
         lastTickAt = date
+        lastActiveSampleAt = date
+        lastSampleWasIdle = false
+        observationSuspended = true
+        systemInactiveBoundary = false
     }
 
     mutating func reset(at date: Date) {
@@ -95,13 +138,36 @@ struct ActiveUseTracker {
         lastTickAt = date
         lastActiveSampleAt = nil
         lastSampleWasIdle = false
+        observationSuspended = false
+        systemInactiveBoundary = false
     }
 
-    private func result(didResetAfterIdle: Bool) -> ActiveUseTick {
+    /// Applies a system-inactive boundary without discarding work credit. The span
+    /// after this boundary is discounted when activity returns, covering sleep gaps
+    /// for which no ordinary inactive timer samples can arrive.
+    @discardableResult
+    mutating func markInactive(at date: Date) -> ActiveUseTick {
+        observationSuspended = false
+        let result = tick(at: date, userIsActive: false)
+        systemInactiveBoundary = true
+        return result
+    }
+
+    private mutating func decayCredit(for elapsed: TimeInterval) {
+        accumulatedActiveTime = max(
+            0,
+            accumulatedActiveTime - elapsed * Self.inactiveDecayRate
+        )
+    }
+
+    private func result(
+        didResetAfterIdle: Bool,
+        shouldOfferCheckIn: Bool
+    ) -> ActiveUseTick {
         ActiveUseTick(
             activeSeconds: accumulatedActiveTime,
             didResetAfterIdle: didResetAfterIdle,
-            shouldOfferCheckIn: accumulatedActiveTime >= activeInterval
+            shouldOfferCheckIn: shouldOfferCheckIn
         )
     }
 }

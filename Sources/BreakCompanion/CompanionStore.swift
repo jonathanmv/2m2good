@@ -435,7 +435,10 @@ final class CompanionStore: ObservableObject {
     /// work. The app's clock remains installed; this only re-anchors its state.
     func noteSystemInactive(at date: Date? = nil) {
         let date = date ?? nowProvider()
-        activeUseTracker.reset(at: date)
+        // System inactivity follows the same half-rate decay as an observed idle
+        // period. It must never erase prior work credit or create an offer at the
+        // boundary; the next active sample can only resume from that decayed credit.
+        activeUseTracker.markInactive(at: date)
         if mode == .routine {
             routineActivityDetector.resetObservation(
                 at: date,
