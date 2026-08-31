@@ -850,6 +850,32 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertFalse(resumed.shouldOfferCheckIn)
     }
 
+    func testSystemBoundaryFollowedByObservedIdleDoesNotDoubleDecayOnReturn() {
+        let start = referenceDate(2_450)
+        let boundary = start.addingTimeInterval(1)
+        var tracker = ActiveUseTracker(
+            activeInterval: 100,
+            idleThreshold: 60,
+            startedAt: boundary,
+            persistenceState: ActiveUseTracker.PersistenceState(
+                accumulatedActiveTime: 49.5,
+                lastActiveSampleAt: boundary,
+                lastSampleWasIdle: false
+            )
+        )
+
+        _ = tracker.markInactive(at: boundary)
+        _ = tracker.tick(at: start.addingTimeInterval(2), userIsActive: false)
+        let resumed = tracker.tick(
+            at: start.addingTimeInterval(3),
+            userIsActive: true
+        )
+
+        XCTAssertTrue(resumed.didResetAfterIdle)
+        XCTAssertEqual(resumed.activeSeconds, 50)
+        XCTAssertFalse(resumed.shouldOfferCheckIn)
+    }
+
     func testActiveCadenceCreditUsesOneXAndInactiveUsesHalfX() {
         let start = referenceDate(2_500)
         var tracker = ActiveUseTracker(

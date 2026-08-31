@@ -77,6 +77,9 @@ struct ActiveUseTracker {
             decayCredit(for: elapsedSinceLastTick)
             lastSampleWasIdle = true
             observationSuspended = false
+            // An ordinary inactive sample has accounted for the boundary span;
+            // do not debit that interval again when activity resumes.
+            systemInactiveBoundary = false
             return result(didResetAfterIdle: false, shouldOfferCheckIn: false)
         }
 
