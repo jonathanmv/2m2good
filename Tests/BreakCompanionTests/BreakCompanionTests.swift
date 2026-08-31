@@ -1604,6 +1604,37 @@ final class BreakCompanionTests: XCTestCase {
     }
 
     @MainActor
+    func testDefaultIdleThresholdKeepsRecentKeyboardOrMouseInputActive() {
+        XCTAssertEqual(CompanionStore.defaultIdleThreshold, 180)
+
+        let suiteName = "BreakCompanionTests.\(#function)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        var signal = activitySignal(CompanionStore.defaultIdleThreshold - 0.001, 10_000)
+        let store = CompanionStore(
+            environment: ["BREAK_INTERVAL_SECONDS": "3600"],
+            defaults: defaults,
+            activitySignalProvider: { signal },
+            speaker: RecordingSpeaker(),
+            nowProvider: { self.referenceDate(5_450) }
+        )
+        store.continueWithBalancedDefaults()
+
+        XCTAssertEqual(store.diagnosticSnapshot().activeUsePath, .accumulating)
+
+        signal = activitySignal(10_000, CompanionStore.defaultIdleThreshold - 0.001)
+        XCTAssertEqual(store.diagnosticSnapshot().activeUsePath, .accumulating)
+
+        signal = activitySignal(CompanionStore.defaultIdleThreshold, 10_000)
+        XCTAssertEqual(store.diagnosticSnapshot().activeUsePath, .waitingForActivity)
+
+        signal = activitySignal(10_000, CompanionStore.defaultIdleThreshold)
+        XCTAssertEqual(store.diagnosticSnapshot().activeUsePath, .waitingForActivity)
+    }
+
+    @MainActor
     func testAutomaticActivitySignalsOfferForKeyboardMovementDragClickAndScroll() {
         let start = referenceDate(5_500)
         let cases: [(String, LocalActivitySignal)] = [
