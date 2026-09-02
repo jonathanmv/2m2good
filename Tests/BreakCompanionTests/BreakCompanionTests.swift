@@ -3290,6 +3290,28 @@ final class BreakCompanionTests: XCTestCase {
         XCTAssertTrue(panel.canBecomeMain)
     }
 
+    @MainActor
+    func testFloatingOrbWindowPolicyKeepsDesktopSpacesButNotForeignFullScreenSpaces() {
+        let panel = CompanionPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        FloatingOrbWindowPolicy.apply(to: panel)
+
+        XCTAssertTrue(panel.collectionBehavior.contains(.canJoinAllSpaces))
+        XCTAssertTrue(panel.collectionBehavior.contains(.fullScreenNone))
+        XCTAssertTrue(panel.collectionBehavior.contains(.stationary))
+        XCTAssertFalse(
+            panel.collectionBehavior.contains(.fullScreenAuxiliary),
+            "AppKit must not opt the orb into another app's full-screen Space"
+        )
+        // Mission Control's cross-process full-screen transition is not exposed
+        // as a deterministic XCTest fixture; this exercises the real NSPanel
+        // collection policy that makes AppKit hide and restore the orb.
+    }
+
     func testPointerMovementClassifierKeepsTapDeadZone() {
         XCTAssertEqual(PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 4, y: 0)), .tap)
         XCTAssertEqual(PointerMovementClassifier.classify(from: .zero, to: CGPoint(x: 3, y: 4)), .drag)

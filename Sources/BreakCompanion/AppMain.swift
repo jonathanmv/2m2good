@@ -1,6 +1,23 @@
 import AppKit
 import SwiftUI
 
+enum FloatingOrbWindowPolicy {
+    // Joining all ordinary desktop Spaces preserves the orb's multi-desktop
+    // behavior. Full-screen none is required as an explicit opt-out: without
+    // it, canJoinAllSpaces still puts a floating panel in foreign full-screen
+    // Spaces. Full-screen auxiliary is also intentionally omitted because it
+    // explicitly permits accompanying another app's full-screen window.
+    static let collectionBehavior: NSWindow.CollectionBehavior = [
+        .canJoinAllSpaces,
+        .fullScreenNone,
+        .stationary
+    ]
+
+    static func apply(to panel: NSPanel) {
+        panel.collectionBehavior = collectionBehavior
+    }
+}
+
 final class CompanionPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
@@ -96,7 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         // AppKit moves the panel from its non-control background. SwiftUI controls,
         // links, text selection, and accessibility actions retain their own hit testing.
         panel.hidesOnDeactivate = false
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        FloatingOrbWindowPolicy.apply(to: panel)
         panel.contentView = NSHostingView(rootView: CompanionView(store: store))
         panel.setFrameOrigin(origin(for: panel.frame.size))
         store.companionHasKeyboardFocus = { [weak panel] in panel?.isKeyWindow ?? false }

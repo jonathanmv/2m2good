@@ -40,11 +40,12 @@ enum SelfCheck {
         checkSettingsAndDiagnostics(&failures)
         checkSupportiveCopy(&failures)
         checkPointer(&failures)
+        checkFloatingOrbWindowPolicy(&failures)
         checkPauseScreenControls(&failures)
         checkActivityDetectionAndRecovery(&failures)
 
         if failures.isEmpty {
-            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, concise update prompt states and recovery actions, standing session composition, cadence settings, body-area selection, first-run and menu-bar configuration, legacy migration, privacy-safe diagnostics, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, durable pause history and relative context, honest empty pause context, timer/session relaunch checkpoints, settings-safe check-in restoration, five-minute pending-offer reminders, chevron collapse-and-restore behavior, spoken movement guidance, completion dismissal, progress color, keyboard and mouse activity signals, pointer movement, routine activity recovery, and weighted cadence credit.")
+            print("Self-check passed: \(ProductIdentity.diagnosticsIdentity), semantic-version comparisons, GitHub Release asset selection and checksum verification, concise update prompt states and recovery actions, standing session composition, cadence settings, body-area selection, first-run and menu-bar configuration, legacy migration, privacy-safe diagnostics, supportive wording, recent-shown persistence, focus balance, click-only check-in responses, durable pause history and relative context, honest empty pause context, timer/session relaunch checkpoints, settings-safe check-in restoration, five-minute pending-offer reminders, chevron collapse-and-restore behavior, spoken movement guidance, completion dismissal, progress color, keyboard and mouse activity signals, pointer movement, routine activity recovery, desktop-only floating orb Spaces, and weighted cadence credit.")
             return true
         }
 
@@ -993,6 +994,16 @@ enum SelfCheck {
         defaults.removePersistentDomain(forName: suiteName)
         body(defaults)
         defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    private static func checkFloatingOrbWindowPolicy(_ failures: inout [String]) {
+        let behavior = FloatingOrbWindowPolicy.collectionBehavior
+        if !behavior.contains(.canJoinAllSpaces)
+            || !behavior.contains(.fullScreenNone)
+            || !behavior.contains(.stationary)
+            || behavior.contains(.fullScreenAuxiliary) {
+            failures.append("the floating orb should join desktop Spaces without joining another app's full-screen Space")
+        }
     }
 
     private static func checkPauseScreenControls(_ failures: inout [String]) {
