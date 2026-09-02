@@ -156,6 +156,31 @@ Inspect the deterministic, privacy-safe startup diagnostic with:
 
 For the live app, choose **Copy diagnostics** from the menu bar and inspect the clipboard with `pbpaste`. Both reports contain only the effective cadence, selected body areas, coarse mode, the active-use status (`accumulating active use`, `waiting for active use`, `scheduled check-in`, `pending offer`, `settings open`, `routine in progress`, or `completion screen`), and the pending-offer presentation (`visible pause choices`, `collapsed pending orb`, or `no pending offer`). A pending offer means the store has crossed the active-use threshold and is waiting for a decision; it does not mean that the offer failed to happen. They never include key values, pointer coordinates, app content, agent data, analytics, or network state.
 
+### Full-screen Space behavior
+
+The end-user trigger for this rule is another app entering macOS full-screen,
+not an idle-timer or pause-state transition. The old visible symptom was the
+orb still covering that app's content because the panel was `.floating` and
+explicitly declared `.fullScreenAuxiliary`; that collection flag is AppKit's
+permission for an auxiliary window to accompany another app's full-screen
+window. Testing also showed that omitting that flag alone is insufficient:
+a floating `.canJoinAllSpaces` panel can still appear there. The orb now keeps
+`.canJoinAllSpaces` and `.stationary` for ordinary multi-desktop use, adds the
+explicit `.fullScreenNone` opt-out, and omits `.fullScreenAuxiliary`. AppKit
+therefore leaves it out of a foreign full-screen Space and restores it when
+that Space is exited, without changing its position, dragging, timing, pause
+behavior, or menu-bar fallback.
+
+This policy is delegated to AppKit because macOS does not provide a supported,
+deterministic API for an app to query which other process owns the active
+full-screen Space. The behavior-level test checks the actual `NSPanel`
+collection policy; CI cannot reliably automate Mission Control or a Netflix
+full-screen session. During development, a separate AppKit full-screen probe
+reproduced the distinction: the old auxiliary panel remained on-screen over
+the probe, a panel with only `.canJoinAllSpaces` also remained visible, and the
+otherwise identical panel with `.fullScreenNone` was absent from that Space
+while remaining available on an ordinary desktop Space.
+
 Exercise the release installer through its command-line interface with its
 network-free macOS command harness:
 
